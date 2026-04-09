@@ -1,0 +1,196 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface HealthyRecipe {
+  id: string;
+  titulo: string;
+  categoria: string;
+  ingredientes: string[];
+  preparacion: string[];
+  tiempo: string;
+  calorias_aprox: number;
+  fuente: string;
+  imagen_url?: string;
+}
+
+export const HEALTHY_RECIPES: HealthyRecipe[] = [
+  {
+    id: 'hr1',
+    titulo: 'Ensalada de Quinoa y Garbanzos',
+    categoria: 'Almuerzo',
+    ingredientes: [
+      '1 taza de quinoa cocida',
+      '1/2 taza de garbanzos cocidos',
+      'Pepino picado',
+      'Tomates cherry',
+      'Perejil fresco',
+      'Limón y aceite de oliva'
+    ],
+    preparacion: [
+      'Lava y cocina la quinoa según las instrucciones.',
+      'En un bol grande, mezcla la quinoa con los garbanzos.',
+      'Añade las verduras picadas.',
+      'Aliña con limón, aceite de oliva, sal y pimienta.'
+    ],
+    tiempo: '20 min',
+    calorias_aprox: 350,
+    fuente: 'COMPILADO RECETAS saludables.pdf',
+    imagen_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80'
+  },
+  {
+    id: 'hr2',
+    titulo: 'Pollo al Horno con Limón y Hierbas',
+    categoria: 'Cena',
+    ingredientes: [
+      '1 pechuga de pollo',
+      'Rodajas de limón',
+      'Romero y tomillo fresco',
+      'Ajo picado',
+      'Aceite de oliva'
+    ],
+    preparacion: [
+      'Precalienta el horno a 200°C.',
+      'Coloca el pollo en una bandeja para horno.',
+      'Añade el ajo, las hierbas y el limón encima.',
+      'Rocía con aceite de oliva y hornea por 25-30 min.'
+    ],
+    tiempo: '35 min',
+    calorias_aprox: 420,
+    fuente: 'COMPILADO RECETAS saludables.pdf',
+    imagen_url: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=800&q=80'
+  },
+  {
+    id: 'hr3',
+    titulo: 'Bowl de Avena y Frutos Rojos',
+    categoria: 'Desayuno',
+    ingredientes: ['1/2 taza de avena', '1 taza de leche vegetal', 'Arándanos', 'Fresas', 'Semillas de chía'],
+    preparacion: ['Cocinar la avena con la leche hasta que espese.', 'Servir en un bowl.', 'Añadir las frutas y las semillas por encima.'],
+    tiempo: '10 min',
+    calorias_aprox: 250,
+    fuente: 'Libro de Recetas Saludables Vol. 1',
+    imagen_url: 'https://picsum.photos/seed/oats/800/600'
+  },
+  {
+    id: 'hr4',
+    titulo: 'Tacos de Lechuga con Pavo',
+    categoria: 'Cena',
+    ingredientes: ['Hojas de lechuga romana', 'Pavo molido', 'Pimiento picado', 'Cebolla', 'Especias mexicanas'],
+    preparacion: ['Saltear el pavo con las verduras y especias.', 'Lavar las hojas de lechuga.', 'Rellenar las hojas con la mezcla de pavo.'],
+    tiempo: '15 min',
+    calorias_aprox: 210,
+    fuente: 'Recetas Fitness 2024',
+    imagen_url: 'https://picsum.photos/seed/tacos/800/600'
+  },
+  {
+    id: 'hr5',
+    titulo: 'Salmón al Horno con Espárragos',
+    categoria: 'Cena',
+    ingredientes: ['Filete de salmón', 'Manojo de espárragos trigueros', 'Aceite de oliva', 'Limón', 'Eneldo'],
+    preparacion: ['Colocar el salmón y los espárragos en una bandeja.', 'Aliñar con aceite, limón y eneldo.', 'Hornear a 180°C durante 15-20 minutos.'],
+    tiempo: '25 min',
+    calorias_aprox: 380,
+    fuente: 'Guía de Nutrición Deportiva',
+    imagen_url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&q=80'
+  },
+  {
+    id: 'hr6',
+    titulo: 'Tortilla de Espinacas y Champiñones',
+    categoria: 'Desayuno',
+    ingredientes: ['2 huevos', 'Puñado de espinacas frescas', '3 champiñones laminados', 'Sal y pimienta'],
+    preparacion: ['Saltear los champiñones y las espinacas.', 'Batir los huevos y verter sobre las verduras.', 'Cocinar a fuego medio hasta que cuaje.'],
+    tiempo: '10 min',
+    calorias_aprox: 180,
+    fuente: 'Recetas Rápidas y Saludables',
+    imagen_url: 'https://images.unsplash.com/photo-1510693206972-df098062cb71?w=800&q=80'
+  },
+  {
+    id: 'hr7',
+    titulo: 'Batido Verde Energético',
+    categoria: 'Snack',
+    ingredientes: ['1 manzana verde', '1/2 pepino', 'Puñado de espinacas', 'Zumo de 1/2 limón', 'Agua'],
+    preparacion: ['Trocear todos los ingredientes.', 'Batir en la licuadora hasta obtener una mezcla homogénea.', 'Servir frío.'],
+    tiempo: '5 min',
+    calorias_aprox: 120,
+    fuente: 'Detox y Salud',
+    imagen_url: 'https://images.unsplash.com/photo-1544145945-f904253d0c7b?w=800&q=80'
+  },
+  {
+    id: 'hr8',
+    titulo: 'Pasta Integral con Pesto de Albahaca',
+    categoria: 'Almuerzo',
+    ingredientes: ['80g pasta integral', 'Albahaca fresca', 'Piñones o nueces', 'Aceite de oliva', 'Queso parmesano opcional'],
+    preparacion: ['Cocer la pasta al dente.', 'Triturar la albahaca con los frutos secos y aceite.', 'Mezclar la pasta con el pesto recién hecho.'],
+    tiempo: '15 min',
+    calorias_aprox: 450,
+    fuente: 'Cocina Mediterránea',
+    imagen_url: 'https://images.unsplash.com/photo-1473093226795-af9932fe5856?w=800&q=80'
+  },
+  {
+    id: 'hr9',
+    titulo: 'Hummus de Remolacha con Crudités',
+    categoria: 'Snack',
+    ingredientes: ['1 bote de garbanzos cocidos', '1 remolacha cocida', 'Tahini', 'Limón', 'Zanahorias y apio'],
+    preparacion: ['Triturar los garbanzos con la remolacha, tahini y limón.', 'Cortar las verduras en bastones.', 'Servir el hummus con las verduras para dipear.'],
+    tiempo: '10 min',
+    calorias_aprox: 220,
+    fuente: 'Aperitivos Saludables',
+    imagen_url: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=800&q=80'
+  },
+  {
+    id: 'hr10',
+    titulo: 'Pechuga de Pavo con Verduras al Wok',
+    categoria: 'Almuerzo',
+    ingredientes: ['150g pechuga de pavo', 'Pimiento rojo y verde', 'Calabacín', 'Salsa de soja baja en sodio'],
+    preparacion: ['Cortar el pavo y las verduras en tiras.', 'Saltear en un wok con poco aceite.', 'Añadir un toque de salsa de soja al final.'],
+    tiempo: '20 min',
+    calorias_aprox: 310,
+    fuente: 'Cocina Ligera',
+    imagen_url: 'https://images.unsplash.com/photo-1512058560366-cd2427ff56f3?w=800&q=80'
+  },
+  {
+    id: 'hr11',
+    titulo: 'Chia Pudding con Mango',
+    categoria: 'Desayuno',
+    ingredientes: ['3 cdas semillas de chía', '200ml leche de coco', '1/2 mango maduro', 'Canela'],
+    preparacion: ['Mezclar la chía con la leche y dejar reposar toda la noche.', 'Añadir el mango troceado por encima.', 'Espolvorear canela.'],
+    tiempo: '5 min (+ reposo)',
+    calorias_aprox: 280,
+    fuente: 'Desayunos Fit',
+    imagen_url: 'https://images.unsplash.com/photo-1511690656952-34342bb7c2f2?w=800&q=80'
+  },
+  {
+    id: 'hr12',
+    titulo: 'Ensalada de Lentejas y Feta',
+    categoria: 'Almuerzo',
+    ingredientes: ['1 taza de lentejas cocidas', 'Queso feta desmenuzado', 'Tomate picado', 'Cebolla morada', 'Vinagreta de mostaza'],
+    preparacion: ['Mezclar las lentejas con las verduras picadas.', 'Añadir el queso feta.', 'Aliñar con la vinagreta de mostaza y miel.'],
+    tiempo: '10 min',
+    calorias_aprox: 340,
+    fuente: 'Legumbres Creativas',
+    imagen_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80'
+  },
+  {
+    id: 'hr13',
+    titulo: 'Brochetas de Pollo y Verduras',
+    categoria: 'Cena',
+    ingredientes: ['Dados de pechuga de pollo', 'Champiñones enteros', 'Cebolla', 'Pimiento', 'Pimentón dulce'],
+    preparacion: ['Montar las brochetas alternando pollo y verdura.', 'Sazonar con pimentón y sal.', 'Cocinar a la plancha o barbacoa.'],
+    tiempo: '20 min',
+    calorias_aprox: 290,
+    fuente: 'Cenas Proteicas',
+    imagen_url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&q=80'
+  },
+  {
+    id: 'hr14',
+    titulo: 'Sopa de Verduras Depurativa',
+    categoria: 'Cena',
+    ingredientes: ['Puerro', 'Apio', 'Zanahoria', 'Calabaza', 'Caldo de verduras natural'],
+    preparacion: ['Trocear todas las verduras.', 'Cocer en el caldo durante 20-25 minutos.', 'Se puede triturar para hacer crema.'],
+    tiempo: '30 min',
+    calorias_aprox: 150,
+    fuente: 'Recetas de Invierno',
+    imagen_url: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&q=80'
+  }
+];

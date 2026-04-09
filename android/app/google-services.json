@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "167463849607",
+    "project_id": "gpte007",
+    "storage_bucket": "gpte007.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:167463849607:android:e870020f220b420e757222",
+        "android_client_info": {
+          "package_name": "com.guantes.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "167463849607-hoe69v91apphptv4ifndnqcb3st2ajeq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.guantes.app",
+            "certificate_hash": "c6e58f2a6e91a38fe2fdc0e32c71643d918a7477"
+          }
+        },
+        {
+          "client_id": "167463849607-k4ddmb26mg14l9cotrldloshc66tm98q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1NgWqqyOLGG_gy8KC0jExXFr6gr4kWrs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "167463849607-k4ddmb26mg14l9cotrldloshc66tm98q.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

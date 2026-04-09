@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher'] ||
+         (request.auth.token.email == "guantesparaencajar@gmail.com" && request.auth.token.email_verified == true) ||
+         (request.auth.token.email == "hernandezkevin001998@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // ===============================================================
+    // Rules for Collections
+    // ===============================================================
+
+    // Usuarios
+    match /users/{uid} {
+      allow read, update: if isOwner(uid) || isAdmin();
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Entrenos / Videos de entrenamiento
+    match /workout_videos/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    match /workout_categories/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Clases y reservas
+    match /clases/{fecha}/reservas/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    match /bookings/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(request.resource.data.user_id) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Pagos
+    match /payments/{id} {
+      allow read: if isOwner(resource.data.user_id) || isAdmin();
+      allow create, update: if isOwner(request.resource.data.user_id) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Planes
+    match /planes/{id} {
+      allow read: if isAuthenticated();
+      allow write, delete: if isAdmin();
+    }
+
+    // Notificaciones
+    match /notifications/{id} {
+      allow read: if isOwner(resource.data.user_id) || resource.data.user_id == 'admin' || isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(resource.data.user_id) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Correos de la extensión Trigger Email
+    match /mail/{id} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Default rules for other collections
+    match /{path=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && !isAdmin() && request.method != 'delete';
+      allow write: if isAdmin();
+    }
+  }
+}
