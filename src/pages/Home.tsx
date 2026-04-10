@@ -1,10 +1,52 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { Heart, Flame, Trophy, Play, Dumbbell, Calendar, Utensils, Quote, Smile, Zap, Target, Activity, Star, AlertCircle, Droplets, RefreshCw, ChevronRight, Video, Upload, Trash2, Lock, CheckCircle2, Info, Clock, Plus, Users, Send } from 'lucide-react';
+import {
+  Heart,
+  Flame,
+  Trophy,
+  Play,
+  Dumbbell,
+  Calendar,
+  Utensils,
+  Quote,
+  Smile,
+  Zap,
+  Target,
+  Activity,
+  Star,
+  AlertCircle,
+  Droplets,
+  RefreshCw,
+  ChevronRight,
+  Video,
+  Upload,
+  Trash2,
+  Lock,
+  CheckCircle2,
+  Info,
+  Clock,
+  Plus,
+  Users,
+  Send,
+} from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { AssessmentModal } from '../components/AssessmentModal';
-import { doc, updateDoc, setDoc, collection, onSnapshot, query, orderBy, addDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import {
+  doc,
+  updateDoc,
+  setDoc,
+  collection,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+  addDoc,
+  deleteDoc,
+  getDocs,
+  limit,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { LazyVideoWrapper } from '../components/LazyVideoWrapper';
@@ -13,93 +55,97 @@ import { EvolvingAvatar } from '../components/EvolvingAvatar';
 import { uploadVideoToDrive } from '../lib/driveService';
 import { MonthChallenge } from '../components/MonthChallenge';
 
-
 const QUOTES = [
-  { text: "¿Cansado? Mi abuela entrena más duro y tiene 90 años. ¡Sigue!", emoji: "👵" },
-  { text: "El sudor es solo la grasa llorando. ¡Hazla sufrir!", emoji: "💧" },
-  { text: "Si fuera fácil, todos serían campeones. ¡MUEVE EL CULO!", emoji: "🥊" },
-  { text: "No viniste a modelar, viniste a encajar. ¡Mueve esas manos!", emoji: "👊" },
-  { text: "¿Un descanso? Claro, cuando estés muerto. Por ahora, ¡JAB-CROSS!", emoji: "💀" },
-  { text: "Tu sombra te está ganando el round. ¡Espabila!", emoji: "👻" },
-  { text: "¿Duele? Perfecto. El dolor te recuerda que sigues vivo. ¡Sigue!", emoji: "🔥" },
-  { text: "Si quieres descansar, ve al spa. Aquí se viene a sudar sangre.", emoji: "🩸" },
-  { text: "La técnica sin agresividad es solo baile. ¡Pega con alma!", emoji: "👹" },
-  { text: "No llores por el entrenamiento, llora por las pastas que te comiste anoche.", emoji: "🍝" }
+  { text: '¿Cansado? Mi abuela entrena más duro y tiene 90 años. ¡Sigue!', emoji: '👵' },
+  { text: 'El sudor es solo la grasa llorando. ¡Hazla sufrir!', emoji: '💧' },
+  { text: 'Si fuera fácil, todos serían campeones. ¡MUEVE EL CULO!', emoji: '🥊' },
+  { text: 'No viniste a modelar, viniste a encajar. ¡Mueve esas manos!', emoji: '👊' },
+  { text: '¿Un descanso? Claro, cuando estés muerto. Por ahora, ¡JAB-CROSS!', emoji: '💀' },
+  { text: 'Tu sombra te está ganando el round. ¡Espabila!', emoji: '👻' },
+  { text: '¿Duele? Perfecto. El dolor te recuerda que sigues vivo. ¡Sigue!', emoji: '🔥' },
+  { text: 'Si quieres descansar, ve al spa. Aquí se viene a sudar sangre.', emoji: '🩸' },
+  { text: 'La técnica sin agresividad es solo baile. ¡Pega con alma!', emoji: '👹' },
+  {
+    text: 'No llores por el entrenamiento, llora por las pastas que te comiste anoche.',
+    emoji: '🍝',
+  },
 ];
 
 const normalJokes = [
-  "¿Qué le dice un semáforo a otro? ¡No me mires que me estoy cambiando!",
-  "¿Por qué los pájaros no usan Facebook? Porque ya tienen Twitter.",
-  "¿Qué le dice una iguana a su hermana gemela? Somos iguanitas.",
-  "¿Qué hace una abeja en el gimnasio? ¡Zum-ba!",
-  "¿Cómo se dice pañuelo en japonés? Saka-moko.",
-  "¿Qué le dice un jaguar a otro jaguar? Jaguar you?",
-  "¿Por qué los osos panda no quieren casarse? Porque tienen ojeras.",
-  "¿Qué le dice un techo a otro? Te-echo de menos.",
-  "¿Cómo se llama el campeón de buceo japonés? Tokofondo.",
-  "¿Y el subcampeón? Kasitoko.",
-  "¿Qué le dice una pulga a otra? ¿Vamos a pie o esperamos al perro?",
-  "¿Por qué los esqueletos no pelean entre ellos? Porque no tienen agallas.",
-  "¿Qué hace un perro con un taladro? Ta-drando.",
-  "¿Cuál es el colmo de un zapatero? Que su mujer sea una zapatilla.",
-  "¿Qué le dice un pez a otro? Nada.",
-  "¿Por qué las focas miran siempre hacia arriba? ¡Porque ahí están los focos!",
-  "¿Qué le dice una impresora a otra? ¿Esa hoja es tuya o es una impresión mía?",
+  '¿Qué le dice un semáforo a otro? ¡No me mires que me estoy cambiando!',
+  '¿Por qué los pájaros no usan Facebook? Porque ya tienen Twitter.',
+  '¿Qué le dice una iguana a su hermana gemela? Somos iguanitas.',
+  '¿Qué hace una abeja en el gimnasio? ¡Zum-ba!',
+  '¿Cómo se dice pañuelo en japonés? Saka-moko.',
+  '¿Qué le dice un jaguar a otro jaguar? Jaguar you?',
+  '¿Por qué los osos panda no quieren casarse? Porque tienen ojeras.',
+  '¿Qué le dice un techo a otro? Te-echo de menos.',
+  '¿Cómo se llama el campeón de buceo japonés? Tokofondo.',
+  '¿Y el subcampeón? Kasitoko.',
+  '¿Qué le dice una pulga a otra? ¿Vamos a pie o esperamos al perro?',
+  '¿Por qué los esqueletos no pelean entre ellos? Porque no tienen agallas.',
+  '¿Qué hace un perro con un taladro? Ta-drando.',
+  '¿Cuál es el colmo de un zapatero? Que su mujer sea una zapatilla.',
+  '¿Qué le dice un pez a otro? Nada.',
+  '¿Por qué las focas miran siempre hacia arriba? ¡Porque ahí están los focos!',
+  '¿Qué le dice una impresora a otra? ¿Esa hoja es tuya o es una impresión mía?',
   "¿Cómo se dice 'estoy perdido' en chino? Chon-ta-ma-la.",
-  "¿Qué le dice una piedra a otra? La vida es dura.",
-  "¿Por qué los fantasmas son malos mentirosos? Porque se les ve el plumero.",
-  "¿Qué le dice un fideo a otro? ¡Oye, mi cuerpo pide salsa!",
-  "¿Por qué los tomates no toman café? Porque toman té-mate.",
-  "¿Qué hace un mudo bailando? ¡Muda-nza!",
+  '¿Qué le dice una piedra a otra? La vida es dura.',
+  '¿Por qué los fantasmas son malos mentirosos? Porque se les ve el plumero.',
+  '¿Qué le dice un fideo a otro? ¡Oye, mi cuerpo pide salsa!',
+  '¿Por qué los tomates no toman café? Porque toman té-mate.',
+  '¿Qué hace un mudo bailando? ¡Muda-nza!',
   "¿Cómo se dice 'perro' en chino? Chu-chu-ma-lo.",
-  "¿Qué le dice una taza a otra? ¿Qué taza-ciendo?",
-  "¿Por qué los elefantes no usan computadora? Porque le tienen miedo al mouse.",
-  "¿Qué hace un cocinero cuando está triste? ¡Llora-cebolla!",
+  '¿Qué le dice una taza a otra? ¿Qué taza-ciendo?',
+  '¿Por qué los elefantes no usan computadora? Porque le tienen miedo al mouse.',
+  '¿Qué hace un cocinero cuando está triste? ¡Llora-cebolla!',
   "¿Cómo se dice 'espejo' en chino? ¡Ay-soy-yo!",
-  "¿Qué le dice un cable a otro? ¡Somos intocables!",
-  "¿Por qué los libros de historia son tan pesados? Porque tienen mucho pasado."
+  '¿Qué le dice un cable a otro? ¡Somos intocables!',
+  '¿Por qué los libros de historia son tan pesados? Porque tienen mucho pasado.',
 ];
 
 const darkJokes: string[] = [
-  "¿Por qué los esqueletos no pelean entre ellos? Porque no tienen agallas.",
-  "Mi abuelo tiene el corazón de un león y una prohibición de por vida en el zoológico.",
-  "¿Por qué en África no juegan al póker? Porque hay demasiados leopardos.",
-  "¿Qué le dice un huérfano a otro huérfano? ¡Qué pasa, bro! (Mentira, no tienen hermanos)",
-  "¿Cómo sabes que un vampiro ha estado en la panadería? Porque falta el pan de muerto.",
-  "La paciencia es una virtud... que se pierde rápido en el tráfico.",
-  "Mi perro solía perseguir a las personas en bicicleta... hasta que le quité la bicicleta.",
-  "Tengo un chiste sobre el desempleo, pero no funciona.",
-  "Escribí un libro sobre poltergeists. Literalmente, desapareció de las estanterías.",
+  '¿Por qué los esqueletos no pelean entre ellos? Porque no tienen agallas.',
+  'Mi abuelo tiene el corazón de un león y una prohibición de por vida en el zoológico.',
+  '¿Por qué en África no juegan al póker? Porque hay demasiados leopardos.',
+  '¿Qué le dice un huérfano a otro huérfano? ¡Qué pasa, bro! (Mentira, no tienen hermanos)',
+  '¿Cómo sabes que un vampiro ha estado en la panadería? Porque falta el pan de muerto.',
+  'La paciencia es una virtud... que se pierde rápido en el tráfico.',
+  'Mi perro solía perseguir a las personas en bicicleta... hasta que le quité la bicicleta.',
+  'Tengo un chiste sobre el desempleo, pero no funciona.',
+  'Escribí un libro sobre poltergeists. Literalmente, desapareció de las estanterías.',
   "El psiquiatra me dijo que estaba loco. Le pedí una segunda opinión. Él dijo: 'También eres feo'.",
-  "Las donaciones de órganos son geniales, hasta que empiezan a preguntar de dónde los sacaste.",
-  "Llevo a mi suegra en el corazón... justo donde el médico le diagnosticó el infarto.",
-  "El chiste sobre la electricidad fue un cortocircuito.",
-  "Mi psicólogo me recomendó que le escribiera cartas a las personas que odio y luego las quemara. Ya lo hice, ¿pero qué hago con las cartas?",
-  "El médico me dio un año de vida. Así que le disparé y el juez me dio 15 años.",
-  "¿Cuál es el colmo de un electricista? Que su mujer se llame Luz y los hijos le salgan corrientes.",
+  'Las donaciones de órganos son geniales, hasta que empiezan a preguntar de dónde los sacaste.',
+  'Llevo a mi suegra en el corazón... justo donde el médico le diagnosticó el infarto.',
+  'El chiste sobre la electricidad fue un cortocircuito.',
+  'Mi psicólogo me recomendó que le escribiera cartas a las personas que odio y luego las quemara. Ya lo hice, ¿pero qué hago con las cartas?',
+  'El médico me dio un año de vida. Así que le disparé y el juez me dio 15 años.',
+  '¿Cuál es el colmo de un electricista? Que su mujer se llame Luz y los hijos le salgan corrientes.',
   "Quería ser donante de sangre, pero siempre hacen demasiadas preguntas. '¿De quién es esta sangre?' '¿Por qué está en un balde?'",
-  "¿Por qué el libro de matemáticas se suicidó? Porque tenía demasiados problemas.",
-  "Ojalá la muerte fuera de madera... para tocarla y que de buena suerte.",
-  "Si quieres que algo esté bien hecho... probablemente no deberías pedirme que lo haga."
+  '¿Por qué el libro de matemáticas se suicidó? Porque tenía demasiados problemas.',
+  'Ojalá la muerte fuera de madera... para tocarla y que de buena suerte.',
+  'Si quieres que algo esté bien hecho... probablemente no deberías pedirme que lo haga.',
 ];
-
 
 export function Home() {
   const user = useStore((state) => state.user);
   const navigate = useNavigate();
   const [dailyQuote, setDailyQuote] = useState({ text: '', emoji: '' });
-  const [dailyJokes, setDailyJokes] = useState<{normal: string, dark: string[]}>({ normal: '', dark: [] });
+  const [dailyJokes, setDailyJokes] = useState<{ normal: string; dark: string[] }>({
+    normal: '',
+    dark: [],
+  });
   const [showAssessment, setShowAssessment] = useState(false);
   const [dailyWorkout, setDailyWorkout] = useState<any>(null);
-  const [currentChallenge, setCurrentChallenge] = useState<{ 
-    id: string, 
-    url?: string, 
-    text?: string, 
-    title?: string,
-    categoria?: string,
-    dificultad?: string,
-    objetivo?: string,
-    createdAt?: any
+  const [currentChallenge, setCurrentChallenge] = useState<{
+    id: string;
+    url?: string;
+    text?: string;
+    title?: string;
+    categoria?: string;
+    dificultad?: string;
+    objetivo?: string;
+    createdAt?: any;
   } | null>(null);
   const [isChallengeCompleted, setIsChallengeCompleted] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -115,9 +161,11 @@ export function Home() {
     text: '',
     categoria: 'Boxeo',
     dificultad: 'intermedio',
-    objetivo: 'general'
+    objetivo: 'general',
   });
   const [allUsersCount, setAllUsersCount] = useState(0);
+  const [topUsers, setTopUsers] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
   const setUser = useStore((state) => state.setUser);
 
   const [alertModal, setAlertModal] = useState<{
@@ -129,7 +177,7 @@ export function Home() {
     isOpen: false,
     title: '',
     message: '',
-    type: 'info'
+    type: 'info',
   });
 
   const [confirmModal, setConfirmModal] = useState<{
@@ -141,10 +189,14 @@ export function Home() {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => {}
+    onConfirm: () => {},
   });
 
-  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'info' = 'info'
+  ) => {
     setAlertModal({ isOpen: true, title, message, type });
   };
 
@@ -153,6 +205,19 @@ export function Home() {
       navigate('/login');
       return;
     }
+
+    // Actualizar presencia
+    const updatePresence = async () => {
+      try {
+        await updateDoc(doc(db, 'users', String(user.id)), {
+          last_seen: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('Error presence update:', err);
+      }
+    };
+    updatePresence();
+    const presenceInterval = setInterval(updatePresence, 120000); // Cada 2 min
 
     // Fetch global settings
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
@@ -179,22 +244,35 @@ export function Home() {
           setShowAssessment(true);
         }
       }
-      // Si está completado pero no tiene fecha (legacy), no bloqueamos.
-
     };
 
     checkAssessment();
 
-    // Admin counts
+    // Admin counts & social listeners
     let unsubUsers: (() => void) | undefined;
     if (user?.role === 'admin' || user?.email === 'hernandezkevin001998@gmail.com') {
-      unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-        setAllUsersCount(snapshot.docs.length);
+      const qUsers = query(collection(db, 'users'));
+      unsubUsers = onSnapshot(qUsers, (snapshot) => {
+        const activeCount = snapshot.docs.filter((d) => d.data().isActive !== false).length;
+        setAllUsersCount(activeCount);
       });
     }
 
+    const qTop = query(collection(db, 'users'), orderBy('xp', 'desc'), limit(5));
+    const unsubscribeTop = onSnapshot(qTop, (snap) => {
+      setTopUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+
+    const qAct = query(collection(db, 'activity_feed'), orderBy('createdAt', 'desc'), limit(10));
+    const unsubscribeAct = onSnapshot(qAct, (snap) => {
+      setActivities(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
+      clearInterval(presenceInterval);
       unsubscribeSettings();
+      unsubscribeTop();
+      unsubscribeAct();
       if (unsubUsers) unsubUsers();
     };
   }, [user, navigate]);
@@ -202,15 +280,15 @@ export function Home() {
   const refreshJokesAndQuotes = () => {
     const randomDayIndex = Math.floor(Math.random() * 10000);
     setDailyQuote(QUOTES[randomDayIndex % QUOTES.length]);
-    
+
     const normalJoke = normalJokes[randomDayIndex % normalJokes.length];
     const darkJoke1 = darkJokes[randomDayIndex % darkJokes.length];
     const darkJoke2 = darkJokes[(randomDayIndex + 1) % darkJokes.length];
     const darkJoke3 = darkJokes[(randomDayIndex + 2) % darkJokes.length];
-    
+
     setDailyJokes({
       normal: normalJoke,
-      dark: [darkJoke1, darkJoke2, darkJoke3]
+      dark: [darkJoke1, darkJoke2, darkJoke3],
     });
   };
 
@@ -222,16 +300,16 @@ export function Home() {
     const dayIndex = Math.floor(shiftedTime.getTime() / (1000 * 60 * 60 * 24));
 
     setDailyQuote(QUOTES[dayIndex % QUOTES.length]);
-    
+
     // Select 1 normal joke and 3 dark jokes based on dayIndex
     const normalJoke = normalJokes[dayIndex % normalJokes.length];
     const darkJoke1 = darkJokes[dayIndex % darkJokes.length];
     const darkJoke2 = darkJokes[(dayIndex + 1) % darkJokes.length];
     const darkJoke3 = darkJokes[(dayIndex + 2) % darkJokes.length];
-    
+
     setDailyJokes({
       normal: normalJoke,
-      dark: [darkJoke1, darkJoke2, darkJoke3]
+      dark: [darkJoke1, darkJoke2, darkJoke3],
     });
 
     // Generate daily workout - only if relevant user data changed
@@ -244,7 +322,7 @@ export function Home() {
         ['Cuerpo Completo'],
         45
       );
-      
+
       // Only set if different from current daily workout to avoid re-render loops
       setDailyWorkout((prev: any) => {
         if (JSON.stringify(prev) === JSON.stringify(workout)) return prev;
@@ -255,26 +333,23 @@ export function Home() {
 
   useEffect(() => {
     if (!user) return;
-    
+
     // 1. Fetch the latest challenge for the user's goal
-    const qChallenge = query(
-      collection(db, 'challenges'), 
-      orderBy('createdAt', 'desc')
-    );
-    
+    const qChallenge = query(collection(db, 'challenges'), orderBy('createdAt', 'desc'));
+
     const unsubscribeChallenges = onSnapshot(qChallenge, async (snapshot) => {
-      const allChallenges = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      
+      const allChallenges = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as any);
+
       // Filter logic: match user.fitnessGoal or 'general'
       const userGoal = user.fitnessGoal || 'general';
-      const filtered = allChallenges.filter(c => 
-        c.objetivo === userGoal || c.objetivo === 'general' || !c.objetivo
+      const filtered = allChallenges.filter(
+        (c) => c.objetivo === userGoal || c.objetivo === 'general' || !c.objetivo
       );
-      
+
       if (filtered.length > 0) {
         const challenge = filtered[0];
         setCurrentChallenge(challenge);
-        
+
         // Check if completed today using the subcollection
         const todayStr = new Date().toISOString().split('T')[0];
         const recordRef = doc(db, 'challenge_completions', user.id, 'records', todayStr);
@@ -295,10 +370,10 @@ export function Home() {
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
     const currentCount = user.water_intake?.date === today ? user.water_intake.count : 0;
-    
+
     // If clicking the same glass that is the current max, decrease by 1 (unfill)
     // Otherwise, fill up to the clicked glass
-    const newCount = (index + 1 === currentCount) ? index : index + 1;
+    const newCount = index + 1 === currentCount ? index : index + 1;
 
     try {
       const userRef = doc(db, 'users', String(user.id));
@@ -310,11 +385,20 @@ export function Home() {
     }
   };
 
-  const waterCount = user?.water_intake?.date === new Date().toISOString().split('T')[0] ? user.water_intake.count : 0;
+  const waterCount =
+    user?.water_intake?.date === new Date().toISOString().split('T')[0]
+      ? user.water_intake.count
+      : 0;
 
-  const isSpecialUser = user?.email === 'hernandezkevin001998@gmail.com' || user?.role === 'admin' || user?.plan === 'premium';
-  const hasFullAccess = isSpecialUser || (user?.classes_per_month && user.classes_per_month >= 4) || (user?.plan_id && user.plan_id.includes('decisao'));
-  
+  const isSpecialUser =
+    user?.email === 'hernandezkevin001998@gmail.com' ||
+    user?.role === 'admin' ||
+    user?.plan === 'premium';
+  const hasFullAccess =
+    isSpecialUser ||
+    (user?.classes_per_month && user.classes_per_month >= 4) ||
+    (user?.plan_id && user.plan_id.includes('decisao'));
+
   const isNutritionUnlocked = isSpecialUser || appSettings.nutrition_unlocked || hasFullAccess;
   const isTechniqueUnlocked = isSpecialUser || appSettings.technique_unlocked || hasFullAccess;
   const isChallengeUnlocked = isSpecialUser || appSettings.challenge_unlocked || hasFullAccess;
@@ -339,7 +423,7 @@ export function Home() {
         (progress) => setUploadProgress(progress),
         { title: 'Reto del Día', type: 'challenge' }
       );
-      
+
       await addDoc(collection(db, 'challenges'), {
         url: downloadURL,
         title: 'Nuevo Reto de Video',
@@ -347,13 +431,17 @@ export function Home() {
         categoria: 'Boxeo',
         dificultad: 'intermedio',
         createdAt: new Date().toISOString(),
-        createdBy: user.id
+        createdBy: user.id,
       });
-      
+
       showAlert('Éxito', 'Video subido correctamente.', 'success');
     } catch (error: any) {
       console.error('Error uploading video:', error);
-      showAlert('Error', 'Error al subir el video: ' + (error.message || 'Error desconocido'), 'error');
+      showAlert(
+        'Error',
+        'Error al subir el video: ' + (error.message || 'Error desconocido'),
+        'error'
+      );
     } finally {
       setUploadProgress(null);
       if (e.target) e.target.value = '';
@@ -370,14 +458,20 @@ export function Home() {
       await addDoc(collection(db, 'challenges'), {
         ...challengeForm,
         createdAt: new Date().toISOString(),
-        createdBy: user.id
+        createdBy: user.id,
       });
       setShowChallengeModal(false);
-      setChallengeForm({ title: '', text: '', categoria: 'Boxeo', dificultad: 'intermedio', objetivo: 'general' });
-      showAlert('Éxito', 'Reto publicado correctamente.', 'success');
+      setChallengeForm({
+        title: '',
+        text: '',
+        categoria: 'Boxeo',
+        dificultad: 'intermedio',
+        objetivo: 'general',
+      });
+      alert('Éxito: Reto publicado correctamente.');
     } catch (error) {
       console.error('Error saving challenge:', error);
-      showAlert('Error', 'No se pudo guardar el reto.', 'error');
+      alert('Error: No se pudo guardar el reto.');
     }
   };
 
@@ -391,12 +485,12 @@ export function Home() {
         try {
           await deleteDoc(doc(db, 'challenges', currentChallenge.id));
           setCurrentChallenge(null);
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
         } catch (error) {
           console.error('Error deleting challenge:', error);
           showAlert('Error', 'No se pudo eliminar el reto.', 'error');
         }
-      }
+      },
     });
   };
 
@@ -407,56 +501,58 @@ export function Home() {
       <header className="flex items-center justify-between mb-8 sm:mb-12">
         <div className="flex items-center gap-3 sm:gap-5">
           <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/5">
-            <span className="text-xl sm:text-3xl font-bold text-primary">{user.name.charAt(0)}</span>
+            <span className="text-xl sm:text-3xl font-bold text-primary">
+              {user.name.charAt(0)}
+            </span>
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white truncate">Hola, {user.name}</h1>
+            <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white truncate">
+              Hola, {user.name}
+            </h1>
             {user.role === 'student' && (
-              <p className="text-[10px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 sm:mt-1 truncate">Nivel {user.license_level} • {user.goal}</p>
+              <p className="text-[10px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 sm:mt-1 truncate">
+                Nivel {user.license_level} • {user.goal}
+              </p>
             )}
             {user.role !== 'student' && (
-              <p className="text-[10px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 capitalize mt-0.5 sm:mt-1">{user.role}</p>
+              <p className="text-[10px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 capitalize mt-0.5 sm:mt-1">
+                {user.role}
+              </p>
             )}
           </div>
         </div>
 
-        {(user.role === 'admin' || user.email === 'hernandezkevin001998@gmail.com') && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-wrap gap-4 mb-10"
-          >
-            <div className="flex-1 min-w-[150px] glass-card p-6 rounded-[2rem] border border-primary/20 bg-primary/5 flex items-center gap-4 group hover:border-primary/40 transition-all">
-              <div className="flex flex-col items-center">
-                <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 mb-3">
-                  <Users className="w-6 h-6 text-emerald-500" />
-                </div>
-                <span className="text-2xl font-black text-white">{allUsersCount}</span>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Registrados</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
         {user.role === 'student' && (
           <div className="flex gap-1.5 sm:gap-3">
-            <div className="flex items-center gap-1 sm:gap-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm" title="Experiencia">
+            <div
+              className="flex items-center gap-1 sm:gap-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
+              title="Experiencia"
+            >
               <Star className="w-3 h-3 sm:w-4 sm:h-4 text-primary fill-primary" />
-              <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200">{user.xp || 0}</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200">
+                {user.xp || 0}
+              </span>
             </div>
             <div className="flex items-center gap-1 sm:gap-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
               <Heart className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 fill-red-500" />
-              <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200">{user.lives}</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200">
+                {user.lives}
+              </span>
             </div>
           </div>
         )}
       </header>
 
-      <section className="mb-16">
-        <MonthChallenge 
-          userId={user.id} 
-          onMotivationalQuote={(quote) => showAlert('¡Ánimo!', quote, 'info')}
-        />
-      </section>
+
+
+      {user.role === 'student' && (
+        <section className="mb-16">
+          <MonthChallenge
+            userId={user.id}
+            onMotivationalQuote={(quote) => showAlert('¡Ánimo!', quote, 'info')}
+          />
+        </section>
+      )}
 
       <section className={`mb-16 relative ${!isChallengeUnlocked ? 'opacity-60 grayscale' : ''}`}>
         {!isChallengeUnlocked && (
@@ -464,25 +560,34 @@ export function Home() {
             <Lock className="w-12 h-12 text-white/50" />
           </div>
         )}
-        <div className="glass-card p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] relative overflow-hidden">
+        <div className="glass-card p-5 sm:p-8 rounded-3xl sm:rounded-[2.5rem] relative overflow-hidden">
           <div className="flex items-center justify-between mb-6 sm:mb-8">
             <div className="flex items-center gap-3 sm:gap-5">
               <div className="p-3 sm:p-4 bg-orange-500/10 rounded-xl sm:rounded-2xl border border-orange-500/20">
                 <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
               </div>
               <div>
-                <h2 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Reto del Día</h2>
-                <p className="text-[10px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 sm:mt-1">¡Supera tus límites hoy!</p>
+                <h2 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  Reto del Día
+                </h2>
+                <p className="text-[10px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 sm:mt-1">
+                  ¡Supera tus límites hoy!
+                </p>
               </div>
             </div>
             {isSpecialUser && (
               <div className="flex gap-2">
                 <label className="cursor-pointer p-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2 text-xs font-bold">
                   <Upload className="w-4 h-4" /> Subir Video
-                  <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={handleVideoUpload}
+                  />
                 </label>
                 {currentChallenge && (
-                  <button 
+                  <button
                     onClick={handleDeleteChallenge}
                     className="p-2.5 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-colors border border-red-500/20"
                   >
@@ -500,8 +605,8 @@ export function Home() {
                 <span>{Math.round(uploadProgress)}%</span>
               </div>
               <div className="w-full bg-slate-700 rounded-full h-1.5">
-                <div 
-                  className="bg-primary h-1.5 rounded-full transition-all duration-300" 
+                <div
+                  className="bg-primary h-1.5 rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -519,32 +624,39 @@ export function Home() {
               )}
               {currentChallenge.url ? (
                 <div className="aspect-video rounded-lg overflow-hidden bg-black relative shadow-2xl">
-                  <LazyVideoWrapper 
-                    src={currentChallenge.url} 
-                    controls 
+                  <LazyVideoWrapper
+                    src={currentChallenge.url}
+                    controls
                     className="w-full h-full object-contain"
                   />
                 </div>
               ) : (
                 <div className="p-5 sm:p-8 bg-slate-900/40 rounded-2xl sm:rounded-3xl border border-slate-800 shadow-inner">
                   <h4 className="text-base sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2 sm:gap-3">
-                    <Target className="w-5 h-5 sm:w-6 sm:h-6 text-primary" /> {currentChallenge.title || 'Misión del Día'}
+                    <Target className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />{' '}
+                    {currentChallenge.title || 'Misión del Día'}
                   </h4>
-                  <p className="text-slate-300 text-sm sm:text-lg leading-relaxed whitespace-pre-wrap">{currentChallenge.text}</p>
+                  <p className="text-slate-300 text-sm sm:text-lg leading-relaxed whitespace-pre-wrap">
+                    {currentChallenge.text}
+                  </p>
                 </div>
               )}
 
               <div className="flex flex-wrap gap-3">
                 {currentChallenge.categoria && (
-                  <span className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-black uppercase tracking-widest">{currentChallenge.categoria}</span>
+                  <span className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-black uppercase tracking-widest">
+                    {currentChallenge.categoria}
+                  </span>
                 )}
                 {currentChallenge.dificultad && (
-                  <span className="px-4 py-2 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-black uppercase tracking-widest">{currentChallenge.dificultad}</span>
+                  <span className="px-4 py-2 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-black uppercase tracking-widest">
+                    {currentChallenge.dificultad}
+                  </span>
                 )}
               </div>
 
               {!isChallengeCompleted ? (
-                <button 
+                <button
                   onClick={async () => {
                     try {
                       setIsChallengeCompleted(true);
@@ -552,13 +664,31 @@ export function Home() {
                       await setDoc(doc(db, 'challenge_completions', user.id, 'records', today), {
                         challengeId: currentChallenge.id,
                         completedAt: new Date().toISOString(),
-                        userId: user.id
+                        userId: user.id,
                       });
-                      showAlert('¡Felicidades!', 'Has completado el reto de hoy. ¡Sigue así!', 'success');
+
+                      // Log to Activity Feed
+                      await addDoc(collection(db, 'activity_feed'), {
+                        type: 'challenge_completion',
+                        userId: user.id,
+                        userName: user.name,
+                        message: '¡ha completado el reto del día!',
+                        createdAt: serverTimestamp(),
+                      });
+
+                      showAlert(
+                        '¡Felicidades!',
+                        'Has completado el reto de hoy. ¡Sigue así!',
+                        'success'
+                      );
                     } catch (error) {
                       console.error('Error completing challenge:', error);
                       setIsChallengeCompleted(false);
-                      showAlert('Error', 'No se pudo registrar como completado. Inténtalo de nuevo.', 'error');
+                      showAlert(
+                        'Error',
+                        'No se pudo registrar como completado. Inténtalo de nuevo.',
+                        'error'
+                      );
                     }
                   }}
                   className="w-full bg-primary text-white font-black py-4 sm:py-5 rounded-2xl sm:rounded-3xl uppercase text-xs sm:text-base tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 sm:gap-3"
@@ -584,29 +714,43 @@ export function Home() {
         <section className="mb-16">
           <div className="glass-card p-8 rounded-[2.5rem]">
             <div className="flex flex-col md:flex-row gap-8 items-center">
-              <div className="flex-shrink-0">
-                <EvolvingAvatar 
+              <div className="shrink-0">
+                <EvolvingAvatar
                   gender={user.gender || 'male'}
-                  level={((user.classes_per_month || 0) >= 4) ? 
-                    ((user.lives || 0) <= 1 ? 'thin' : (user.streak || 0) >= 5 ? 'strong' : 'normal') : 
-                    'normal'
-                  } 
+                  level={
+                    (user.classes_per_month || 0) >= 4
+                      ? (user.lives || 0) <= 1
+                        ? 'thin'
+                        : (user.streak || 0) >= 5
+                          ? 'strong'
+                          : 'normal'
+                      : 'normal'
+                  }
                 />
               </div>
               <div className="flex-1 w-full">
                 <div className="flex justify-between items-end mb-6">
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.25em] text-primary mb-3">Progreso de Licencia</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Nivel {user.license_level}</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.25em] text-primary mb-3">
+                      Progreso de Licencia
+                    </p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+                      Nivel {user.license_level}
+                    </p>
                   </div>
                   <div className="p-4 bg-yellow-500/10 rounded-2xl border border-yellow-500/20">
                     <Trophy className="w-9 h-9 text-yellow-500" />
                   </div>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-800/50 h-5 rounded-full overflow-hidden mb-4 border border-slate-200 dark:border-slate-700/50">
-                  <div className="bg-primary h-full shadow-[0_0_20px_rgba(0,119,255,0.5)] transition-all duration-1000" style={{ width: '35%' }}></div>
+                  <div
+                    className="bg-primary h-full shadow-[0_0_20px_rgba(0,119,255,0.5)] transition-all duration-1000"
+                    style={{ width: '35%' }}
+                  ></div>
                 </div>
-                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">35% para el siguiente nivel</p>
+                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                  35% para el siguiente nivel
+                </p>
               </div>
             </div>
           </div>
@@ -619,38 +763,42 @@ export function Home() {
         </div>
         Hidratación Diaria
       </h2>
-      <div className="glass-card p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] mb-12 sm:mb-16 relative overflow-hidden group">
+      <div className="glass-card p-6 sm:p-10 rounded-4xl sm:rounded-[3rem] mb-12 sm:mb-16 relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-blue-500/5 rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-110"></div>
-        
+
         <div className="flex flex-col md:flex-row items-center gap-8 sm:gap-12 relative z-10">
           {/* Character Visual */}
           <div className="relative">
-            <motion.div 
-              animate={{ 
+            <motion.div
+              animate={{
                 y: [0, -10, 0],
-                scale: waterCount >= 7 ? [1, 1.08, 1] : 1
+                scale: waterCount >= 7 ? [1, 1.08, 1] : 1,
               }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="w-28 h-28 sm:w-40 sm:h-40 bg-blue-500/10 rounded-[2rem] sm:rounded-[3rem] flex items-center justify-center border border-blue-500/20 relative overflow-hidden shadow-inner"
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-28 h-28 sm:w-40 sm:h-40 bg-blue-500/10 rounded-4xl sm:rounded-[3rem] flex items-center justify-center border border-blue-500/20 relative overflow-hidden shadow-inner"
             >
               <span className="text-5xl sm:text-7xl z-10">
-                {waterCount === 0 ? "😫" : 
-                 waterCount < 3 ? "😐" :
-                 waterCount < 5 ? "😊" :
-                 waterCount < 7 ? "😎" :
-                 "🤩"}
+                {waterCount === 0
+                  ? '😫'
+                  : waterCount < 3
+                    ? '😐'
+                    : waterCount < 5
+                      ? '😊'
+                      : waterCount < 7
+                        ? '😎'
+                        : '🤩'}
               </span>
-              
+
               {/* Water level inside character circle */}
-              <motion.div 
+              <motion.div
                 initial={{ height: 0 }}
                 animate={{ height: `${(waterCount / 7) * 100}%` }}
                 className="absolute bottom-0 left-0 right-0 bg-blue-500/25 transition-all duration-1000 ease-out"
               />
             </motion.div>
-            
+
             {waterCount >= 7 && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0, rotate: -20 }}
                 animate={{ opacity: 1, scale: 1, rotate: 0 }}
                 className="absolute -top-4 -right-4 bg-yellow-500 text-white p-3 rounded-2xl shadow-2xl shadow-yellow-500/40 border-2 border-white dark:border-slate-900"
@@ -663,17 +811,22 @@ export function Home() {
           <div className="flex-1 text-center md:text-left">
             <div className="mb-6 sm:mb-10">
               <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2 sm:mb-3 leading-tight tracking-tight">
-                {waterCount === 0 ? "¡Tengo muchísima sed! 🌵" : 
-                 waterCount < 3 ? "Un poco mejor, ¡más agua! 💧" :
-                 waterCount < 5 ? "¡Me siento hidratado! ✨" :
-                 waterCount < 7 ? "¡Casi al 100%! 🚀" :
-                 "¡Nivel de hidratación ÓPTIMO! 🏆"}
+                {waterCount === 0
+                  ? '¡Tengo muchísima sed! 🌵'
+                  : waterCount < 3
+                    ? 'Un poco mejor, ¡más agua! 💧'
+                    : waterCount < 5
+                      ? '¡Me siento hidratado! ✨'
+                      : waterCount < 7
+                        ? '¡Casi al 100%! 🚀'
+                        : '¡Nivel de hidratación ÓPTIMO! 🏆'}
               </h3>
               <p className="text-base sm:text-lg text-slate-500 dark:text-slate-400 font-medium">
-                Has bebido <span className="text-blue-500 font-bold">{waterCount}</span> de <span className="text-slate-900 dark:text-white font-bold">7</span> vasos hoy.
+                Has bebido <span className="text-blue-500 font-bold">{waterCount}</span> de{' '}
+                <span className="text-slate-900 dark:text-white font-bold">7</span> vasos hoy.
               </p>
             </div>
- 
+
             <div className="flex flex-wrap justify-center md:justify-start gap-3 sm:gap-5">
               {[...Array(7)].map((_, i) => (
                 <motion.button
@@ -681,30 +834,30 @@ export function Home() {
                   whileHover={{ scale: 1.15, y: -6 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={() => handleWaterClick(i)}
-                  className={`relative w-11 h-16 sm:w-14 sm:h-20 rounded-b-[1.2rem] sm:rounded-b-[1.5rem] border-2 transition-all duration-500 ${
-                    i < waterCount 
-                      ? 'bg-blue-500/20 border-blue-400 shadow-xl shadow-blue-500/15' 
+                  className={`relative w-11 h-16 sm:w-14 sm:h-20 rounded-b-[1.2rem] sm:rounded-b-3xl border-2 transition-all duration-500 ${
+                    i < waterCount
+                      ? 'bg-blue-500/20 border-blue-400 shadow-xl shadow-blue-500/15'
                       : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700 hover:border-blue-300'
                   }`}
                 >
                   {/* Glass reflection */}
                   <div className="absolute top-1.5 left-1.5 w-1.5 h-6 bg-white/20 rounded-full" />
-                  
+
                   {/* Water filling animation */}
                   <AnimatePresence>
                     {i < waterCount && (
-                      <motion.div 
+                      <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: '100%', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-blue-500/40 to-blue-300/30 rounded-b-[14px]"
+                        className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-blue-500/40 to-blue-300/30 rounded-b-[14px]"
                       />
                     )}
                   </AnimatePresence>
 
                   {/* Bubbles animation when full */}
                   {i < waterCount && (
-                    <motion.div 
+                    <motion.div
                       animate={{ y: [-5, -20], opacity: [0, 1, 0] }}
                       transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
                       className="absolute bottom-3 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/30 rounded-full"
@@ -718,9 +871,9 @@ export function Home() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-12 sm:mb-16">
-        <button 
+        <button
           onClick={() => isWorkoutsUnlocked && navigate('/workouts')}
-          className={`relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] transition-all text-left group min-h-[200px] sm:min-h-[240px] ${!isWorkoutsUnlocked ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:border-red-500/40 hover:shadow-xl hover:shadow-red-500/5'}`}
+          className={`relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card-premium p-6 sm:p-10 rounded-4xl transition-all text-left group min-h-[200px] sm:min-h-[240px] ${!isWorkoutsUnlocked ? 'opacity-60 grayscale cursor-not-allowed' : 'neon-border-red hover:shadow-2xl hover:shadow-red-500/10'}`}
         >
           {!isWorkoutsUnlocked && (
             <div className="absolute inset-0 bg-slate-950/20 z-20 flex items-center justify-center backdrop-blur-[2px]">
@@ -731,17 +884,23 @@ export function Home() {
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
               <Dumbbell className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
-            <span className="bg-red-500/10 text-red-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-red-500/20">Rutinas</span>
+            <span className="bg-red-500/10 text-red-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-red-500/20">
+              Rutinas
+            </span>
           </div>
           <div className="relative z-10">
-            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-red-500 transition-colors uppercase tracking-tight leading-none">Entrenamientos</h3>
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">{isWorkoutsUnlocked ? 'Rutinas personalizadas.' : 'Sección Bloqueada'}</p>
+            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-red-500 transition-colors uppercase tracking-tight leading-none">
+              Entrenamientos
+            </h3>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">
+              {isWorkoutsUnlocked ? 'Rutinas personalizadas.' : 'Sección Bloqueada'}
+            </p>
           </div>
         </button>
 
-        <button 
+        <button
           onClick={() => isTechniqueUnlocked && navigate('/saberes')}
-          className={`relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] transition-all text-left group min-h-[200px] sm:min-h-[240px] ${!isTechniqueUnlocked ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5'}`}
+          className={`relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card-premium p-6 sm:p-10 rounded-4xl transition-all text-left group min-h-[200px] sm:min-h-[240px] ${!isTechniqueUnlocked ? 'opacity-60 grayscale cursor-not-allowed' : 'neon-border-red hover:shadow-2xl hover:shadow-primary/10'}`}
         >
           {!isTechniqueUnlocked && (
             <div className="absolute inset-0 bg-slate-950/20 z-20 flex items-center justify-center backdrop-blur-[2px]">
@@ -752,31 +911,46 @@ export function Home() {
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
               <Target className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
-            <span className="bg-primary/10 text-primary text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-primary/20">Técnica</span>
+            <span className="bg-primary/10 text-primary text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-primary/20">
+              Técnica
+            </span>
           </div>
           <div className="relative z-10">
-            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white uppercase tracking-tight leading-none group-hover:text-primary transition-colors">Aprender Boxeo</h3>
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">{isTechniqueUnlocked ? 'Domina los fundamentos del boxeo.' : 'Sección Bloqueada'}</p>
+            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white uppercase tracking-tight leading-none group-hover:text-primary transition-colors">
+              Aprender Boxeo
+            </h3>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">
+              {isTechniqueUnlocked ? 'Domina los fundamentos del boxeo.' : 'Sección Bloqueada'}
+            </p>
           </div>
         </button>
 
-        <button onClick={() => navigate('/calendar')} className="relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] hover:border-purple-500/40 transition-all text-left group min-h-[200px] sm:min-h-[240px] hover:shadow-xl hover:shadow-purple-500/5">
+        <button
+          onClick={() => navigate('/calendar')}
+          className="relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-4xl sm:rounded-[2.5rem] hover:border-purple-500/40 transition-all text-left group min-h-[200px] sm:min-h-[240px] hover:shadow-xl hover:shadow-purple-500/5"
+        >
           <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-purple-500/5 rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-110"></div>
           <div className="flex items-center justify-between relative z-10">
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 border border-purple-500/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
               <Calendar className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
-            <span className="bg-purple-500/10 text-purple-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-purple-500/20">Presencial</span>
+            <span className="bg-purple-500/10 text-purple-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-purple-500/20">
+              Presencial
+            </span>
           </div>
           <div className="relative z-10">
-            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-purple-500 transition-colors uppercase tracking-tight leading-none">Reservar Clase</h3>
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">Agenda tu sesión con el profesor.</p>
+            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-purple-500 transition-colors uppercase tracking-tight leading-none">
+              Reservar Clase
+            </h3>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">
+              Agenda tu sesión con el profesor.
+            </p>
           </div>
         </button>
 
-        <button 
+        <button
           onClick={() => isNutritionUnlocked && navigate('/meals')}
-          className={`relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] transition-all text-left group min-h-[200px] sm:min-h-[240px] ${!isNutritionUnlocked ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:border-orange-500/40 hover:shadow-xl hover:shadow-orange-500/5'}`}
+          className={`relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-4xl sm:rounded-[2.5rem] transition-all text-left group min-h-[200px] sm:min-h-[240px] ${!isNutritionUnlocked ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:border-orange-500/40 hover:shadow-xl hover:shadow-orange-500/5'}`}
         >
           {!isNutritionUnlocked && (
             <div className="absolute inset-0 bg-slate-950/20 z-20 flex items-center justify-center backdrop-blur-[2px]">
@@ -787,49 +961,71 @@ export function Home() {
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
               <Utensils className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
-            <span className="bg-orange-500/10 text-orange-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-orange-500/20">Nutrición</span>
+            <span className="bg-orange-500/10 text-orange-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-orange-500/20">
+              Comidas Saludables
+            </span>
           </div>
           <div className="relative z-10">
-            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-orange-500 transition-colors uppercase tracking-tight leading-none">Alimentación</h3>
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">{isNutritionUnlocked ? 'Recetas y planes de alimentación.' : 'Sección Bloqueada'}</p>
+            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-orange-500 transition-colors uppercase tracking-tight leading-none">
+              Alimentación
+            </h3>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">
+              {isNutritionUnlocked ? 'Recetas y planes de alimentación.' : 'Sección Bloqueada'}
+            </p>
           </div>
         </button>
 
-        <button 
+        <button
           onClick={() => navigate('/timer')}
-          className="relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] hover:border-emerald-500/40 transition-all text-left group min-h-[200px] sm:min-h-[240px] hover:shadow-xl hover:shadow-emerald-500/5"
+          className="relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-4xl sm:rounded-[2.5rem] hover:border-emerald-500/40 transition-all text-left group min-h-[200px] sm:min-h-[240px] hover:shadow-xl hover:shadow-emerald-500/5"
         >
           <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-emerald-500/5 rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-110"></div>
           <div className="flex items-center justify-between relative z-10">
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
               <Clock className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
-            <span className="bg-emerald-500/10 text-emerald-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-emerald-500/20">Herramienta</span>
+            <span className="bg-emerald-500/10 text-emerald-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-emerald-500/20">
+              Herramienta
+            </span>
           </div>
           <div className="relative z-10">
-            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors uppercase tracking-tight leading-none">Temporizador</h3>
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">Cronómetro de asaltos, preparación y descanso.</p>
+            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors uppercase tracking-tight leading-none">
+              Temporizador
+            </h3>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">
+              Cronómetro de asaltos, preparación y descanso.
+            </p>
           </div>
         </button>
 
-        <button onClick={() => navigate('/plans')} className="relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] hover:border-blue-400/40 transition-all text-left group md:col-span-2 shadow-xl shadow-black/5 hover:shadow-blue-400/5">
-          <div className="absolute top-0 right-0 w-64 h-64 sm:w-80 sm:h-80 bg-blue-400/5 rounded-full -mr-32 -mt-32 sm:-mr-40 sm:-mt-40 transition-transform group-hover:scale-110"></div>
+        <button
+          onClick={() => navigate('/plans')}
+          className="relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card-premium p-6 sm:p-10 rounded-4xl transition-all text-left group md:col-span-2 shadow-xl border border-primary/20 neon-glow-blue"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 sm:w-80 sm:h-80 bg-primary/5 rounded-full -mr-32 -mt-32 sm:-mr-40 sm:-mt-40 transition-transform group-hover:scale-110" />
           <div className="flex items-center justify-between relative z-10">
-            <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-blue-400/10 flex items-center justify-center text-blue-400 border border-blue-400/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
+            <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
               <Star className="w-8 h-8 sm:w-9 sm:h-9" />
             </div>
-            <span className="bg-blue-400/10 text-blue-400 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-blue-400/20">Membresía</span>
+            <span className="bg-primary/10 text-primary text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-primary/20">
+              Membresía Premium
+            </span>
           </div>
           <div className="relative z-10">
-            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-blue-400 transition-colors uppercase tracking-tight leading-none">Planes y Precios</h3>
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">Conoce nuestras tarifas y reserva tu clase.</p>
+            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-primary transition-colors uppercase tracking-tight leading-none">
+              Planes y Precios
+            </h3>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">
+              Conoce nuestras tarifas y reserva tu clase personal.
+            </p>
           </div>
         </button>
       </div>
 
+
       <div className="flex flex-col gap-6">
-        <div className="flex justify-end mb-[-1.5rem] relative z-20">
-          <button 
+        <div className="flex justify-end -mb-6 relative z-20">
+          <button
             onClick={refreshJokesAndQuotes}
             className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 px-4 py-2 rounded-2xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-700 shadow-lg"
             title="Mostrar otra frase y chistes"
@@ -839,10 +1035,12 @@ export function Home() {
           </button>
         </div>
 
-        <div className="bg-gradient-to-br from-slate-900 to-slate-950 p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] border border-slate-800 relative overflow-hidden shadow-2xl">
+        <div className="bg-linear-to-br from-slate-900 to-slate-950 p-6 sm:p-10 rounded-4xl sm:rounded-[2.5rem] border border-slate-800 relative overflow-hidden shadow-2xl">
           <Quote className="absolute top-8 right-8 w-12 h-12 sm:w-20 sm:h-20 text-white/5 rotate-180" />
           <h3 className="text-primary font-black text-[10px] sm:text-[11px] uppercase tracking-[0.25em] mb-6 sm:mb-8 flex items-center gap-3 sm:gap-4">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg sm:rounded-xl flex items-center justify-center text-xl sm:text-2xl border border-primary/20">{dailyQuote.emoji}</div>
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg sm:rounded-xl flex items-center justify-center text-xl sm:text-2xl border border-primary/20">
+              {dailyQuote.emoji}
+            </div>
             Frase del Día
           </h3>
           <p className="text-xl sm:text-2xl font-medium italic text-slate-100 relative z-10 leading-relaxed tracking-tight">
@@ -850,18 +1048,22 @@ export function Home() {
           </p>
         </div>
 
-        <div className="glass-card p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] mb-12">
+        <div className="glass-card p-6 sm:p-10 rounded-4xl sm:rounded-[2.5rem] mb-12">
           <h3 className="flex items-center gap-3 sm:gap-4 font-black text-xl sm:text-2xl mb-8 sm:mb-10 text-slate-900 dark:text-white uppercase tracking-tight">
             <div className="p-2.5 sm:p-3 bg-yellow-500/10 rounded-xl sm:rounded-2xl border border-yellow-500/20">
               <Smile className="w-6 h-6 sm:w-7 sm:h-7 text-yellow-500" />
             </div>
             Rincón del Humor
           </h3>
-          
+
           <div className="space-y-6 sm:space-y-8">
             <div className="bg-white/40 dark:bg-slate-800/40 p-6 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-inner">
-              <span className="text-[10px] sm:text-[11px] font-black text-emerald-500 uppercase tracking-[0.25em] mb-3 sm:mb-4 block">Humor Familiar 😄</span>
-              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-medium">{dailyJokes.normal}</p>
+              <span className="text-[10px] sm:text-[11px] font-black text-emerald-500 uppercase tracking-[0.25em] mb-3 sm:mb-4 block">
+                Humor Familiar 😄
+              </span>
+              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                {dailyJokes.normal}
+              </p>
             </div>
 
             {dailyJokes.dark.length > 0 && (
@@ -874,8 +1076,12 @@ export function Home() {
                 <div className="space-y-4 sm:space-y-6 relative z-10">
                   {dailyJokes.dark.map((joke, idx) => (
                     <div key={idx} className="flex gap-3 sm:gap-4 items-start">
-                      <span className="text-purple-500/50 font-black text-lg sm:text-xl">{idx + 1}.</span>
-                      <p className="text-sm sm:text-base text-slate-400 leading-relaxed font-medium">{joke}</p>
+                      <span className="text-purple-500/50 font-black text-lg sm:text-xl">
+                        {idx + 1}.
+                      </span>
+                      <p className="text-sm sm:text-base text-slate-400 leading-relaxed font-medium">
+                        {joke}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -885,7 +1091,6 @@ export function Home() {
         </div>
       </div>
 
-
       {/* Alert Modal */}
       <Modal
         isOpen={alertModal.isOpen}
@@ -893,7 +1098,9 @@ export function Home() {
         title={alertModal.title}
       >
         <div className="flex flex-col items-center text-center p-4">
-          {alertModal.type === 'success' && <CheckCircle2 className="w-16 h-16 text-emerald-500 mb-4" />}
+          {alertModal.type === 'success' && (
+            <CheckCircle2 className="w-16 h-16 text-emerald-500 mb-4" />
+          )}
           {alertModal.type === 'error' && <AlertCircle className="w-16 h-16 text-red-500 mb-4" />}
           {alertModal.type === 'info' && <Info className="w-16 h-16 text-blue-500 mb-4" />}
           <p className="text-slate-300">{alertModal.message}</p>
@@ -948,16 +1155,19 @@ export function Home() {
             </h4>
             <div className="bg-slate-50 dark:bg-slate-900/50 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center gap-4 transition-all hover:border-primary/50">
               <Upload className="w-10 h-10 text-slate-300" />
-              <input 
-                type="file" 
-                accept="video/*" 
+              <input
+                type="file"
+                accept="video/*"
                 onChange={handleVideoUpload}
                 disabled={uploadProgress !== null}
                 className="text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer w-full"
               />
               {uploadProgress !== null && (
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-2">
-                  <div className="bg-primary h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                  <div
+                    className="bg-primary h-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
                 </div>
               )}
             </div>
@@ -968,7 +1178,9 @@ export function Home() {
               <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-slate-900 px-4 text-slate-500 font-bold tracking-widest">Ó</span>
+              <span className="bg-white dark:bg-slate-900 px-4 text-slate-500 font-bold tracking-widest">
+                Ó
+              </span>
             </div>
           </div>
 
@@ -977,34 +1189,42 @@ export function Home() {
             <h4 className="text-xs font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
               <Quote className="w-4 h-4" /> Opción B: Texto e Instrucciones
             </h4>
-            
+
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Título del Reto</label>
-              <input 
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                Título del Reto
+              </label>
+              <input
                 type="text"
                 placeholder="Ej: 500 Golpes de Saco"
                 value={challengeForm.title}
-                onChange={e => setChallengeForm({...challengeForm, title: e.target.value})}
+                onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })}
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white outline-none focus:border-primary transition-all"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descripción / Instrucciones</label>
-              <textarea 
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                Descripción / Instrucciones
+              </label>
+              <textarea
                 placeholder="Describe qué deben hacer los alumnos..."
                 value={challengeForm.text}
-                onChange={e => setChallengeForm({...challengeForm, text: e.target.value})}
+                onChange={(e) => setChallengeForm({ ...challengeForm, text: e.target.value })}
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white outline-none focus:border-primary h-32 resize-none transition-all"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoría</label>
-                <select 
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                  Categoría
+                </label>
+                <select
                   value={challengeForm.categoria}
-                  onChange={e => setChallengeForm({...challengeForm, categoria: e.target.value})}
+                  onChange={(e) =>
+                    setChallengeForm({ ...challengeForm, categoria: e.target.value })
+                  }
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white outline-none focus:border-primary appearance-none"
                 >
                   <option value="Boxeo">Boxeo</option>
@@ -1014,10 +1234,14 @@ export function Home() {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dificultad</label>
-                <select 
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                  Dificultad
+                </label>
+                <select
                   value={challengeForm.dificultad}
-                  onChange={e => setChallengeForm({...challengeForm, dificultad: e.target.value})}
+                  onChange={(e) =>
+                    setChallengeForm({ ...challengeForm, dificultad: e.target.value })
+                  }
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white outline-none focus:border-primary appearance-none"
                 >
                   <option value="principiante">Principiante</option>
@@ -1029,10 +1253,12 @@ export function Home() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Objetivo Fitness (Asignación)</label>
-              <select 
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                Objetivo Fitness (Asignación)
+              </label>
+              <select
                 value={challengeForm.objetivo}
-                onChange={e => setChallengeForm({...challengeForm, objetivo: e.target.value})}
+                onChange={(e) => setChallengeForm({ ...challengeForm, objetivo: e.target.value })}
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white outline-none focus:border-primary appearance-none"
               >
                 <option value="general">Cualquier Objetivo (General)</option>
@@ -1042,7 +1268,7 @@ export function Home() {
               </select>
             </div>
 
-            <button 
+            <button
               type="submit"
               className="w-full bg-emerald-500 text-white font-black py-5 rounded-3xl uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 hover:scale-[1.01] transition-all mt-4"
             >

@@ -34,7 +34,7 @@ export function BoxingGlossary() {
 
   return (
     <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden mb-6 shadow-xl">
-      <button 
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 transition-colors"
       >
@@ -44,14 +44,23 @@ export function BoxingGlossary() {
           </div>
           <h3 className="font-bold text-lg">Glosario de Boxeo</h3>
         </div>
-        {isOpen ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+        {isOpen ? (
+          <ChevronUp className="w-5 h-5 text-slate-400" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-slate-400" />
+        )}
       </button>
-      
+
       {isOpen && (
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
           {glossary.map((item, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
-              <span className="font-black text-primary min-w-[40px]" translate="no">{item.term}</span>
+            <div
+              key={index}
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800/50 transition-colors"
+            >
+              <span className="font-black text-primary min-w-[40px]" translate="no">
+                {item.term}
+              </span>
               <span className="text-slate-300 text-sm">{item.definition}</span>
             </div>
           ))}

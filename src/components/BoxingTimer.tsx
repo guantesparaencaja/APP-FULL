@@ -15,7 +15,7 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
   restDurationSec,
   roundsCount,
   onRoundEnd,
-  onSessionEnd
+  onSessionEnd,
 }) => {
   const [currentRound, setCurrentRound] = useState(1);
   const [isResting, setIsResting] = useState(false);
@@ -24,14 +24,14 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
   const [isFinished, setIsFinished] = useState(false);
 
   const motivationPhrases = [
-    "¡Vamos, con fuerza!",
-    "¡Sigue así, no pares!",
-    "¡Un esfuerzo más, tú puedes!",
-    "¡Mantén la guardia arriba!",
-    "¡Respira y golpea!",
-    "¡Excelente trabajo, sigue!",
-    "¡Concéntrate en la técnica!",
-    "¡No te rindas ahora!"
+    '¡Vamos, con fuerza!',
+    '¡Sigue así, no pares!',
+    '¡Un esfuerzo más, tú puedes!',
+    '¡Mantén la guardia arriba!',
+    '¡Respira y golpea!',
+    '¡Excelente trabajo, sigue!',
+    '¡Concéntrate en la técnica!',
+    '¡No te rindas ahora!',
   ];
 
   const speak = useCallback((text: string) => {
@@ -58,7 +58,7 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
 
       osc.type = 'sine';
       osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-      
+
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
 
@@ -86,13 +86,14 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
 
     if (isActive && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft(prev => {
+        setTimeLeft((prev) => {
           const next = prev - 1;
           if (!isResting) {
             if (next === 10) {
               speak('¡Últimos diez segundos, ráfaga final!');
             } else if (next > 10 && next % 30 === 0 && next !== roundDurationSec) {
-              const randomPhrase = motivationPhrases[Math.floor(Math.random() * motivationPhrases.length)];
+              const randomPhrase =
+                motivationPhrases[Math.floor(Math.random() * motivationPhrases.length)];
               speak(randomPhrase);
             }
           }
@@ -119,16 +120,27 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
         playBell();
         speak(`¡Round ${currentRound + 1}, a pelear!`);
         setIsResting(false);
-        setCurrentRound(prev => prev + 1);
+        setCurrentRound((prev) => prev + 1);
         setTimeLeft(roundDurationSec);
       }
     }
 
     return () => clearInterval(interval);
-  }, [isActive, timeLeft, isResting, currentRound, roundsCount, roundDurationSec, restDurationSec, onRoundEnd, onSessionEnd, playBell]);
+  }, [
+    isActive,
+    timeLeft,
+    isResting,
+    currentRound,
+    roundsCount,
+    roundDurationSec,
+    restDurationSec,
+    onRoundEnd,
+    onSessionEnd,
+    playBell,
+  ]);
 
   const toggleTimer = () => setIsActive(!isActive);
-  
+
   const resetTimer = () => {
     setIsActive(false);
     setIsResting(false);
@@ -148,24 +160,37 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
   };
 
   return (
-    <div className={`relative overflow-hidden rounded-3xl p-8 transition-colors duration-500 ${
-      isFinished ? 'bg-slate-900' : isResting ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'
-    } border shadow-2xl`}>
-      
+    <div
+      className={`relative overflow-hidden rounded-3xl p-8 transition-colors duration-500 ${
+        isFinished
+          ? 'bg-slate-900'
+          : isResting
+            ? 'bg-emerald-500/10 border-emerald-500/20'
+            : 'bg-red-500/10 border-red-500/20'
+      } border shadow-2xl`}
+    >
       <div className="flex justify-between items-center mb-8">
         <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Round</span>
-          <span className="text-4xl font-black text-white">{currentRound} / {roundsCount}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+            Round
+          </span>
+          <span className="text-4xl font-black text-white">
+            {currentRound} / {roundsCount}
+          </span>
         </div>
-        <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-          isResting ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30' : 'bg-red-500/20 text-red-500 border-red-500/30'
-        }`}>
+        <div
+          className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+            isResting
+              ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30'
+              : 'bg-red-500/20 text-red-500 border-red-500/30'
+          }`}
+        >
           {isResting ? 'Descanso' : 'Trabajo'}
         </div>
       </div>
 
       <div className="flex flex-col items-center mb-10">
-        <motion.div 
+        <motion.div
           key={timeLeft}
           initial={{ scale: 0.9, opacity: 0.5 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -178,23 +203,27 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
       </div>
 
       <div className="flex items-center justify-center gap-6">
-        <button 
+        <button
           onClick={resetTimer}
           className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 transition-all"
         >
           <RotateCcw className="w-6 h-6" />
         </button>
-        
-        <button 
+
+        <button
           onClick={toggleTimer}
           className={`w-20 h-20 flex items-center justify-center rounded-full shadow-xl transition-all ${
             isActive ? 'bg-slate-800 text-white' : 'bg-primary text-white scale-110'
           }`}
         >
-          {isActive ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current ml-1" />}
+          {isActive ? (
+            <Pause className="w-8 h-8 fill-current" />
+          ) : (
+            <Play className="w-8 h-8 fill-current ml-1" />
+          )}
         </button>
 
-        <button 
+        <button
           onClick={skipStep}
           className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 transition-all"
         >
@@ -203,14 +232,16 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
       </div>
 
       {isFinished && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center text-center p-6"
         >
           <Bell className="w-12 h-12 text-primary mb-4" />
-          <h3 className="text-2xl font-black uppercase tracking-tight text-white mb-2">¡Sesión Terminada!</h3>
-          <button 
+          <h3 className="text-2xl font-black uppercase tracking-tight text-white mb-2">
+            ¡Sesión Terminada!
+          </h3>
+          <button
             onClick={resetTimer}
             className="mt-4 text-xs font-black uppercase tracking-widest text-primary hover:underline"
           >

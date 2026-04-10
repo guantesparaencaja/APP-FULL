@@ -2,10 +2,23 @@ import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { db } from '../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { X, CheckCircle2, Target, Zap, AlertTriangle, ChefHat, Dumbbell, TrendingDown, Scale, TrendingUp, ChevronRight, ChevronLeft } from 'lucide-react';
+import {
+  X,
+  CheckCircle2,
+  Target,
+  Zap,
+  AlertTriangle,
+  ChefHat,
+  Dumbbell,
+  TrendingDown,
+  Scale,
+  TrendingUp,
+  ChevronRight,
+  ChevronLeft,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const user = useStore((state) => state.user);
   const setUser = useStore((state) => state.setUser);
   const [step, setStep] = useState(1);
@@ -16,7 +29,7 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
     activity_level: user?.activity_level || 'moderado',
     experience_level: user?.experience_level || 'intermedio',
     injuries: user?.injuries || '',
-    dietary_restrictions: user?.dietary_restrictions || ''
+    dietary_restrictions: user?.dietary_restrictions || '',
   });
 
   if (!isOpen) return null;
@@ -30,7 +43,7 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
       const updateData = {
         ...formData,
         assessment_completed: true,
-        assessment_updated_at: now
+        assessment_updated_at: now,
       };
       await updateDoc(userRef, updateData);
       setUser({ ...user, ...updateData });
@@ -53,9 +66,30 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
       content: (
         <div className="grid grid-cols-1 gap-4">
           {[
-            { id: 'bajar', fGoal: 'bajar_peso', label: 'Bajar Peso', desc: 'Enfocado en cardio y quema de calorías', icon: <TrendingDown className="w-6 h-6" />, color: 'blue' },
-            { id: 'mantener', fGoal: 'mantener', label: 'Mantener Peso', desc: 'Equilibrio entre cardio y fuerza', icon: <Scale className="w-6 h-6" />, color: 'emerald' },
-            { id: 'subir', fGoal: 'aumentar', label: 'Aumentar Peso', desc: 'Hipertrofia y ganancia muscular', icon: <TrendingUp className="w-6 h-6" />, color: 'orange' }
+            {
+              id: 'bajar',
+              fGoal: 'bajar_peso',
+              label: 'Bajar Peso',
+              desc: 'Enfocado en cardio y quema de calorías',
+              icon: <TrendingDown className="w-6 h-6" />,
+              color: 'blue',
+            },
+            {
+              id: 'mantener',
+              fGoal: 'mantener',
+              label: 'Mantener Peso',
+              desc: 'Equilibrio entre cardio y fuerza',
+              icon: <Scale className="w-6 h-6" />,
+              color: 'emerald',
+            },
+            {
+              id: 'subir',
+              fGoal: 'aumentar',
+              label: 'Aumentar Peso',
+              desc: 'Hipertrofia y ganancia muscular',
+              icon: <TrendingUp className="w-6 h-6" />,
+              color: 'orange',
+            },
           ].map((g) => (
             <motion.button
               key={g.id}
@@ -64,7 +98,9 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
               onClick={() => setFormData({ ...formData, goal: g.id, fitnessGoal: g.fGoal as any })}
               className={`p-5 rounded-[2rem] border-2 transition-all text-left flex items-center gap-4 group ${formData.goal === g.id ? 'border-primary bg-primary/5' : 'border-slate-700 bg-slate-900/50'}`}
             >
-              <div className={`p-4 rounded-2xl transition-colors ${formData.goal === g.id ? 'bg-primary text-white' : 'bg-slate-800 text-slate-500'}`}>
+              <div
+                className={`p-4 rounded-2xl transition-colors ${formData.goal === g.id ? 'bg-primary text-white' : 'bg-slate-800 text-slate-500'}`}
+              >
                 {g.icon}
               </div>
               <div className="flex-1">
@@ -75,7 +111,7 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
             </motion.button>
           ))}
         </div>
-      )
+      ),
     },
     {
       id: 'activity',
@@ -88,7 +124,7 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
             { id: 'sedentario', label: 'Sedentario', desc: 'Poca o ninguna actividad' },
             { id: 'ligero', label: 'Ligero', desc: '1-3 días por semana' },
             { id: 'moderado', label: 'Moderado', desc: '3-5 días por semana' },
-            { id: 'intenso', label: 'Intenso', desc: '6-7 días por semana' }
+            { id: 'intenso', label: 'Intenso', desc: '6-7 días por semana' },
           ].map((a) => (
             <button
               key={a.id}
@@ -99,11 +135,13 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
                 <p className="font-black text-white uppercase tracking-tight">{a.label}</p>
                 <p className="text-xs text-slate-400 font-medium">{a.desc}</p>
               </div>
-              {formData.activity_level === a.id && <CheckCircle2 className="w-5 h-5 text-primary" />}
+              {formData.activity_level === a.id && (
+                <CheckCircle2 className="w-5 h-5 text-primary" />
+              )}
             </button>
           ))}
         </div>
-      )
+      ),
     },
     {
       id: 'experience',
@@ -113,7 +151,9 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
       content: (
         <div className="space-y-6">
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Nivel de Experiencia</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">
+              Nivel de Experiencia
+            </label>
             <div className="grid grid-cols-3 gap-2">
               {['principiante', 'intermedio', 'avanzado'].map((e) => (
                 <button
@@ -138,7 +178,7 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
             />
           </div>
         </div>
-      )
+      ),
     },
     {
       id: 'diet',
@@ -148,7 +188,9 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
       content: (
         <div className="space-y-4">
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Restricciones Alimenticias</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">
+              Restricciones Alimenticias
+            </label>
             <textarea
               value={formData.dietary_restrictions}
               onChange={(e) => setFormData({ ...formData, dietary_restrictions: e.target.value })}
@@ -161,12 +203,13 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
               <ChefHat className="w-4 h-4 text-emerald-500" />
             </div>
             <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-              Esta información nos ayuda a generar planes de comida y entrenamiento que se adapten 100% a tus necesidades y estilo de vida.
+              Esta información nos ayuda a generar planes de comida y entrenamiento que se adapten
+              100% a tus necesidades y estilo de vida.
             </p>
           </div>
         </div>
-      )
-    }
+      ),
+    },
   ];
 
   const currentStep = steps[step - 1];
@@ -174,7 +217,7 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -187,11 +230,18 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
                 {currentStep.icon}
               </div>
               <div>
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none">{currentStep.title}</h3>
-                <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-widest">{currentStep.subtitle}</p>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none">
+                  {currentStep.title}
+                </h3>
+                <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-widest">
+                  {currentStep.subtitle}
+                </p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            >
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -200,8 +250,8 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
           <div className="px-8 mb-8">
             <div className="flex gap-2 h-1.5 w-full">
               {steps.map((_, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className={`flex-1 rounded-full transition-all duration-500 ${i + 1 <= step ? 'bg-primary' : 'bg-slate-100 dark:bg-slate-800'}`}
                 />
               ))}
@@ -231,7 +281,7 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
               </button>
             )}
             <button
-              onClick={() => step < steps.length ? setStep(step + 1) : handleSave()}
+              onClick={() => (step < steps.length ? setStep(step + 1) : handleSave())}
               disabled={loading}
               className="flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-primary text-white shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
             >
@@ -240,9 +290,13 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean, onClose:
               ) : (
                 <>
                   {step < steps.length ? (
-                    <>Siguiente <ChevronRight className="w-4 h-4" /></>
+                    <>
+                      Siguiente <ChevronRight className="w-4 h-4" />
+                    </>
                   ) : (
-                    <>Finalizar Evaluación <CheckCircle2 className="w-4 h-4" /></>
+                    <>
+                      Finalizar Evaluación <CheckCircle2 className="w-4 h-4" />
+                    </>
                   )}
                 </>
               )}

@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { UserPlus, Mail, Lock, User, Scale, Hand, Target, ArrowLeft, ArrowRight, Ruler, Eye, EyeOff } from 'lucide-react';
+import {
+  UserPlus,
+  Mail,
+  Lock,
+  User,
+  Scale,
+  Hand,
+  Target,
+  ArrowLeft,
+  ArrowRight,
+  Ruler,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -44,13 +57,17 @@ export function Register() {
       handleNext();
       return;
     }
-    
+
     try {
       if (formData.password !== formData.confirmPassword) {
         throw new Error('Las contraseñas no coinciden.');
       }
-      
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
       const user = userCredential.user;
 
       const userData = {
@@ -69,7 +86,7 @@ export function Register() {
         license_level: 1,
         profile_pic: null,
         is_new_user: false,
-        tutorial_completed: false
+        tutorial_completed: false,
       };
 
       await setDoc(doc(db, 'users', user.uid), userData);
@@ -141,9 +158,11 @@ export function Register() {
       let errorMsg = 'Error al registrar usuario. Intenta de nuevo.';
       if (err.message === 'Las contraseñas no coinciden.') errorMsg = err.message;
       else if (err.code === 'auth/email-already-in-use') errorMsg = 'El correo ya está registrado.';
-      else if (err.code === 'auth/weak-password') errorMsg = 'La contraseña es muy corta (mínimo 6 caracteres).';
+      else if (err.code === 'auth/weak-password')
+        errorMsg = 'La contraseña es muy corta (mínimo 6 caracteres).';
       else if (err.code === 'auth/invalid-email') errorMsg = 'El formato del correo es inválido.';
-      else if (err.code === 'auth/network-request-failed') errorMsg = 'Error de conexión. Revisa tu internet.';
+      else if (err.code === 'auth/network-request-failed')
+        errorMsg = 'Error de conexión. Revisa tu internet.';
       setError(errorMsg);
     }
   };
@@ -151,11 +170,16 @@ export function Register() {
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased pb-12">
       <div className="flex items-center bg-transparent p-4 justify-between z-10">
-        <div className="text-primary flex size-12 shrink-0 items-center justify-center cursor-pointer" onClick={handleBack}>
+        <div
+          className="text-primary flex size-12 shrink-0 items-center justify-center cursor-pointer"
+          onClick={handleBack}
+        >
           <ArrowLeft className="w-8 h-8" />
         </div>
         <div className="flex-1 text-center pr-12">
-          <span className="text-primary font-bold tracking-widest uppercase text-sm">Paso {step} de 3</span>
+          <span className="text-primary font-bold tracking-widest uppercase text-sm">
+            Paso {step} de 3
+          </span>
         </div>
       </div>
 
@@ -169,206 +193,266 @@ export function Register() {
 
       <form onSubmit={handleRegister} className="flex flex-col gap-4 px-6 pt-4 pb-12 flex-1">
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        
-        <div style={{ display: step === 1 ? 'flex' : 'none' }} className="flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Nombre Completo</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <User className="w-5 h-5" />
-                </div>
-                <input 
-                  type="text" 
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all" 
-                  placeholder="Tu nombre" 
-                  required
-                />
-              </div>
-            </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Mail className="w-5 h-5" />
-                </div>
-                <input 
-                  type="email" 
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all" 
-                  placeholder="tu@email.com" 
-                  required
-                />
+        <div
+          style={{ display: step === 1 ? 'flex' : 'none' }}
+          className="flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500"
+        >
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Nombre Completo
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <User className="w-5 h-5" />
               </div>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all"
+                placeholder="Tu nombre"
+                required
+              />
             </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Contraseña</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <input 
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 pr-10 text-slate-100 placeholder-slate-500 transition-all" 
-                  placeholder="••••••••" 
-                  required
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300">
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Confirmar Contraseña</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <input 
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 pr-10 text-slate-100 placeholder-slate-500 transition-all" 
-                  placeholder="••••••••" 
-                  required
-                />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300">
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-            
-            <button type="button" onClick={handleNext} className="mt-6 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow">
-              <span>SIGUIENTE</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
-        </div>
-
-        <div style={{ display: step === 2 ? 'flex' : 'none' }} className="flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Edad</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <User className="w-5 h-5" />
-                </div>
-                <input 
-                  type="number" 
-                  value={formData.age}
-                  onChange={(e) => setFormData({...formData, age: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all" 
-                  placeholder="Ej: 25" 
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Peso Actual (kg)</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Scale className="w-5 h-5" />
-                </div>
-                <input 
-                  type="number" 
-                  value={formData.weight}
-                  onChange={(e) => setFormData({...formData, weight: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all" 
-                  placeholder="Ej: 75" 
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Altura (cm)</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Ruler className="w-5 h-5" />
-                </div>
-                <input 
-                  type="number" 
-                  value={formData.height}
-                  onChange={(e) => setFormData({...formData, height: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all" 
-                  placeholder="Ej: 175" 
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Mano Dominante</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Hand className="w-5 h-5" />
-                </div>
-                <select 
-                  value={formData.dominant_hand}
-                  onChange={(e) => setFormData({...formData, dominant_hand: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 transition-all"
-                >
-                  <option value="Derecha">Derecha</option>
-                  <option value="Izquierda">Izquierda</option>
-                  <option value="Ambidiestra">Ambidiestra</option>
-                </select>
-              </div>
-            </div>
-            
-            <button type="button" onClick={handleNext} className="mt-6 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow">
-              <span>SIGUIENTE</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
-        </div>
-
-        <div style={{ display: step === 3 ? 'flex' : 'none' }} className="flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Objetivo en Boxeo</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Target className="w-5 h-5" />
-                </div>
-                <select 
-                  value={formData.boxing_goal}
-                  onChange={(e) => setFormData({...formData, boxing_goal: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 transition-all"
-                >
-                  <option value="Desarrollar habilidades de autodefensa y confianza">Desarrollar habilidades de autodefensa y confianza</option>
-                  <option value="Entrenamiento recreativo y fitness deportivo">Entrenamiento recreativo y fitness deportivo</option>
-                  <option value="Entrenamiento técnico competitivo">Entrenamiento técnico competitivo</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">Objetivo Físico</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Target className="w-5 h-5" />
-                </div>
-                <select 
-                  value={formData.fitness_goal}
-                  onChange={(e) => setFormData({...formData, fitness_goal: e.target.value})}
-                  className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 transition-all"
-                >
-                  <option value="Recomposición corporal y pérdida de grasa">Recomposición corporal y pérdida de grasa</option>
-                  <option value="Aumento de masa muscular hipertrófica">Aumento de masa muscular hipertrófica</option>
-                  <option value="Acondicionamiento físico general y mantenimiento">Acondicionamiento físico general y mantenimiento</option>
-                </select>
-              </div>
-            </div>
-
-            <button type="submit" className="mt-6 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow">
-              <span>FINALIZAR REGISTRO</span>
-              <UserPlus className="w-5 h-5" />
-            </button>
           </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Email
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <Mail className="w-5 h-5" />
+              </div>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all"
+                placeholder="tu@email.com"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Contraseña
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <Lock className="w-5 h-5" />
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 pr-10 text-slate-100 placeholder-slate-500 transition-all"
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Confirmar Contraseña
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <Lock className="w-5 h-5" />
+              </div>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 pr-10 text-slate-100 placeholder-slate-500 transition-all"
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300"
+              >
+                {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleNext}
+            className="mt-6 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow"
+          >
+            <span>SIGUIENTE</span>
+            <ArrowRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div
+          style={{ display: step === 2 ? 'flex' : 'none' }}
+          className="flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500"
+        >
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Edad
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <User className="w-5 h-5" />
+              </div>
+              <input
+                type="number"
+                value={formData.age}
+                onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all"
+                placeholder="Ej: 25"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Peso Actual (kg)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <Scale className="w-5 h-5" />
+              </div>
+              <input
+                type="number"
+                value={formData.weight}
+                onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all"
+                placeholder="Ej: 75"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Altura (cm)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <Ruler className="w-5 h-5" />
+              </div>
+              <input
+                type="number"
+                value={formData.height}
+                onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 placeholder-slate-500 transition-all"
+                placeholder="Ej: 175"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Mano Dominante
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <Hand className="w-5 h-5" />
+              </div>
+              <select
+                value={formData.dominant_hand}
+                onChange={(e) => setFormData({ ...formData, dominant_hand: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 transition-all"
+              >
+                <option value="Derecha">Derecha</option>
+                <option value="Izquierda">Izquierda</option>
+                <option value="Ambidiestra">Ambidiestra</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleNext}
+            className="mt-6 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow"
+          >
+            <span>SIGUIENTE</span>
+            <ArrowRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div
+          style={{ display: step === 3 ? 'flex' : 'none' }}
+          className="flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500"
+        >
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Objetivo en Boxeo
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <Target className="w-5 h-5" />
+              </div>
+              <select
+                value={formData.boxing_goal}
+                onChange={(e) => setFormData({ ...formData, boxing_goal: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 transition-all"
+              >
+                <option value="Desarrollar habilidades de autodefensa y confianza">
+                  Desarrollar habilidades de autodefensa y confianza
+                </option>
+                <option value="Entrenamiento recreativo y fitness deportivo">
+                  Entrenamiento recreativo y fitness deportivo
+                </option>
+                <option value="Entrenamiento técnico competitivo">
+                  Entrenamiento técnico competitivo
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-primary ml-1">
+              Objetivo Físico
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <Target className="w-5 h-5" />
+              </div>
+              <select
+                value={formData.fitness_goal}
+                onChange={(e) => setFormData({ ...formData, fitness_goal: e.target.value })}
+                className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 pl-10 text-slate-100 transition-all"
+              >
+                <option value="Recomposición corporal y pérdida de grasa">
+                  Recomposición corporal y pérdida de grasa
+                </option>
+                <option value="Aumento de masa muscular hipertrófica">
+                  Aumento de masa muscular hipertrófica
+                </option>
+                <option value="Acondicionamiento físico general y mantenimiento">
+                  Acondicionamiento físico general y mantenimiento
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="mt-6 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow"
+          >
+            <span>FINALIZAR REGISTRO</span>
+            <UserPlus className="w-5 h-5" />
+          </button>
+        </div>
       </form>
     </div>
   );

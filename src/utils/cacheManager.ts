@@ -58,8 +58,8 @@ export async function cacheVideo(url: string) {
     // Update metadata for LRU
     const metadataStr = localStorage.getItem(METADATA_KEY);
     let metadata: CacheMetadata[] = metadataStr ? JSON.parse(metadataStr) : [];
-    
-    const existingIndex = metadata.findIndex(m => m.url === url);
+
+    const existingIndex = metadata.findIndex((m) => m.url === url);
     if (existingIndex !== -1) {
       metadata[existingIndex].lastUsed = Date.now();
     } else {
@@ -85,11 +85,11 @@ export async function getCachedVideo(url: string): Promise<string | null> {
 
     if (response) {
       console.log(`Cache hit for: ${url}`);
-      
+
       // Update metadata for LRU
       const metadataStr = localStorage.getItem(METADATA_KEY);
       let metadata: CacheMetadata[] = metadataStr ? JSON.parse(metadataStr) : [];
-      const existingIndex = metadata.findIndex(m => m.url === url);
+      const existingIndex = metadata.findIndex((m) => m.url === url);
       if (existingIndex !== -1) {
         metadata[existingIndex].lastUsed = Date.now();
         localStorage.setItem(METADATA_KEY, JSON.stringify(metadata));

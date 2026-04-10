@@ -1,8 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Flame, Clock, Dumbbell, Calendar, TrendingUp, ChevronRight, Activity, Award, Target } from 'lucide-react';
+import {
+  Trophy,
+  Flame,
+  Clock,
+  Dumbbell,
+  Calendar,
+  TrendingUp,
+  ChevronRight,
+  Activity,
+  Award,
+  Target,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, getDocs, onSnapshot, orderBy, limit, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  limit,
+  updateDoc,
+} from 'firebase/firestore';
 import { calculateStreak, StreakInfo } from '../utils/streakCalculator';
 import { ACHIEVEMENTS, Achievement } from '../utils/achievements';
 import { TrainingCalendar } from '../components/TrainingCalendar';
@@ -19,7 +39,11 @@ export const UserProgressDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [workouts, setWorkouts] = useState<WorkoutRecord[]>([]);
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
-  const [streak, setStreak] = useState<StreakInfo>({ currentStreak: 0, bestStreak: 0, lastWorkoutDate: null });
+  const [streak, setStreak] = useState<StreakInfo>({
+    currentStreak: 0,
+    bestStreak: 0,
+    lastWorkoutDate: null,
+  });
   const [punchesToday, setPunchesToday] = useState<number | null>(null);
   const [punchInput, setPunchInput] = useState('');
   const [weeklyPlan, setWeeklyPlan] = useState<any[]>([]);
@@ -35,37 +59,45 @@ export const UserProgressDashboard: React.FC = () => {
       where('userId', '==', userId),
       orderBy('timestamp', 'desc')
     );
-    const unsubWorkouts = onSnapshot(q, (querySnapshot) => {
-      const workoutData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as WorkoutRecord[];
-      setWorkouts(workoutData);
-      const dates = workoutData
-        .filter(w => w.timestamp)
-        .map(w => w.timestamp.toDate());
-      setStreak(calculateStreak(dates));
-    }, (err) => {
-      console.error('Error en listener workout_history:', err);
-    });
+    const unsubWorkouts = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const workoutData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as WorkoutRecord[];
+        setWorkouts(workoutData);
+        const dates = workoutData.filter((w) => w.timestamp).map((w) => w.timestamp.toDate());
+        setStreak(calculateStreak(dates));
+      },
+      (err) => {
+        console.error('Error en listener workout_history:', err);
+      }
+    );
 
     // ✅ onSnapshot para achievements en tiempo real
     const aq = query(collection(db, 'user_achievements'), where('userId', '==', userId));
-    const unsubAchievements = onSnapshot(aq, (snap) => {
-      setUnlockedAchievements(snap.docs.map(doc => doc.data().achievementId));
-    }, (err) => {
-      console.error('Error en listener achievements:', err);
-    });
+    const unsubAchievements = onSnapshot(
+      aq,
+      (snap) => {
+        setUnlockedAchievements(snap.docs.map((doc) => doc.data().achievementId));
+      },
+      (err) => {
+        console.error('Error en listener achievements:', err);
+      }
+    );
 
     // getDocs para datos de inicialización (plan semanal y punches_today)
     const initData = async () => {
       try {
         const pq = query(collection(db, 'weekly_plans'), where('userId', '==', userId), limit(1));
         const planSnapshot = await getDocs(pq);
-        setWeeklyPlan(planSnapshot.docs.map(doc => doc.data().combos || []).flat());
+        setWeeklyPlan(planSnapshot.docs.map((doc) => doc.data().combos || []).flat());
 
         if (auth.currentUser?.email) {
-          const uSnap = await getDocs(query(collection(db, 'users'), where('email', '==', auth.currentUser.email)));
+          const uSnap = await getDocs(
+            query(collection(db, 'users'), where('email', '==', auth.currentUser.email))
+          );
           if (!uSnap.empty) {
             setPunchesToday(uSnap.docs[0].data().punches_today || 0);
           }
@@ -116,16 +148,34 @@ export const UserProgressDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 pb-24">
       <header className="mb-8">
-        <span className="text-xs font-black uppercase tracking-[0.3em] text-primary mb-2 block">Tu Progreso</span>
+        <span className="text-xs font-black uppercase tracking-[0.3em] text-primary mb-2 block">
+          Tu Progreso
+        </span>
         <h1 className="text-4xl font-black uppercase tracking-tight">Panel de Control</h1>
       </header>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={<Flame className="text-orange-500" />} label="Días en el Ring" value={`${streak.currentStreak} días`} />
-        <StatCard icon={<Clock className="text-blue-500" />} label="Minutos Totales" value={`${totalMinutes}`} />
-        <StatCard icon={<Dumbbell className="text-emerald-500" />} label="Entrenamientos" value={`${totalWorkouts}`} />
-        <StatCard icon={<Trophy className="text-yellow-500" />} label="Logros" value={`${unlockedAchievements.length}`} />
+        <StatCard
+          icon={<Flame className="text-orange-500" />}
+          label="Días en el Ring"
+          value={`${streak.currentStreak} días`}
+        />
+        <StatCard
+          icon={<Clock className="text-blue-500" />}
+          label="Minutos Totales"
+          value={`${totalMinutes}`}
+        />
+        <StatCard
+          icon={<Dumbbell className="text-emerald-500" />}
+          label="Entrenamientos"
+          value={`${totalWorkouts}`}
+        />
+        <StatCard
+          icon={<Trophy className="text-yellow-500" />}
+          label="Logros"
+          value={`${unlockedAchievements.length}`}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -138,7 +188,9 @@ export const UserProgressDashboard: React.FC = () => {
                 Historial de Asistencias (Calendario)
               </h2>
             </div>
-            <TrainingCalendar workoutDates={workouts.filter(w => w.timestamp).map(w => w.timestamp.toDate())} />
+            <TrainingCalendar
+              workoutDates={workouts.filter((w) => w.timestamp).map((w) => w.timestamp.toDate())}
+            />
           </section>
 
           {/* Nuevo Plan Semanal */}
@@ -153,8 +205,12 @@ export const UserProgressDashboard: React.FC = () => {
               {weeklyPlan.length === 0 ? (
                 <div className="text-center text-slate-500 py-6">
                   <Dumbbell className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm font-bold">Tu entrenador aún no ha asignado un plan semanal específico.</p>
-                  <p className="text-[10px] uppercase tracking-widest mt-1">Trabaja en la licencia de saberes</p>
+                  <p className="text-sm font-bold">
+                    Tu entrenador aún no ha asignado un plan semanal específico.
+                  </p>
+                  <p className="text-[10px] uppercase tracking-widest mt-1">
+                    Trabaja en la licencia de saberes
+                  </p>
                 </div>
               ) : (
                 <ul className="space-y-3">
@@ -177,23 +233,33 @@ export const UserProgressDashboard: React.FC = () => {
                 <Award className="w-5 h-5 text-primary" />
                 Logros Desbloqueados
               </h2>
-              <span className="text-xs font-bold text-slate-500">{unlockedAchievements.length} / {ACHIEVEMENTS.length}</span>
+              <span className="text-xs font-bold text-slate-500">
+                {unlockedAchievements.length} / {ACHIEVEMENTS.length}
+              </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {ACHIEVEMENTS.map(achievement => {
+              {ACHIEVEMENTS.map((achievement) => {
                 const isUnlocked = unlockedAchievements.includes(achievement.id);
                 return (
-                  <div 
+                  <div
                     key={achievement.id}
                     className={`p-4 rounded-2xl border flex flex-col items-center text-center transition-all ${
-                      isUnlocked ? 'bg-slate-900 border-primary/30' : 'bg-slate-900/30 border-slate-800 opacity-40 grayscale'
+                      isUnlocked
+                        ? 'bg-slate-900 border-primary/30'
+                        : 'bg-slate-900/30 border-slate-800 opacity-40 grayscale'
                     }`}
                   >
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isUnlocked ? 'bg-primary/20 text-primary' : 'bg-slate-800 text-slate-600'}`}>
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isUnlocked ? 'bg-primary/20 text-primary' : 'bg-slate-800 text-slate-600'}`}
+                    >
                       <Activity className="w-6 h-6" />
                     </div>
-                    <h3 className="text-[10px] font-black uppercase tracking-tight leading-tight mb-1">{achievement.title}</h3>
-                    <p className="text-[8px] text-slate-500 leading-tight">{achievement.description}</p>
+                    <h3 className="text-[10px] font-black uppercase tracking-tight leading-tight mb-1">
+                      {achievement.title}
+                    </h3>
+                    <p className="text-[8px] text-slate-500 leading-tight">
+                      {achievement.description}
+                    </p>
                   </div>
                 );
               })}
@@ -232,16 +298,18 @@ export const UserProgressDashboard: React.FC = () => {
             <h3 className="text-sm font-black uppercase tracking-widest text-white mb-2 flex items-center gap-2">
               🥊 Contador de Golpes
             </h3>
-            <p className="text-xs text-slate-400 mb-4">Registra tu volumen de golpeo en saco o sombra de hoy.</p>
+            <p className="text-xs text-slate-400 mb-4">
+              Registra tu volumen de golpeo en saco o sombra de hoy.
+            </p>
             <div className="flex gap-2 mb-4">
-              <input 
-                type="number" 
-                placeholder="Ej. 1500" 
+              <input
+                type="number"
+                placeholder="Ej. 1500"
                 value={punchInput}
-                onChange={e => setPunchInput(e.target.value)}
+                onChange={(e) => setPunchInput(e.target.value)}
                 className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white w-full"
               />
-              <button 
+              <button
                 onClick={handleRegisterPunches}
                 className="bg-primary text-white font-black px-4 rounded-xl hover:bg-red-600 transition-colors"
               >
@@ -249,7 +317,9 @@ export const UserProgressDashboard: React.FC = () => {
               </button>
             </div>
             <div className="bg-slate-800 p-4 rounded-xl flex items-center justify-between">
-              <span className="text-[10px] uppercase font-black text-slate-400 tracking-widest">Golpes hoy</span>
+              <span className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
+                Golpes hoy
+              </span>
               <span className="font-black text-2xl text-emerald-400">{punchesToday || 0}</span>
             </div>
           </section>
@@ -260,23 +330,33 @@ export const UserProgressDashboard: React.FC = () => {
               Actividad Reciente
             </h2>
             <div className="space-y-4">
-              {workouts.slice(0, 5).map(workout => (
-                <div key={workout.id} className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+              {workouts.slice(0, 5).map((workout) => (
+                <div
+                  key={workout.id}
+                  className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex items-center justify-between"
+                >
                   <div>
                     <h4 className="font-bold text-sm">Entrenamiento de Boxeo</h4>
                     <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">
-                      {workout.timestamp?.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} • {Math.floor(workout.durationSeconds / 60)} min
+                      {workout.timestamp
+                        ?.toDate()
+                        .toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
+                      • {Math.floor(workout.durationSeconds / 60)} min
                     </p>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs font-black text-primary">+{workout.caloriesEstimate} kcal</span>
+                    <span className="text-xs font-black text-primary">
+                      +{workout.caloriesEstimate} kcal
+                    </span>
                   </div>
                 </div>
               ))}
               {workouts.length === 0 && (
                 <div className="text-center py-8 text-slate-500">
                   <p className="text-sm">Aún no has entrenado.</p>
-                  <p className="text-xs uppercase font-black tracking-widest mt-2">¡Comienza hoy!</p>
+                  <p className="text-xs uppercase font-black tracking-widest mt-2">
+                    ¡Comienza hoy!
+                  </p>
                 </div>
               )}
             </div>
@@ -287,13 +367,17 @@ export const UserProgressDashboard: React.FC = () => {
   );
 };
 
-const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
+const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({
+  icon,
+  label,
+  value,
+}) => (
   <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex flex-col gap-3">
-    <div className="w-10 h-10 bg-white/5 rounded-2xl flex items-center justify-center">
-      {icon}
-    </div>
+    <div className="w-10 h-10 bg-white/5 rounded-2xl flex items-center justify-center">{icon}</div>
     <div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">{label}</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">
+        {label}
+      </p>
       <p className="text-xl font-black text-white">{value}</p>
     </div>
   </div>

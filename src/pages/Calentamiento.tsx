@@ -1,11 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, CheckCircle, Loader2, Video, Upload, Settings, AlertCircle, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Play,
+  CheckCircle,
+  Loader2,
+  Video,
+  Upload,
+  Settings,
+  AlertCircle,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { db } from '../lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { uploadVideoToDrive } from '../lib/driveService';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 export const Calentamiento: React.FC = () => {
   const navigate = useNavigate();
@@ -19,15 +30,15 @@ export const Calentamiento: React.FC = () => {
     descripcion: string;
     duracion: string;
   } | null>(null);
-  
+
   const [loadingVideo, setLoadingVideo] = useState(true);
   const [editForm, setEditForm] = useState({
     titulo: '',
     descripcion: '',
     duracion: '',
-    videoUrl: ''
+    videoUrl: '',
   });
-  
+
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -44,7 +55,7 @@ export const Calentamiento: React.FC = () => {
           titulo: data.titulo || '',
           descripcion: data.descripcion || '',
           duracion: data.duracion || '',
-          videoUrl: data.videoUrl || ''
+          videoUrl: data.videoUrl || '',
         });
       } else {
         const defaultConfig: any = {
@@ -52,7 +63,7 @@ export const Calentamiento: React.FC = () => {
           videoUrl: '',
           titulo: 'Calentamiento Pro Boxeo',
           descripcion: 'Rutina obligatoria de movilidad articular y activación neuromuscular.',
-          duracion: '10-12 minutos'
+          duracion: '10-12 minutos',
         };
         setVideoConfig(defaultConfig);
         setEditForm(defaultConfig);
@@ -66,22 +77,22 @@ export const Calentamiento: React.FC = () => {
     if (!user) return;
     setSaving(true);
     setSaveError(null);
-    
+
     try {
       let finalUrl = editForm.videoUrl;
-      
+
       if (videoFile) {
         setUploading(true);
         finalUrl = await uploadVideoToDrive(
-          videoFile, 
-          user.id, 
+          videoFile,
+          user.id,
           (progress) => setUploadProgress(progress),
           { type: 'calentamiento', title: editForm.titulo }
         );
       }
-      
+
       if (!finalUrl && !videoFile) {
-        throw new Error("Debes subir un video para guardar la configuración.");
+        throw new Error('Debes subir un video para guardar la configuración.');
       }
 
       await setDoc(doc(db, 'configuracion', 'calentamiento'), {
@@ -91,16 +102,16 @@ export const Calentamiento: React.FC = () => {
         descripcion: editForm.descripcion,
         duracion: editForm.duracion,
         actualizadoEn: new Date().toISOString(),
-        actualizadoPor: user.email
+        actualizadoPor: user.email,
       });
-      
+
       setVideoFile(null);
       setUploadProgress(0);
       setUploading(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
-      console.error("Error saving video:", err);
+      console.error('Error saving video:', err);
       setSaveError('Error: ' + (err.message || 'Error al procesar el video'));
     } finally {
       setSaving(false);
@@ -119,13 +130,13 @@ export const Calentamiento: React.FC = () => {
         descripcion: editForm.descripcion,
         duracion: editForm.duracion,
         actualizadoEn: new Date().toISOString(),
-        actualizadoPor: user?.email
+        actualizadoPor: user?.email,
       });
-      setVideoConfig(prev => prev ? { ...prev, videoUrl: '' } : null);
-      setEditForm(prev => ({ ...prev, videoUrl: '' }));
+      setVideoConfig((prev) => (prev ? { ...prev, videoUrl: '' } : null));
+      setEditForm((prev) => ({ ...prev, videoUrl: '' }));
       alert('Video eliminado con éxito');
     } catch (err: any) {
-      console.error("Error deleting video:", err);
+      console.error('Error deleting video:', err);
       setSaveError('Error al eliminar el video');
     } finally {
       setSaving(false);
@@ -135,14 +146,16 @@ export const Calentamiento: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans p-4 pb-24">
       <header className="flex items-center justify-between mb-8 max-w-4xl mx-auto w-full pt-4">
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="w-12 h-12 flex items-center justify-center bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 transition-transform active:scale-90"
         >
           <ArrowLeft className="w-6 h-6 text-primary" />
         </button>
         <div className="text-center">
-          <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-1">Guantes Protocolo</p>
+          <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-1">
+            Guantes Protocolo
+          </p>
           <h1 className="text-xl font-black uppercase italic tracking-tighter">Calentamiento</h1>
         </div>
         <div className="w-12"></div>
@@ -154,13 +167,15 @@ export const Calentamiento: React.FC = () => {
           {loadingVideo ? (
             <div className="aspect-video flex flex-col items-center justify-center gap-4 bg-slate-950">
               <Loader2 className="w-10 h-10 text-primary animate-spin" />
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Sincronizando Video...</p>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                Sincronizando Video...
+              </p>
             </div>
           ) : videoConfig?.videoUrl ? (
             <div className="aspect-video w-full bg-black relative group">
-              <video 
-                src={videoConfig.videoUrl} 
-                controls 
+              <video
+                src={videoConfig.videoUrl}
+                controls
                 controlsList="nodownload"
                 className="w-full h-full object-contain"
                 poster="https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?auto=format&fit=crop&q=80"
@@ -168,18 +183,24 @@ export const Calentamiento: React.FC = () => {
               <div className="absolute top-4 left-4 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Protocolo GPTE</span>
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">
+                    Protocolo GPTE
+                  </span>
                 </div>
               </div>
             </div>
           ) : (
             <div className="aspect-video bg-slate-950 flex flex-col items-center justify-center text-center p-8">
-               <Video className="w-16 h-16 text-slate-800 mb-4" />
-               <p className="text-slate-500 font-bold uppercase italic text-sm">No hay video configurado</p>
-               {user?.role === 'admin' && <p className="text-slate-700 text-xs mt-2">Sube uno en el panel de abajo</p>}
+              <Video className="w-16 h-16 text-slate-800 mb-4" />
+              <p className="text-slate-500 font-bold uppercase italic text-sm">
+                No hay video configurado
+              </p>
+              {user?.role === 'admin' && (
+                <p className="text-slate-700 text-xs mt-2">Sube uno en el panel de abajo</p>
+              )}
             </div>
           )}
-          
+
           <div className="p-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-4">
@@ -191,18 +212,23 @@ export const Calentamiento: React.FC = () => {
                     {videoConfig?.titulo || 'Calentamiento Oficial'}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">Esencial</span>
-                    <p className="text-slate-400 text-xs font-bold">{videoConfig?.duracion || '10 min'}</p>
+                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">
+                      Esencial
+                    </span>
+                    <p className="text-slate-400 text-xs font-bold">
+                      {videoConfig?.duracion || '10 min'}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
-            
+
             <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-8">
-              {videoConfig?.descripcion || 'Esta rutina es fundamental para preparar el cuerpo antes de la sesión principal. Enfócate en la técnica del movimiento.'}
+              {videoConfig?.descripcion ||
+                'Esta rutina es fundamental para preparar el cuerpo antes de la sesión principal. Enfócate en la técnica del movimiento.'}
             </p>
 
-            <motion.button 
+            <motion.button
               whileTap={{ scale: 0.96 }}
               onClick={() => {
                 setHasWarmedUp(true);
@@ -225,12 +251,16 @@ export const Calentamiento: React.FC = () => {
                     <Settings className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black uppercase italic leading-none mb-1 text-slate-900 dark:text-white">Admin: Nuevo Calentamiento</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sube videos directamente — Sin YouTube</p>
+                    <h3 className="text-lg font-black uppercase italic leading-none mb-1 text-slate-900 dark:text-white">
+                      Admin: Nuevo Calentamiento
+                    </h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Sube videos directamente — Sin YouTube
+                    </p>
                   </div>
                 </div>
                 <div className="p-3 bg-red-500/5 rounded-2xl border border-red-500/10">
-                   <ShieldCheck className="w-5 h-5 text-red-500" />
+                  <ShieldCheck className="w-5 h-5 text-red-500" />
                 </div>
               </div>
 
@@ -238,15 +268,17 @@ export const Calentamiento: React.FC = () => {
                 <div className="space-y-6">
                   {/* Selector de Video */}
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Archivo de Video (MP4)</label>
-                    <input 
-                      type="file" 
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Archivo de Video (MP4)
+                    </label>
+                    <input
+                      type="file"
                       id="video-upload-admin"
                       accept="video/*"
                       onChange={(e) => e.target.files?.[0] && setVideoFile(e.target.files[0])}
                       className="hidden"
                     />
-                    <label 
+                    <label
                       htmlFor="video-upload-admin"
                       className={`w-full aspect-video rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-4 cursor-pointer relative overflow-hidden
                         ${videoFile ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 hover:border-primary/50'}
@@ -257,15 +289,21 @@ export const Calentamiento: React.FC = () => {
                           <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
                             <Video className="w-8 h-8 text-primary" />
                           </div>
-                          <p className="text-sm font-black text-slate-800 dark:text-white px-4 truncate max-w-[200px]">{videoFile.name}</p>
-                          <p className="text-[10px] font-black text-slate-500 uppercase mt-1">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                          <p className="text-sm font-black text-slate-800 dark:text-white px-4 truncate max-w-[200px]">
+                            {videoFile.name}
+                          </p>
+                          <p className="text-[10px] font-black text-slate-500 uppercase mt-1">
+                            {(videoFile.size / 1024 / 1024).toFixed(1)} MB
+                          </p>
                         </div>
                       ) : (
                         <div className="text-center group-hover:scale-105 transition-transform flex flex-col items-center">
                           {videoConfig?.videoUrl ? (
                             <div className="relative">
-                               <Video className="w-10 h-10 text-primary mx-auto mb-3 opacity-50" />
-                               <div className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full"><CheckCircle className="w-3 h-3" /></div>
+                              <Video className="w-10 h-10 text-primary mx-auto mb-3 opacity-50" />
+                              <div className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full">
+                                <CheckCircle className="w-3 h-3" />
+                              </div>
                             </div>
                           ) : (
                             <Upload className="w-10 h-10 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
@@ -275,14 +313,19 @@ export const Calentamiento: React.FC = () => {
                           </p>
                         </div>
                       )}
-                      
+
                       {uploading && (
                         <div className="absolute inset-0 bg-white/90 dark:bg-slate-950/90 flex flex-col items-center justify-center p-8 backdrop-blur-sm">
-                           <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
-                           <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
-                             <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-                           </div>
-                           <p className="text-[10px] font-black text-primary uppercase tracking-widest">Subiendo: {uploadProgress}%</p>
+                          <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+                          <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
+                            <div
+                              className="h-full bg-primary transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] font-black text-primary uppercase tracking-widest">
+                            Subiendo: {uploadProgress}%
+                          </p>
                         </div>
                       )}
                     </label>
@@ -292,30 +335,36 @@ export const Calentamiento: React.FC = () => {
                 <div className="space-y-6">
                   <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Título Público</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">
+                        Título Público
+                      </label>
                       <input
                         type="text"
                         value={editForm.titulo}
-                        onChange={(e) => setEditForm({...editForm, titulo: e.target.value})}
+                        onChange={(e) => setEditForm({ ...editForm, titulo: e.target.value })}
                         placeholder="Ej: Calentamiento de Elite"
                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-sm focus:border-primary outline-none text-slate-900 dark:text-white font-medium"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Duración</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">
+                        Duración
+                      </label>
                       <input
                         type="text"
                         value={editForm.duracion}
-                        onChange={(e) => setEditForm({...editForm, duracion: e.target.value})}
+                        onChange={(e) => setEditForm({ ...editForm, duracion: e.target.value })}
                         placeholder="Ej: 12 Minutos"
                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-sm focus:border-primary outline-none text-slate-900 dark:text-white font-medium"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Instrucciones</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">
+                        Instrucciones
+                      </label>
                       <textarea
                         value={editForm.descripcion}
-                        onChange={(e) => setEditForm({...editForm, descripcion: e.target.value})}
+                        onChange={(e) => setEditForm({ ...editForm, descripcion: e.target.value })}
                         placeholder="Describe los beneficios..."
                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-sm focus:border-primary outline-none resize-none h-28 text-slate-900 dark:text-white font-medium shadow-inner"
                       />
@@ -324,24 +373,28 @@ export const Calentamiento: React.FC = () => {
 
                   <AnimatePresence>
                     {saveSuccess && (
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         className="bg-emerald-500 text-white px-4 py-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-emerald-500/20"
                       >
                         <CheckCircle className="w-5 h-5" />
-                        <span className="text-xs font-black uppercase tracking-tight">¡Video Actualizado con Éxito!</span>
+                        <span className="text-xs font-black uppercase tracking-tight">
+                          ¡Video Actualizado con Éxito!
+                        </span>
                       </motion.div>
                     )}
                     {saveError && (
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="bg-red-500 text-white px-4 py-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-red-500/20"
                       >
                         <AlertCircle className="w-5 h-5" />
-                        <span className="text-xs font-black uppercase tracking-tight">{saveError}</span>
+                        <span className="text-xs font-black uppercase tracking-tight">
+                          {saveError}
+                        </span>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -354,7 +407,7 @@ export const Calentamiento: React.FC = () => {
                     >
                       {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : '💾 Publicar Video'}
                     </button>
-                    
+
                     {videoConfig?.videoUrl && (
                       <button
                         onClick={handleDeleteVideo}

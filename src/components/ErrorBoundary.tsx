@@ -14,7 +14,7 @@ interface State {
 export class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
+    error: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -23,7 +23,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
-    
+
     // Log error to Firestore
     try {
       addDoc(collection(db, 'system_errors'), {
@@ -32,7 +32,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         componentStack: errorInfo.componentStack,
         url: window.location.href,
         timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent
+        userAgent: navigator.userAgent,
       });
     } catch (e) {
       console.error('Failed to log error to Firestore', e);

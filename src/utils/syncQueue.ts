@@ -55,14 +55,14 @@ class SyncQueue {
       try {
         await this.executeAction(action);
         // Éxito: remover de la cola
-        this.queue = this.queue.filter(a => a.id !== action.id);
+        this.queue = this.queue.filter((a) => a.id !== action.id);
         this.persist();
       } catch (err) {
         console.warn('[GPTE SyncQueue] Acción fallida, reintento:', action.type, err);
         if (action.retries >= MAX_RETRIES) {
           // Descartar tras MAX_RETRIES intentos fallidos
           console.error('[GPTE SyncQueue] Descartando acción tras 3 fallos:', action);
-          this.queue = this.queue.filter(a => a.id !== action.id);
+          this.queue = this.queue.filter((a) => a.id !== action.id);
           this.persist();
         } else {
           action.retries++;

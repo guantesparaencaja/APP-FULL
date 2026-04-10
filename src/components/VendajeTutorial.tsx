@@ -3,7 +3,15 @@ import { ShieldCheck, Video, CheckCircle, Plus, Trash2, Upload, X, Loader2 } fro
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { db, storage } from '../lib/firebase';
-import { doc, updateDoc, collection, onSnapshot, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc,
+  updateDoc,
+  collection,
+  onSnapshot,
+  addDoc,
+  deleteDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface VendajeVideo {
@@ -29,13 +37,17 @@ export function VendajeTutorial() {
 
   // ✅ onSnapshot — tiempo real para vendaje_videos
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'vendaje_videos'), (snapshot) => {
-      setVideos(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VendajeVideo)));
-      setLoading(false);
-    }, (err) => {
-      console.error('Error en listener vendaje_videos:', err);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      collection(db, 'vendaje_videos'),
+      (snapshot) => {
+        setVideos(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as VendajeVideo));
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error en listener vendaje_videos:', err);
+        setLoading(false);
+      }
+    );
     return () => unsub();
   }, []);
 
@@ -46,7 +58,7 @@ export function VendajeTutorial() {
         const userRef = doc(db, 'users', String(user.id));
         await updateDoc(userRef, {
           vendaje_progreso: 100,
-          hasSeenVendaje: true
+          hasSeenVendaje: true,
         });
         setUser({ ...user, vendaje_progreso: 100 });
       } catch (err) {
@@ -66,11 +78,14 @@ export function VendajeTutorial() {
     }
     setUploadProgress(10);
     try {
-      const storageRef = ref(storage, `vendaje_videos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`);
+      const storageRef = ref(
+        storage,
+        `vendaje_videos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+      );
       const snapshot = await uploadBytes(storageRef, file);
       setUploadProgress(90);
       const downloadURL = await getDownloadURL(snapshot.ref);
-      setNewVideo(prev => ({ ...prev, video_url: downloadURL }));
+      setNewVideo((prev) => ({ ...prev, video_url: downloadURL }));
       setUploadProgress(null);
     } catch (error: any) {
       alert('Error al subir el video: ' + error.message);
@@ -84,7 +99,7 @@ export function VendajeTutorial() {
     try {
       await addDoc(collection(db, 'vendaje_videos'), {
         ...newVideo,
-        created_at: serverTimestamp()
+        created_at: serverTimestamp(),
       });
       setNewVideo({ title: '', description: '', video_url: '' });
       setShowAdd(false);
@@ -115,13 +130,16 @@ export function VendajeTutorial() {
           <ShieldCheck className="w-8 h-8 text-primary" />
         </div>
         <div>
-          <h2 className="text-2xl font-black uppercase italic tracking-tight text-white">Vendaje de Manos</h2>
+          <h2 className="text-2xl font-black uppercase italic tracking-tight text-white">
+            Vendaje de Manos
+          </h2>
           <p className="text-primary font-bold text-sm">Protege tus manos correctamente</p>
         </div>
       </div>
 
       <p className="text-slate-300 mb-6 relative z-10">
-        Antes de comenzar con tu entrenamiento y proceso de licencia, es obligatorio saber cómo proteger tus manos. Un buen vendaje previene lesiones graves.
+        Antes de comenzar con tu entrenamiento y proceso de licencia, es obligatorio saber cómo
+        proteger tus manos. Un buen vendaje previene lesiones graves.
       </p>
 
       {/* Admin: Add video button */}
@@ -139,7 +157,10 @@ export function VendajeTutorial() {
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 animate-in fade-in slide-in-from-top-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-lg text-white">Nuevo Video de Vendaje</h3>
-                <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-white">
+                <button
+                  onClick={() => setShowAdd(false)}
+                  className="text-slate-400 hover:text-white"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -171,10 +192,15 @@ export function VendajeTutorial() {
                   />
                   {uploadProgress !== null && (
                     <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                      <div className="bg-primary h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                      <div
+                        className="bg-primary h-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
                     </div>
                   )}
-                  <span className="text-xs text-slate-500 text-center my-1">O pega una URL directamente</span>
+                  <span className="text-xs text-slate-500 text-center my-1">
+                    O pega una URL directamente
+                  </span>
                   <input
                     type="url"
                     placeholder="URL del video"
@@ -205,12 +231,17 @@ export function VendajeTutorial() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10">
           {/* Placeholder cards when no videos exist */}
           {['Vendaje Básico', 'Vendaje Profesional'].map((title) => (
-            <div key={title} className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col items-center justify-center text-center gap-3">
+            <div
+              key={title}
+              className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col items-center justify-center text-center gap-3"
+            >
               <Video className="w-8 h-8 text-slate-400" />
               <div>
                 <h3 className="font-bold text-white">{title}</h3>
                 <p className="text-xs text-slate-400">
-                  {isAdmin ? 'Agrega un video usando el botón de arriba' : 'Próximamente disponible'}
+                  {isAdmin
+                    ? 'Agrega un video usando el botón de arriba'
+                    : 'Próximamente disponible'}
                 </p>
               </div>
             </div>
@@ -219,7 +250,10 @@ export function VendajeTutorial() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10">
           {videos.map((v) => (
-            <div key={v.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden group">
+            <div
+              key={v.id}
+              className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden group"
+            >
               <div className="aspect-video bg-slate-900 relative">
                 <video src={v.video_url} controls className="w-full h-full object-cover" />
                 {isAdmin && (

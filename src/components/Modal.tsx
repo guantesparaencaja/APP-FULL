@@ -29,7 +29,9 @@ export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) 
             className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden"
           >
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
-              <h3 className="text-xl font-black text-white uppercase italic tracking-tight">{title}</h3>
+              <h3 className="text-xl font-black text-white uppercase italic tracking-tight">
+                {title}
+              </h3>
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
@@ -37,13 +39,9 @@ export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) 
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-6 max-h-[70vh] overflow-y-auto">
-              {children}
-            </div>
+            <div className="p-6 max-h-[70vh] overflow-y-auto">{children}</div>
             {footer && (
-              <div className="p-6 border-t border-slate-800 bg-slate-900/50">
-                {footer}
-              </div>
+              <div className="p-6 border-t border-slate-800 bg-slate-900/50">{footer}</div>
             )}
           </motion.div>
         </div>

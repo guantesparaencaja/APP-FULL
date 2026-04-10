@@ -1,4 +1,8 @@
-export const compressImage = async (file: File, maxWidthPx: number = 1024, quality: number = 0.8): Promise<File> => {
+export const compressImage = async (
+  file: File,
+  maxWidthPx: number = 1024,
+  quality: number = 0.8
+): Promise<File> => {
   return new Promise((resolve) => {
     try {
       if (!file.type.startsWith('image/')) {

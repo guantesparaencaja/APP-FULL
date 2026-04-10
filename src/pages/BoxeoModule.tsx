@@ -4,7 +4,7 @@ import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize2, RefreshCw,
   Trash2, Plus, ChevronRight, ChevronLeft, RotateCcw, Eye, EyeOff,
   Upload, X, Check, Loader2, Shield, Footprints, Zap, Target,
-  Dumbbell, Wind, Flame, Heart, AlertCircle, Star, Edit2, Monitor, Users
+  Dumbbell, Wind, Flame, Heart, AlertCircle, Star, Edit2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { db, storage } from '../lib/firebase';
@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { motion, AnimatePresence } from 'motion/react';
+import { VideoPlayerModal } from '../components/VideoPlayerModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface BoxeoVideo {
@@ -91,193 +92,6 @@ const SEED_VIDEOS: Omit<BoxeoVideo, 'id'>[] = [
   { nombre: 'Estiramiento Post-Entrenamiento', subcategoria: 'Calentamiento', nivel: 'Principiante', duracion_seg: 55, descripcion: 'Enfriamiento completo de 5 minutos después de la sesión.', puntos_clave: ['Hombros, espalda, isquiotibiales', 'Mantener 30 seg cada posición', 'Respiración profunda'], errores_comunes: ['Hacerlo con prisa', 'Estirar en frío', 'Olvidar el cuello'], url_directa: '', activo: true, orden: 3 },
 ];
 
-// ─── Video Playback Component ─────────────────────────────────────────────────
-function VideoPlayer({
-  video, onClose, onNext, onReplace, onHide, isAdmin
-}: {
-  video: BoxeoVideo;
-  onClose: () => void;
-  onNext?: () => void;
-  onReplace: () => void;
-  onHide: () => void;
-  isAdmin: boolean;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(true);
-  const [muted, setMuted] = useState(false);
-  const [error, setError] = useState(false);
-  const [showErrorKey, setShowErrorKey] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (videoRef.current.paused) { videoRef.current.play(); setPlaying(true); }
-    else { videoRef.current.pause(); setPlaying(false); }
-  };
-
-  const toggleMute = () => {
-    if (videoRef.current) videoRef.current.muted = !muted;
-    setMuted(!muted);
-  };
-
-  const retry = () => { setError(false); if (videoRef.current) { videoRef.current.load(); videoRef.current.play(); } };
-
-  const goFullscreen = async () => { 
-    const el = videoRef.current as any;
-    if (!el) return;
-    if (el.requestFullscreen) {
-      await el.requestFullscreen().catch(() => {});
-    } else if (el.webkitRequestFullscreen) {
-      await el.webkitRequestFullscreen();
-    }
-    try {
-      const screenAny = window.screen as any;
-      if (screenAny.orientation && screenAny.orientation.lock) {
-        await screenAny.orientation.lock('landscape').catch(() => {});
-      }
-    } catch (e) {}
-  };
-
-  const driveUrl = video.url_directa || (video.drive_file_id ? `https://drive.google.com/uc?id=${video.drive_file_id}` : '');
-
-  return (
-    <motion.div
-      className="fixed inset-0 z-50 bg-black flex flex-col"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-sm">
-        <button onClick={onClose} className="text-white p-2 hover:bg-white/10 rounded-full transition-colors">
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <div className="text-center flex-1 mx-4">
-          <p className="text-white font-black text-sm uppercase tracking-widest truncate">{video.nombre}</p>
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-              video.nivel === 'Principiante' ? 'bg-emerald-500/30 text-emerald-400' :
-              video.nivel === 'Intermedio' ? 'bg-yellow-500/30 text-yellow-400' :
-              'bg-red-500/30 text-red-400'
-            }`}>{video.nivel}</span>
-            <span className="text-[9px] text-slate-400 font-bold">{video.duracion_seg}s</span>
-          </div>
-        </div>
-        <div className="w-10" />
-      </div>
-
-      {/* Video */}
-      <div className="flex-1 relative bg-black flex items-center justify-center">
-        {!driveUrl ? (
-          <div className="text-center p-8">
-            <AlertCircle className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 font-bold text-sm">Sin video — el admin aún no ha subido este video</p>
-          </div>
-        ) : error ? (
-          <div className="text-center p-8">
-            <AlertCircle className="w-12 h-12 text-red-500/50 mx-auto mb-3" />
-            <p className="text-slate-300 font-bold text-sm mb-4">Video no disponible, toca para intentar de nuevo</p>
-            <button onClick={retry} className="bg-primary text-white px-6 py-3 rounded-xl font-black text-sm flex items-center gap-2 mx-auto">
-              <RefreshCw className="w-4 h-4" /> Reintentar
-            </button>
-          </div>
-        ) : (
-          <video
-            ref={videoRef}
-            src={driveUrl}
-            autoPlay
-            playsInline
-            loop
-            onClick={goFullscreen}
-            className="max-h-full max-w-full object-contain cursor-pointer"
-            style={{ maxHeight: 'calc(100vh - 200px)' }}
-            onError={() => setError(true)}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-          />
-        )}
-
-        {/* Controls overlay */}
-        {!error && driveUrl && (
-          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button onClick={togglePlay} className="bg-white/20 backdrop-blur-sm p-3 rounded-full text-white">
-                {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-              </button>
-              <button onClick={toggleMute} className="bg-white/20 backdrop-blur-sm p-2.5 rounded-full text-white">
-                {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={retry} className="bg-white/20 backdrop-blur-sm p-2.5 rounded-full text-white">
-                <RotateCcw className="w-4 h-4" />
-              </button>
-              <button onClick={goFullscreen} className="bg-white/20 backdrop-blur-sm p-2.5 rounded-full text-white">
-                <Maximize2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom info */}
-      <div className="bg-slate-950 p-4 space-y-3">
-        {/* Key points */}
-        {video.puntos_clave?.length > 0 && (
-          <div>
-            <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">Puntos Clave</p>
-            <div className="flex flex-wrap gap-2">
-              {video.puntos_clave.map((p, i) => (
-                <span key={i} className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded-lg border border-primary/20">
-                  ✓ {p}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Errors toggle */}
-        {video.errores_comunes?.length > 0 && (
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="w-full flex items-center justify-between bg-red-500/5 border border-red-500/20 rounded-xl px-4 py-2.5 text-red-400"
-          >
-            <span className="text-[10px] font-black uppercase tracking-widest">Errores Comunes</span>
-            <ChevronRight className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-90' : ''}`} />
-          </button>
-        )}
-        {showDetails && (
-          <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-            {video.errores_comunes.map((e, i) => (
-              <p key={i} className="text-[11px] text-slate-400 flex items-start gap-2">
-                <span className="text-red-500 mt-0.5">✗</span> {e}
-              </p>
-            ))}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-2 pt-1">
-          {onNext && (
-            <button onClick={onNext} className="flex-1 bg-primary text-white py-3 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
-              Siguiente <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
-          {!isAdmin && (
-            <>
-              <button onClick={onReplace} className="bg-slate-800 text-slate-300 py-3 px-4 rounded-xl text-[11px] font-black uppercase tracking-widest border border-slate-700">
-                Cambiar
-              </button>
-              <button onClick={onHide} className="bg-red-500/10 text-red-400 py-3 px-4 rounded-xl text-[11px] font-black uppercase tracking-widest border border-red-500/20">
-                <EyeOff className="w-4 h-4" />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
@@ -291,7 +105,6 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const [levelFilter, setLevelFilter] = useState<string>('Todos');
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
-  const [showGuideModal, setShowGuideModal] = useState(false);
   const [undoVideo, setUndoVideo] = useState<BoxeoVideo | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -458,22 +271,39 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     </div>
   );
 
-  // ─── Video player overlay ─────────────────────────────────────────────────
-  if (selectedVideo) return (
-    <AnimatePresence>
-      <VideoPlayer
-        video={selectedVideo}
+  // ─── Video player con VideoPlayerModal compacto ───────────────────────────
+  if (selectedVideo) {
+    const driveUrl = selectedVideo.url_directa || (selectedVideo.drive_file_id ? `https://drive.google.com/uc?id=${selectedVideo.drive_file_id}` : '');
+    const nivelColor = selectedVideo.nivel === 'Principiante' ? 'text-emerald-400' : selectedVideo.nivel === 'Intermedio' ? 'text-yellow-400' : 'text-red-400';
+    return (
+      <VideoPlayerModal
+        title={selectedVideo.nombre}
+        subtitle={selectedVideo.descripcion}
+        level={selectedVideo.nivel}
+        levelColor={nivelColor}
+        duration={`${selectedVideo.duracion_seg}s`}
+        videoUrl={driveUrl}
+        keyPoints={selectedVideo.puntos_clave || []}
+        commonErrors={selectedVideo.errores_comunes || []}
         onClose={() => setSelectedVideo(null)}
         onNext={nextVideo ? () => setSelectedVideo(nextVideo) : undefined}
-        onReplace={() => {
-          const alts = subVideos.filter(v => v.id !== selectedVideo.id);
-          if (alts.length) setSelectedVideo(alts[0]);
-        }}
-        onHide={() => handleHide(selectedVideo)}
-        isAdmin={isAdmin}
+        extraActions={
+          !isAdmin ? (
+            <>
+              <button
+                onClick={() => { const alts = subVideos.filter(v => v.id !== selectedVideo.id); if (alts.length) setSelectedVideo(alts[0]); }}
+                className="bg-slate-800 text-slate-300 py-2.5 px-4 rounded-xl text-[10px] font-black uppercase border border-slate-700"
+              >Cambiar</button>
+              <button
+                onClick={() => handleHide(selectedVideo)}
+                className="bg-red-500/10 text-red-400 py-2.5 px-4 rounded-xl text-[10px] font-black uppercase border border-red-500/20"
+              ><EyeOff className="w-4 h-4" /></button>
+            </>
+          ) : undefined
+        }
       />
-    </AnimatePresence>
-  );
+    );
+  }
 
   // ─── Video list for subcategory ───────────────────────────────────────────
   if (selectedSub) {
@@ -631,22 +461,12 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
         <p className="text-[11px] font-black text-red-400 uppercase tracking-[0.3em] mb-2">CORE DE LA APP</p>
         <h2 className="text-2xl font-black italic text-white leading-tight">Domina el Arte<br />del Boxeo</h2>
         <p className="text-slate-400 text-sm mt-2">Desde técnica básica hasta sparring profesional</p>
-        <div className="flex flex-wrap gap-3 mt-4">
-          {isAdmin && (
-            <button 
-              onClick={() => setShowGuideModal(true)}
-              className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-md px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest border border-white/20 transition-all flex items-center gap-2"
-            >
-              📹 Guía Videos 3D
-            </button>
-          )}
-          {isAdmin && videos.length === 0 && (
-            <button onClick={handleSeed} disabled={seeding}
-              className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2">
-              {seeding ? <><Loader2 className="w-4 h-4 animate-spin" /> Cargando...</> : '⚡ Cargar Contenido Inicial'}
-            </button>
-          )}
-        </div>
+        {isAdmin && videos.length === 0 && (
+          <button onClick={handleSeed} disabled={seeding}
+            className="mt-4 bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2">
+            {seeding ? <><Loader2 className="w-4 h-4 animate-spin" /> Cargando...</> : '⚡ Cargar Contenido Inicial'}
+          </button>
+        )}
       </div>
 
       {/* Subcategory grid */}
@@ -670,102 +490,6 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
           </motion.button>
         ))}
       </div>
-      {/* 3D Video Production Guide Modal */}
-      <AnimatePresence>
-        {showGuideModal && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
-              className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto p-8 relative shadow-2xl custom-scrollbar"
-            >
-              <button 
-                onClick={() => setShowGuideModal(false)}
-                className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="mb-8">
-                <span className="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2 block">ADMINISTRADOR</span>
-                <h2 className="text-3xl font-black italic text-white tracking-tight uppercase">Guía de Producción 3D</h2>
-                <p className="text-slate-400 text-sm mt-1">Sigue estas reglas para mantener la calidad visual de GPTE.</p>
-              </div>
-
-              <div className="space-y-8">
-                <section className="bg-white/5 border border-white/10 rounded-3xl p-6">
-                  <h3 className="text-primary font-bold text-lg mb-4 flex items-center gap-2">
-                    <Monitor className="w-5 h-5" /> Formato y Duración
-                  </h3>
-                  <ul className="space-y-3">
-                    <li className="flex gap-3 text-sm text-slate-300">
-                      <span className="text-primary font-black">01.</span>
-                      <span><strong>Duración:</strong> Máximo 30 segundos (idealmente 15-20s).</span>
-                    </li>
-                    <li className="flex gap-3 text-sm text-slate-300">
-                      <span className="text-primary font-black">02.</span>
-                      <span><strong>Relación:</strong> Vertical (9:16) para móvil o 16:9 alta resolución.</span>
-                    </li>
-                    <li className="flex gap-3 text-sm text-slate-300">
-                      <span className="text-primary font-black">03.</span>
-                      <span><strong>Fondo:</strong> Limpio o tipo Studio (oscuro/minimalista).</span>
-                    </li>
-                  </ul>
-                </section>
-
-                <section className="bg-indigo-500/10 border border-indigo-500/20 rounded-3xl p-6">
-                  <h3 className="text-indigo-400 font-bold text-lg mb-4 flex items-center gap-2">
-                    <Target className="w-5 h-5" /> Estructura del Video
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Bloque 1: La Técnica</p>
-                      <p className="text-sm text-slate-200">Mostrar el movimiento completo a velocidad real, luego en cámara lenta resaltando la rotación de pies y cadera.</p>
-                    </div>
-                    <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Bloque 2: Errores Comunes</p>
-                      <p className="text-sm text-slate-200">Visualizar 1 o 2 errores típicos (ej: bajar la guardia) con una cruz roja ❌ o señal visual clara.</p>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="bg-emerald-500/5 border border-emerald-500/10 rounded-3xl p-6">
-                  <h3 className="text-emerald-400 font-bold text-lg mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5" /> Modelos 3D Sugeridos
-                  </h3>
-                  <p className="text-xs text-slate-400 mb-6 italic">Usa uno de estos personajes para las animaciones:</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-4 bg-slate-950 rounded-2xl border border-slate-800 group">
-                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl group-hover:scale-110 transition-transform">🤖</div>
-                      <p className="text-xs font-black uppercase text-white">Techno Ghost</p>
-                      <p className="text-[9px] text-slate-500 mt-1 italic">Estilo futurista/transparente</p>
-                    </div>
-                    <div className="text-center p-4 bg-slate-950 rounded-2xl border border-slate-800 group">
-                      <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl group-hover:scale-110 transition-transform">🦁</div>
-                      <p className="text-xs font-black uppercase text-white">The Beast</p>
-                      <p className="text-[9px] text-slate-500 mt-1 italic">Estilo anatómico/fuerza</p>
-                    </div>
-                    <div className="text-center p-4 bg-slate-950 rounded-2xl border border-slate-800 group">
-                      <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl group-hover:scale-110 transition-transform">⚡</div>
-                      <p className="text-xs font-black uppercase text-white">Shadow Boxer</p>
-                      <p className="text-[9px] text-slate-500 mt-1 italic">Estilo silueta/foscforescente</p>
-                    </div>
-                  </div>
-                </section>
-
-                <button 
-                  onClick={() => setShowGuideModal(false)}
-                  className="w-full bg-primary text-white py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
-                >
-                  Entendido
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

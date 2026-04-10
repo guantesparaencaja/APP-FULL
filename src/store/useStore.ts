@@ -46,7 +46,13 @@ export interface User {
   plan?: string;
   plan_id?: string;
   plan_name?: string;
-  plan_status?: 'active' | 'pending' | 'inactive' | 'pending_payment' | 'pending_verification' | 'none';
+  plan_status?:
+    | 'active'
+    | 'pending'
+    | 'inactive'
+    | 'pending_payment'
+    | 'pending_verification'
+    | 'none';
   plan_start_date?: any;
   classes_per_month?: number;
   classes_remaining?: number;
@@ -70,9 +76,16 @@ interface AppState {
 
 export const useStore = create<AppState>((set) => ({
   user: null,
-  theme: (typeof window !== 'undefined' ? localStorage.getItem('theme') as 'light' | 'dark' | 'system' : 'system') || 'system',
-  hasWarmedUp: typeof window !== 'undefined' ? localStorage.getItem('warmupDate') === new Date().toDateString() : false,
-  hasSeenVendaje: typeof window !== 'undefined' ? localStorage.getItem('hasSeenVendaje') === 'true' : false,
+  theme:
+    (typeof window !== 'undefined'
+      ? (localStorage.getItem('theme') as 'light' | 'dark' | 'system')
+      : 'system') || 'system',
+  hasWarmedUp:
+    typeof window !== 'undefined'
+      ? localStorage.getItem('warmupDate') === new Date().toDateString()
+      : false,
+  hasSeenVendaje:
+    typeof window !== 'undefined' ? localStorage.getItem('hasSeenVendaje') === 'true' : false,
   setUser: (user) => set({ user }),
   setTheme: (theme) => {
     localStorage.setItem('theme', theme);
@@ -88,11 +101,12 @@ export const useStore = create<AppState>((set) => ({
     localStorage.setItem('hasSeenVendaje', String(hasSeenVendaje));
     set({ hasSeenVendaje });
   },
-  loseLife: () => set((state) => ({
-    user: state.user ? { ...state.user, lives: Math.max(0, state.user.lives - 1) } : null
-  })),
-  increaseStreak: () => set((state) => ({
-    user: state.user ? { ...state.user, streak: state.user.streak + 1 } : null
-  })),
+  loseLife: () =>
+    set((state) => ({
+      user: state.user ? { ...state.user, lives: Math.max(0, state.user.lives - 1) } : null,
+    })),
+  increaseStreak: () =>
+    set((state) => ({
+      user: state.user ? { ...state.user, streak: state.user.streak + 1 } : null,
+    })),
 }));
-

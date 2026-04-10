@@ -33,7 +33,7 @@ export async function initializePushNotifications(userId: string) {
       try {
         const userRef = doc(db, 'users', userId);
         await updateDoc(userRef, {
-          fcm_token: token.value
+          fcm_token: token.value,
         });
       } catch (err) {
         console.error('Error saving FCM token:', err);

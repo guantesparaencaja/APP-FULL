@@ -22,29 +22,29 @@ export const ACHIEVEMENTS: Achievement[] = [
     title: 'Primer Round',
     description: 'Completa tu primer entrenamiento.',
     icon: 'Trophy',
-    condition: (stats) => stats.totalWorkouts >= 1
+    condition: (stats) => stats.totalWorkouts >= 1,
   },
   {
     id: 'workout_10',
     title: 'Constancia',
     description: 'Completa 10 entrenamientos.',
     icon: 'Flame',
-    condition: (stats) => stats.totalWorkouts >= 10
+    condition: (stats) => stats.totalWorkouts >= 10,
   },
   {
     id: 'rounds_100',
     title: 'Centurión',
     description: 'Completa 100 rounds totales.',
     icon: 'Target',
-    condition: (stats) => stats.totalRounds >= 100
+    condition: (stats) => stats.totalRounds >= 100,
   },
   {
     id: 'hours_10',
     title: 'Veterano',
     description: 'Entrena por más de 10 horas totales.',
     icon: 'Clock',
-    condition: (stats) => stats.totalMinutes >= 600
-  }
+    condition: (stats) => stats.totalMinutes >= 600,
+  },
 ];
 
 export async function checkAndUnlockAchievements(userId: string, stats: UserStats) {
@@ -52,7 +52,7 @@ export async function checkAndUnlockAchievements(userId: string, stats: UserStat
     // Get already unlocked achievements
     const q = query(collection(db, 'user_achievements'), where('userId', '==', userId));
     const querySnapshot = await getDocs(q);
-    const unlockedIds = new Set(querySnapshot.docs.map(doc => doc.data().achievementId));
+    const unlockedIds = new Set(querySnapshot.docs.map((doc) => doc.data().achievementId));
 
     const newUnlocks = [];
 
@@ -62,7 +62,7 @@ export async function checkAndUnlockAchievements(userId: string, stats: UserStat
         await addDoc(collection(db, 'user_achievements'), {
           userId,
           achievementId: achievement.id,
-          unlockedAt: serverTimestamp()
+          unlockedAt: serverTimestamp(),
         });
         newUnlocks.push(achievement);
       }

@@ -12,9 +12,10 @@ export function useRealtimeCollection<T>(
 
   useEffect(() => {
     const q = query(collection(db, collectionPath), ...constraints);
-    const unsub = onSnapshot(q,
+    const unsub = onSnapshot(
+      q,
       (snap) => {
-        setData(snap.docs.map(d => ({ id: d.id, ...d.data() } as T)));
+        setData(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as T));
         setLoading(false);
       },
       (err) => {

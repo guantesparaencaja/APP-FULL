@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday } from 'date-fns';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameDay,
+  addMonths,
+  subMonths,
+  isToday,
+} from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -24,10 +33,16 @@ export const TrainingCalendar: React.FC<TrainingCalendarProps> = ({ workoutDates
           {format(currentMonth, 'MMMM yyyy', { locale: es })}
         </h3>
         <div className="flex gap-2">
-          <button onClick={prevMonth} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+          <button
+            onClick={prevMonth}
+            className="p-2 hover:bg-white/5 rounded-full transition-colors"
+          >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <button onClick={nextMonth} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+          <button
+            onClick={nextMonth}
+            className="p-2 hover:bg-white/5 rounded-full transition-colors"
+          >
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
@@ -35,7 +50,10 @@ export const TrainingCalendar: React.FC<TrainingCalendarProps> = ({ workoutDates
 
       <div className="grid grid-cols-7 gap-2 mb-2">
         {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, i) => (
-          <div key={i} className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest py-2">
+          <div
+            key={i}
+            className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest py-2"
+          >
             {day}
           </div>
         ))}
@@ -48,7 +66,7 @@ export const TrainingCalendar: React.FC<TrainingCalendarProps> = ({ workoutDates
         ))}
 
         {days.map((day) => {
-          const hasWorkout = workoutDates.some(wd => isSameDay(wd, day));
+          const hasWorkout = workoutDates.some((wd) => isSameDay(wd, day));
           const isCurrentDay = isToday(day);
 
           return (

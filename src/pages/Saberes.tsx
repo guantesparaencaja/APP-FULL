@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { PlayCircle, CheckCircle, Lock, ArrowLeft, Upload, Check, Video, Plus, X, Edit2, Trash2, Play, Loader2, Award, Shield, AlertTriangle, ChevronRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { storage, db } from '../lib/firebase';
-import { ref, deleteObject } from 'firebase/storage';
+import { ref, deleteObject, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { collection, getDocs, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, where, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
 import { sendPushNotification } from '../lib/fcmService';
 import { InteractiveLesson } from '../components/InteractiveLesson';
@@ -46,9 +46,6 @@ interface ComboProgress {
   manillas_approved?: boolean;
   contacto_approved?: boolean;
   desarrollo_approved?: boolean;
-  combo_feedback?: string;
-  manillas_feedback?: string;
-  contacto_feedback?: string;
 }
 
 // Removal of legacy Evaluation interface and showEvaluations state
@@ -64,9 +61,9 @@ const DBZ_RANKS = [
   { level: 7, name: "Super Sayayin 3", icon: "✨", color: "text-yellow-200", glow: "shadow-yellow-300/60" },
   { level: 8, name: "Super Sayayin Dios", icon: "🔴", color: "text-red-500", glow: "shadow-red-600/70" },
   { level: 9, name: "Super Sayayin Blue", icon: "🔵", color: "text-blue-500", glow: "shadow-blue-500/80" },
-  { level: 10, name: "Ultra Instinto", icon: "🌀", color: "text-slate-300", glow: "shadow-slate-200/90" },
-  { level: 11, name: "Dios de la Destrucción", icon: "🟣", color: "text-purple-500", glow: "shadow-purple-500/100" },
-  { level: 12, name: "Ángel Supremo", icon: "⚪", color: "text-white", glow: "shadow-white/100" }
+  { level: 10, name: "Ultra Instinto (S)", icon: "🌀", color: "text-slate-300", glow: "shadow-slate-200/90" },
+  { level: 11, name: "Ultra Instinto (D)", icon: "⚪", color: "text-white", glow: "shadow-white/100" },
+  { level: 12, name: "Dios de la Destrucción", icon: "🟣", color: "text-purple-500", glow: "shadow-purple-500/100" }
 ];
 
 const deleteStorageFile = async (storage: any, url?: string) => {
@@ -97,7 +94,6 @@ export function Saberes() {
   const [newComboName, setNewComboName] = useState('');
   const [newComboLevel, setNewComboLevel] = useState(1);
   const [editingComboLevel, setEditingComboLevel] = useState<{id: string, level: number} | null>(null);
-  const [editingComboName, setEditingComboName] = useState<{id: string, name: string} | null>(null);
   const adminVideoInputRef = useRef<HTMLInputElement>(null);
   const [editingCombo, setEditingCombo] = useState<Combo | null>(null);
   const [showAddTutorial, setShowAddTutorial] = useState(false);
@@ -111,6 +107,8 @@ export function Saberes() {
   const [activeTab, setActiveTab] = useState<'Aprender' | 'Combos y Evaluación'>('Aprender');
   // ✅ Preview de video: muestra el video al estudiante antes de confirmar el envío
   const [videoPreview, setVideoPreview] = useState<{ file: File; previewUrl: string; comboId: string } | null>(null);
+  // ✅ Fullscreen video tutorial
+  const [fullscreenVideo, setFullscreenVideo] = useState<Tutorial | null>(null);
 
 
   // Legacy evaluation handlers removed. New system uses combo_progress exclusively.
@@ -262,43 +260,21 @@ export function Saberes() {
     if (user) {
       // Combos
       unsubCombos = onSnapshot(collection(db, 'combos'), (snapshot) => {
-        if (snapshot.empty && (user?.role === 'admin' || user?.email === 'hernandezkevin001998@gmail.com')) {
-          seedInitialCombos();
-        } else {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Combo));
-          setCombos(data);
-        }
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Combo));
+        setCombos(data);
       }, (err) => console.error(err));
 
       // User Evaluations logic removed
       
       // All Evaluations (Admin) logic removed
 
-      // Combo Progress from combo_evaluations
-      let progressQuery: any = collection(db, 'combo_evaluations');
+      // Combo Progress
+      let progressQuery: any = collection(db, 'combo_progress');
       if (user.role !== 'admin' && user.role !== 'teacher') {
-        progressQuery = query(collection(db, 'combo_evaluations'), where('user_id', '==', String(user.id)));
+        progressQuery = query(collection(db, 'combo_progress'), where('user_id', '==', String(user.id)));
       }
       unsubProgress = onSnapshot(progressQuery, (snapshot: any) => {
-        const data = snapshot.docs.map((doc: any) => {
-          const raw = doc.data();
-          return {
-            id: doc.id,
-            combo_id: raw.combo_id,
-            user_id: raw.user_id,
-            user_name: raw.user_name,
-            video_url: raw.combo_video_url || raw.video_url || '',
-            status: raw.combo_status || raw.status || 'pending',
-            video_approved: raw.combo_status === 'approved',
-            manillas_approved: raw.manillas_status === 'approved',
-            contacto_approved: raw.contacto_status === 'approved',
-            desarrollo_approved: raw.desarrollo_approved || false,
-            combo_feedback: raw.combo_feedback || '',
-            manillas_feedback: raw.manillas_feedback || '',
-            contacto_feedback: raw.contacto_feedback || '',
-            created_at: raw.created_at
-          } as ComboProgress;
-        });
+        const data = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as ComboProgress));
         setComboProgress(data);
       }, (err: any) => console.error(err));
 
@@ -442,54 +418,45 @@ export function Saberes() {
     if (adminVideoInputRef.current) adminVideoInputRef.current.value = '';
   };
 
-  // ✅ Confirmar subida: convierte a base64 y guarda en Firestore
+  // ✅ Confirmar subida: Usando Google Drive exclusivo (n8n)
   const handleConfirmVideoUpload = async (file: File, isAdmin = false) => {
     setUploadProgress(0);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.onprogress = (ev) => {
-          if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
-        };
-        reader.readAsDataURL(file);
-      });
-
       if (isAdmin && editingCombo) {
-        // Para admin, seguimos permitiendo base64 si es un video de referencia pequeño o podemos migrarlo también.
-        // Pero para el flujo de estudiantes:
-        await updateDoc(doc(db, 'combos', editingCombo.id), { video_url: base64 });
-        setEditingCombo(null);
-      } else if (videoPreview?.comboId && user) {
-        // ✅ USAR SERVICIO DE DRIVE VIA N8N
-        const driveUrl = await uploadVideoToDrive(
-          videoPreview.file, 
-          String(user.id), 
-          (p) => setUploadProgress(p),
-          { comboId: videoPreview.comboId, userName: user.name }
+        // Admin: sube el video de referencia a Google Drive
+        const videoUrl = await uploadVideoToDrive(
+          file,
+          'admin',
+          (prog) => setUploadProgress(prog),
+          { type: 'combo_reference', comboId: editingCombo.id }
         );
-
-        const comboData = combos.find(c => c.id === videoPreview.comboId);
-        await addDoc(collection(db, 'combo_evaluations'), {
+        await updateDoc(doc(db, 'combos', editingCombo.id), { video_url: videoUrl });
+        setEditingCombo(null);
+        alert('✅ Video de referencia subido a Drive correctamente.');
+      } else if (videoPreview?.comboId && user) {
+        // Estudiante: sube a Google Drive → combo_progress
+        const videoUrl = await uploadVideoToDrive(
+          file,
+          user.id,
+          (prog) => setUploadProgress(prog),
+          { type: 'combo_evaluation', comboId: videoPreview.comboId }
+        );
+        
+        await addDoc(collection(db, 'combo_progress'), {
           combo_id: videoPreview.comboId,
-          combo_name: comboData?.name || 'Combo',
           user_id: String(user.id),
           user_name: user.name,
-          combo_video_url: driveUrl, // URL de Drive
-          combo_status: 'uploaded',
-          manillas_status: 'pending',
-          contacto_status: 'pending',
-          created_at: serverTimestamp()
+          video_url: videoUrl,
+          status: 'pending',
+          created_at: serverTimestamp(),
         });
-        alert('✅ Video enviado a Drive y en proceso de revisión.');
+        alert('✅ Video enviado para revisión. El profesor lo revisará pronto.');
       }
     } catch (err: any) {
-      alert('Error en la subida: ' + err.message);
+      alert('Error al subir el video: ' + (err?.message || 'Intenta de nuevo'));
     } finally {
       setUploadProgress(null);
       setUploadingComboId(null);
-      // Limpiar preview
       if (videoPreview?.previewUrl) URL.revokeObjectURL(videoPreview.previewUrl);
       setVideoPreview(null);
     }
@@ -531,15 +498,6 @@ export function Saberes() {
       setEditingComboLevel(null);
     } catch (err) {
       console.error('Error updating combo level:', err);
-    }
-  };
-
-  const handleUpdateComboName = async (comboId: string, newName: string) => {
-    try {
-      await updateDoc(doc(db, 'combos', comboId), { name: newName });
-      setEditingComboName(null);
-    } catch (err) {
-      console.error('Error updating combo name:', err);
     }
   };
 
@@ -601,36 +559,16 @@ export function Saberes() {
     }
   };
 
-  const GPTE_COMBOS = [
-    '1-2 (Jab-Cross)', '1-2-PI (Paso Izq)', '1-2-PD (Paso Der)',
-    '1-2-3 (Hook Izq)', '1-2-3-4 (Hook Der)', 'PA (Paso Atrás)-1-2',
-    'DJ (Doble Jab)-DR (Directo)', 'DCR (Directo Cuerpo)-DUP', '1-2-Cabeceo (Slip)',
-    '1-2-3-PA-1-2', 'DJ-Cabeceo-DUP', '5-6 (Uppercuts)-3-4',
-    '7-8 (Ganchos)-9-10 (Flotantes)', '1-2-PA-1-2-Cabeceo', 'DUPR (Directo Uppercut)-P (Pivote)',
-    '1-2-3-4-5-6-7-8', 'DJ-DR-PA-DUP-P', 'DG (Gancho)-DCR-118-112',
-    'PE (Paso Esquiva)-3-4-5-6', '1-2-3-P-2-1-PA', 'DUP-10-3-2-2-1',
-    '118-112 (Body Shots)-9-3', '227-221 (Technical)-10-4', '7-8-PE-5-6-4-3',
-    '8-7-PE-6-5-4-3', '1-2-3-4-5-6-7-8-9-10', 'DJ-DR-DG-DCR-DUP-DUPR',
-    'PA-PDE-PI-PD-PC-P-PE', '1-2-Rolly (Roll)-Cabeceo', '5-6-DUP-DUPR-P',
-    '7-8-1-2-9-10-3-4', 'DJ-DR-PA-PDE-Rolly-5-6', 'MAESTRO SUPREMO GPTE'
-  ];
-
-  // Show ALL combos to students (no video requirement), sorted by level, prioritizing custom combos, then name
+  // Show ALL combos to students (no video requirement), sorted by level then name
   const visibleCombos = [...combos].sort((a, b) => {
-    if (a.level !== b.level) return a.level - b.level; // Sort by level first
-
-    const aIsGpte = GPTE_COMBOS.includes(a.name);
-    const bIsGpte = GPTE_COMBOS.includes(b.name);
-    
-    if (aIsGpte !== bIsGpte) return aIsGpte ? 1 : -1; // non-GPTE combos first within the same level
+    if (a.level !== b.level) return a.level - b.level;
     return a.name.localeCompare(b.name);
   });
 
   // Group combos by level for display
   const combosByLevel = visibleCombos.reduce<Record<number, Combo[]>>((acc, combo) => {
-    const groupLevel = combo.level;
-    if (!acc[groupLevel]) acc[groupLevel] = [];
-    acc[groupLevel].push(combo);
+    if (!acc[combo.level]) acc[combo.level] = [];
+    acc[combo.level].push(combo);
     return acc;
   }, {});
 
@@ -704,6 +642,52 @@ export function Saberes() {
         </div>
       )}
 
+      {/* ✅ Modal Fullscreen Tutorial */}
+      {fullscreenVideo && (
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 bg-slate-950/80 backdrop-blur-md border-b border-slate-800">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-black text-primary uppercase tracking-widest truncate">{fullscreenVideo.category}</p>
+              <h4 className="text-base font-black text-white uppercase italic tracking-tight truncate">{fullscreenVideo.title}</h4>
+            </div>
+            <button
+              onClick={() => setFullscreenVideo(null)}
+              className="ml-3 p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {/* Video fullscreen */}
+          <div className="flex-1 bg-black flex items-center justify-center">
+            {fullscreenVideo.video_url ? (
+              <video
+                src={fullscreenVideo.video_url}
+                controls
+                autoPlay
+                playsInline
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-4 text-slate-600">
+                <Video className="w-16 h-16" />
+                <p className="text-sm font-bold uppercase">Sin video disponible</p>
+              </div>
+            )}
+          </div>
+          {/* Descripción completa */}
+          <div className="bg-slate-950 border-t border-slate-800 px-5 py-4 max-h-40 overflow-y-auto">
+            {fullscreenVideo.description && (
+              <p className="text-sm text-slate-300 leading-relaxed">{fullscreenVideo.description}</p>
+            )}
+            <div className="flex items-center gap-2 mt-2">
+              <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded text-[10px] font-black uppercase">Nivel {fullscreenVideo.level}</span>
+              <span className="text-[10px] text-slate-500 font-bold uppercase">{fullscreenVideo.duration}min</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-2 bg-slate-800/50 p-1 rounded-xl mb-6 border border-slate-700/50">
         <button
@@ -757,14 +741,14 @@ export function Saberes() {
           <div className="mb-6">
             {!showAddCombo ? (
               <div className="flex gap-3">
-                  <button 
+                <button 
                   onClick={() => setShowAddCombo(true)}
                   className="flex-1 flex items-center justify-center gap-2 bg-primary/20 text-primary border border-primary/50 py-3 rounded-xl font-bold hover:bg-primary/30 transition-all"
                 >
                   <Plus className="w-5 h-5" />
                   Agregar Combo
                 </button>
-                {combos.length < 30 && (
+                {combos.length === 0 && (
                   <button 
                     onClick={seedInitialCombos}
                     disabled={seeding}
@@ -908,7 +892,53 @@ export function Saberes() {
       </section>
 
       <section className="flex flex-col gap-4">
-        {/* Aprobaciones centralizadas en el Perfil para admins */}
+        {user?.role === 'admin' && comboProgress.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-xl font-bold mb-4">Videos Pendientes de Revisión</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {comboProgress.filter(p => p.status === 'pending').map(progress => {
+                const comboName = combos.find(c => c.id === progress.combo_id)?.name || 'Combo Desconocido';
+                return (
+                  <div key={progress.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-bold">{progress.user_name}</h4>
+                        <p className="text-xs text-slate-400">{comboName}</p>
+                      </div>
+                      <span className="bg-yellow-500/20 text-yellow-500 text-[10px] font-bold px-2 py-1 rounded uppercase">
+                        Pendiente
+                      </span>
+                    </div>
+                    <video src={progress.video_url} controls className="w-full h-48 object-cover rounded-lg mb-3 bg-slate-900" />
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={async () => {
+                          await updateDoc(doc(db, 'combo_progress', progress.id), { status: 'approved' });
+                          // fetchComboProgress(); removed, onSnapshot handles it
+                        }}
+                        className="flex-1 bg-emerald-500/20 text-emerald-500 py-2 rounded-lg text-sm font-bold hover:bg-emerald-500/30 transition-colors"
+                      >
+                        Aprobar
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          await updateDoc(doc(db, 'combo_progress', progress.id), { status: 'rejected' });
+                          // fetchComboProgress(); removed, onSnapshot handles it
+                        }}
+                        className="flex-1 bg-red-500/20 text-red-500 py-2 rounded-lg text-sm font-bold hover:bg-red-500/30 transition-colors"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {comboProgress.filter(p => p.status === 'pending').length === 0 && (
+                <p className="text-slate-400 text-sm col-span-full">No hay videos pendientes de revisión.</p>
+              )}
+            </div>
+          </div>
+        )}
 
         <h3 className="text-lg font-bold">Lista de Saberes Box</h3>
         
@@ -924,29 +954,29 @@ export function Saberes() {
         {/* Render combos grouped by level */}
         {Object.entries(combosByLevel)
           .sort(([a], [b]) => parseInt(a) - parseInt(b))
-          .map(([levelStr, levelCombos]) => (
-            <div key={levelStr} className="mb-8">
+          .map(([level, levelCombos]) => (
+            <div key={level} className="mb-8">
               {/* Level Header - Sayayin Style */}
               <div className="flex items-center gap-4 mb-4">
                 <div className={`relative flex items-center justify-center w-12 h-12 rounded-xl border-2 rotate-3 group-hover:rotate-0 transition-transform duration-300 ${
-                  DBZ_RANKS.find(r => r.level === parseInt(levelStr))?.glow || 'shadow-primary/10'
+                  DBZ_RANKS.find(r => r.level === parseInt(level))?.glow || 'shadow-primary/10'
                 } ${
-                  DBZ_RANKS.find(r => r.level === parseInt(levelStr))?.color?.replace('text-', 'border-') || 'border-slate-700 bg-slate-900'
-                }`}>
-                  <span className="text-xl">{DBZ_RANKS.find(r => r.level === parseInt(levelStr))?.icon || '🥋'}</span>
+                  DBZ_RANKS.find(r => r.level === parseInt(level))?.color?.replace('text-', 'border-') || 'border-slate-700'
+                } bg-slate-900`}>
+                  <span className="text-xl">{DBZ_RANKS.find(r => r.level === parseInt(level))?.icon || '🥋'}</span>
                 </div>
                 <div className="flex-1">
                   <h3 className={`text-lg font-black uppercase italic tracking-tighter leading-none ${
-                    DBZ_RANKS.find(r => r.level === parseInt(levelStr))?.color || 'text-white'
+                    DBZ_RANKS.find(r => r.level === parseInt(level))?.color || 'text-white'
                   }`}>
-                    {DBZ_RANKS.find(r => r.level === parseInt(levelStr))?.name || `Nivel ${levelStr}`}
+                    {DBZ_RANKS.find(r => r.level === parseInt(level))?.name || `Nivel ${level}`}
                   </h3>
-                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Clasificación de Poder Nivel {levelStr}</p>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Clasificación de Poder Nivel {level}</p>
                 </div>
                 <div className={`h-px flex-1 bg-gradient-to-r transition-all duration-1000 ${
-                  parseInt(levelStr) >= 10 ? 'from-slate-100 to-transparent' :
-                  parseInt(levelStr) >= 8 ? 'from-red-600 to-transparent' :
-                  parseInt(levelStr) >= 5 ? 'from-yellow-400 to-transparent' :
+                  parseInt(level) >= 10 ? 'from-slate-100 to-transparent' :
+                  parseInt(level) >= 8 ? 'from-red-600 to-transparent' :
+                  parseInt(level) >= 5 ? 'from-yellow-400 to-transparent' :
                   'from-primary/30 to-transparent'
                 }`}></div>
               </div>
@@ -975,31 +1005,7 @@ export function Saberes() {
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
                           <div>
-                            {editingComboName?.id === combo.id ? (
-                              <div className="flex items-center gap-1 mb-1">
-                                <input
-                                  value={editingComboName.name}
-                                  onChange={(e) => setEditingComboName({ id: combo.id, name: e.target.value })}
-                                  className="bg-slate-900 border border-primary/50 rounded px-2 py-1 text-sm font-bold text-white"
-                                  autoFocus
-                                />
-                                <button onClick={() => handleUpdateComboName(combo.id, editingComboName.name)} className="p-1 text-emerald-400 hover:text-emerald-300">
-                                  <CheckCircle className="w-4 h-4" />
-                                </button>
-                                <button onClick={() => setEditingComboName(null)} className="p-1 text-slate-400 hover:text-white">
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <h3 className={`font-bold text-lg flex items-center gap-2 ${isLocked ? 'text-slate-400' : ''}`} translate="no">
-                                {combo.name}
-                                {user?.role === 'admin' && (
-                                  <button onClick={() => setEditingComboName({ id: combo.id, name: combo.name })} className="text-slate-500 hover:text-primary transition-colors">
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </h3>
-                            )}
+                            <h3 className={`font-bold text-lg ${isLocked ? 'text-slate-400' : ''}`} translate="no">{combo.name}</h3>
                             <div className="flex items-center gap-2 mt-1">
                               {combo.video_url ? (
                                 <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
@@ -1113,16 +1119,9 @@ export function Saberes() {
                                 </div>
                               ) : myProgress?.status === 'rejected' ? (
                                 <div className="flex flex-col gap-2">
-                                  <div className="flex flex-col gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
-                                    <div className="flex items-center gap-2">
-                                      <X className="w-4 h-4 text-red-400 flex-shrink-0" />
-                                      <p className="text-xs text-red-400 font-bold">Evaluación rechazada — Por favor revisa e intenta de nuevo</p>
-                                    </div>
-                                    <div className="flex flex-col gap-1 mt-1 pl-6">
-                                      {myProgress.combo_feedback && <p className="text-[10px] text-red-300"><strong>Video:</strong> {myProgress.combo_feedback}</p>}
-                                      {myProgress.manillas_feedback && <p className="text-[10px] text-red-300"><strong>Manillas:</strong> {myProgress.manillas_feedback}</p>}
-                                      {myProgress.contacto_feedback && <p className="text-[10px] text-red-300"><strong>Contacto:</strong> {myProgress.contacto_feedback}</p>}
-                                    </div>
+                                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+                                    <X className="w-4 h-4 text-red-400 flex-shrink-0" />
+                                    <p className="text-xs text-red-400 font-bold">Video/Combo rechazado — revisa e intenta de nuevo</p>
                                   </div>
                                   <button
                                     onClick={() => handleVideoUploadClick(combo.id)}
@@ -1145,7 +1144,55 @@ export function Saberes() {
                       );
                     })()}
 
-                    {/* Pendientes de revisión para admin eliminados - centralizado en Profile */}
+                    {/* Admin: show pending/approved videos per combo */}
+                    {user?.role === 'admin' && (() => {
+                      const listForCombo = comboProgress.filter(p => p.combo_id === combo.id);
+                      if (listForCombo.length === 0) return null;
+                      return (
+                        <div className="mt-2 border-t border-slate-700 pt-3 flex flex-col gap-3">
+                          <p className="text-[10px] font-black text-primary uppercase tracking-widest">Progreso de Estudiantes en este Combo ({listForCombo.length})</p>
+                          {listForCombo.map(progress => (
+                            <div key={progress.id} className="bg-slate-900/80 rounded-xl p-3 border border-slate-700">
+                              <div className="flex justify-between items-center mb-2">
+                                <p className="text-xs font-bold text-slate-300">{progress.user_name}</p>
+                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${progress.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : progress.status === 'rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                  {progress.status === 'approved' ? 'Aprobado' : progress.status === 'rejected' ? 'Rechazado' : 'En Revisión'}
+                                </span>
+                              </div>
+                              <video src={progress.video_url} controls className="w-full h-36 object-cover rounded-lg bg-slate-950 mb-2" />
+                              <div className="flex flex-wrap gap-4 mb-3 border-y border-slate-700/50 py-2">
+                                <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 cursor-pointer">
+                                  <input type="checkbox" checked={!!progress.video_approved} onChange={async (e) => await updateDoc(doc(db, 'combo_progress', progress.id), { video_approved: e.target.checked })} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Video
+                                </label>
+                                <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 cursor-pointer">
+                                  <input type="checkbox" checked={!!progress.manillas_approved} onChange={async (e) => await updateDoc(doc(db, 'combo_progress', progress.id), { manillas_approved: e.target.checked })} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Manillas
+                                </label>
+                                <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 cursor-pointer">
+                                  <input type="checkbox" checked={!!progress.contacto_approved} onChange={async (e) => await updateDoc(doc(db, 'combo_progress', progress.id), { contacto_approved: e.target.checked })} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Contacto
+                                </label>
+                                <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 cursor-pointer">
+                                  <input type="checkbox" checked={!!progress.desarrollo_approved} onChange={async (e) => await updateDoc(doc(db, 'combo_progress', progress.id), { desarrollo_approved: e.target.checked })} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Desarrollo
+                                </label>
+                              </div>
+                              <div className="flex gap-2">
+                                {progress.status !== 'approved' && (
+                                  <button
+                                    onClick={async () => { await updateDoc(doc(db, 'combo_progress', progress.id), { status: 'approved' }); }}
+                                    className="flex-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 py-2 rounded-lg text-xs font-bold hover:bg-emerald-500/30 transition-colors"
+                                  >✓ Aprobar Combo</button>
+                                )}
+                                {progress.status !== 'rejected' && (
+                                  <button
+                                    onClick={async () => { await updateDoc(doc(db, 'combo_progress', progress.id), { status: 'rejected' }); }}
+                                    className="flex-1 bg-red-500/20 text-red-400 border border-red-500/30 py-2 rounded-lg text-xs font-bold hover:bg-red-500/30 transition-colors"
+                                  >✗ Rechazar Combo</button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                   </div>
                 );

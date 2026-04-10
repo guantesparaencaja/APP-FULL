@@ -1,8 +1,8 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { EXERCISE_CATALOG } from "../data/exercises";
-import { MEAL_CATALOG } from "../data/meals";
+import { GoogleGenAI, Type } from '@google/genai';
+import { EXERCISE_CATALOG } from '../data/exercises';
+import { MEAL_CATALOG } from '../data/meals';
 
-const API_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
+const API_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export interface Exercise {
@@ -24,21 +24,22 @@ export const generateLocalMeals = (
   customMeals?: any[]
 ) => {
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  
+
   const catalogToUse = customMeals && customMeals.length > 0 ? customMeals : MEAL_CATALOG;
 
-  const breakfasts = catalogToUse.filter(m => m.category.toLowerCase() === 'desayuno');
-  const lunches = catalogToUse.filter(m => m.category.toLowerCase() === 'almuerzo');
-  const dinners = catalogToUse.filter(m => m.category.toLowerCase() === 'cena');
-  const snacks = catalogToUse.filter(m => m.category.toLowerCase() === 'snack');
+  const breakfasts = catalogToUse.filter((m) => m.category.toLowerCase() === 'desayuno');
+  const lunches = catalogToUse.filter((m) => m.category.toLowerCase() === 'almuerzo');
+  const dinners = catalogToUse.filter((m) => m.category.toLowerCase() === 'cena');
+  const snacks = catalogToUse.filter((m) => m.category.toLowerCase() === 'snack');
 
-  const getRandomMeal = (meals: any[]) => meals.length > 0 ? meals[Math.floor(Math.random() * meals.length)] : null;
+  const getRandomMeal = (meals: any[]) =>
+    meals.length > 0 ? meals[Math.floor(Math.random() * meals.length)] : null;
 
-  const week = days.map(day => {
-    const b = getRandomMeal(breakfasts) || MEAL_CATALOG.find(m => m.category === 'Desayuno');
-    const l = getRandomMeal(lunches) || MEAL_CATALOG.find(m => m.category === 'Almuerzo');
-    const d = getRandomMeal(dinners) || MEAL_CATALOG.find(m => m.category === 'Cena');
-    const s = getRandomMeal(snacks) || MEAL_CATALOG.find(m => m.category === 'Snack');
+  const week = days.map((day) => {
+    const b = getRandomMeal(breakfasts) || MEAL_CATALOG.find((m) => m.category === 'Desayuno');
+    const l = getRandomMeal(lunches) || MEAL_CATALOG.find((m) => m.category === 'Almuerzo');
+    const d = getRandomMeal(dinners) || MEAL_CATALOG.find((m) => m.category === 'Cena');
+    const s = getRandomMeal(snacks) || MEAL_CATALOG.find((m) => m.category === 'Snack');
 
     return {
       day,
@@ -49,7 +50,12 @@ export const generateLocalMeals = (
           image_keyword: b.image_url || b.image_keyword,
           ingredients: b.ingredients,
           preparation_steps: b.preparation_steps || [{ step: b.instructions }],
-          macros: b.macros || { calories: b.calories, protein: b.protein, carbs: b.carbs, fats: b.fats }
+          macros: b.macros || {
+            calories: b.calories,
+            protein: b.protein,
+            carbs: b.carbs,
+            fats: b.fats,
+          },
         },
         {
           name: l.name,
@@ -57,7 +63,12 @@ export const generateLocalMeals = (
           image_keyword: l.image_url || l.image_keyword,
           ingredients: l.ingredients,
           preparation_steps: l.preparation_steps || [{ step: l.instructions }],
-          macros: l.macros || { calories: l.calories, protein: l.protein, carbs: l.carbs, fats: l.fats }
+          macros: l.macros || {
+            calories: l.calories,
+            protein: l.protein,
+            carbs: l.carbs,
+            fats: l.fats,
+          },
         },
         {
           name: d.name,
@@ -65,7 +76,12 @@ export const generateLocalMeals = (
           image_keyword: d.image_url || d.image_keyword,
           ingredients: d.ingredients,
           preparation_steps: d.preparation_steps || [{ step: d.instructions }],
-          macros: d.macros || { calories: d.calories, protein: d.protein, carbs: d.carbs, fats: d.fats }
+          macros: d.macros || {
+            calories: d.calories,
+            protein: d.protein,
+            carbs: d.carbs,
+            fats: d.fats,
+          },
         },
         {
           name: s.name,
@@ -73,9 +89,14 @@ export const generateLocalMeals = (
           image_keyword: s.image_url || s.image_keyword,
           ingredients: s.ingredients,
           preparation_steps: s.preparation_steps || [{ step: s.instructions }],
-          macros: s.macros || { calories: s.calories, protein: s.protein, carbs: s.carbs, fats: s.fats }
-        }
-      ]
+          macros: s.macros || {
+            calories: s.calories,
+            protein: s.protein,
+            carbs: s.carbs,
+            fats: s.fats,
+          },
+        },
+      ],
     };
   });
 
@@ -98,9 +119,9 @@ export const generateLocalWorkout = (
   // Specific MuscleWiki Schedule Logic
   const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const todayName = days[new Date().getDay()];
-  
+
   let targetMuscles = [...muscles];
-  
+
   // Override muscles based on schedule if no specific muscles provided or if we want to follow the plan
   if (muscles.length === 0 || muscles.includes('Cuerpo Completo')) {
     switch (todayName) {
@@ -128,10 +149,11 @@ export const generateLocalWorkout = (
   }
 
   // Filter catalog by muscles
-  let availableExercises = EXERCISE_CATALOG.filter(ex => 
-    targetMuscles.some(m => 
-      ex.muscle_group.toLowerCase().includes(m.toLowerCase()) || 
-      m.toLowerCase().includes(ex.muscle_group.toLowerCase())
+  let availableExercises = EXERCISE_CATALOG.filter((ex) =>
+    targetMuscles.some(
+      (m) =>
+        ex.muscle_group.toLowerCase().includes(m.toLowerCase()) ||
+        m.toLowerCase().includes(ex.muscle_group.toLowerCase())
     )
   );
 
@@ -143,10 +165,12 @@ export const generateLocalWorkout = (
   // Use a seed based on the date to ensure it changes daily but stays consistent for the day
   const today = new Date().toISOString().split('T')[0];
   const seed = today.split('-').reduce((acc, val) => acc + Number(val), 0);
-  
+
   // Custom shuffle with seed
   const seededShuffle = (array: any[], seed: number) => {
-    let m = array.length, t, i;
+    let m = array.length,
+      t,
+      i;
     while (m) {
       i = Math.floor(Math.abs(Math.sin(seed++) * m--));
       t = array[m];
@@ -157,22 +181,22 @@ export const generateLocalWorkout = (
   };
 
   const shuffled = seededShuffle([...availableExercises], seed);
-  
+
   // Select top N
   const selected = shuffled.slice(0, numExercises);
 
   // Map to expected format
-  const exercises = selected.map(ex => {
+  const exercises = selected.map((ex) => {
     // Determine sets/reps based on goal
-    let sets = "3";
-    let reps = "10-12";
-    
+    let sets = '3';
+    let reps = '10-12';
+
     if (goal.toLowerCase().includes('fuerza')) {
-      sets = "4";
-      reps = "5-8";
+      sets = '4';
+      reps = '5-8';
     } else if (goal.toLowerCase().includes('peso')) {
-      sets = "3";
-      reps = "15-20";
+      sets = '3';
+      reps = '15-20';
     }
 
     return {
@@ -183,19 +207,19 @@ export const generateLocalWorkout = (
       muscles_worked: ex.muscles_worked,
       video_url: ex.video_url,
       sets,
-      reps
+      reps,
     };
   });
 
   return {
     workout_name: `Rutina de ${muscles.join(', ')} (${durationMinutes} min)`,
-    exercises
+    exercises,
   };
 };
 
 export const getYouTubeEmbedUrl = (url: string) => {
   if (!url) return '';
-  
+
   let videoId = '';
   if (url.includes('embed/')) {
     videoId = url.split('embed/')[1].split('?')[0];
@@ -204,8 +228,10 @@ export const getYouTubeEmbedUrl = (url: string) => {
   } else if (url.includes('youtu.be/')) {
     videoId = url.split('youtu.be/')[1].split('?')[0];
   }
-  
-  return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&mute=1&modestbranding=1&rel=0` : url;
+
+  return videoId
+    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&mute=1&modestbranding=1&rel=0`
+    : url;
 };
 
 export const generateWorkout = async (
@@ -228,10 +254,10 @@ export const generateWorkout = async (
   Responde estrictamente en formato JSON.`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: 'gemini-2.0-flash',
     contents: [{ parts: [{ text: prompt }] }],
     config: {
-      responseMimeType: "application/json",
+      responseMimeType: 'application/json',
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -248,16 +274,16 @@ export const generateWorkout = async (
                 muscles_worked: { type: Type.STRING },
                 video_url: { type: Type.STRING },
                 sets: { type: Type.STRING },
-                reps: { type: Type.STRING }
-              }
-            }
-          }
-        }
-      }
-    }
+                reps: { type: Type.STRING },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
-  return JSON.parse(response.text || "{}");
+  return JSON.parse(response.text || '{}');
 };
 
 export const generateWeeklyMeals = async (
@@ -290,10 +316,10 @@ export const generateWeeklyMeals = async (
   Responde estrictamente en formato JSON.`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: 'gemini-2.0-flash',
     contents: [{ parts: [{ text: prompt }] }],
     config: {
-      responseMimeType: "application/json",
+      responseMimeType: 'application/json',
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -319,18 +345,18 @@ export const generateWeeklyMeals = async (
                             name: { type: Type.STRING },
                             amount: { type: Type.STRING },
                             measure: { type: Type.STRING },
-                            icon: { type: Type.STRING }
-                          }
-                        }
+                            icon: { type: Type.STRING },
+                          },
+                        },
                       },
                       preparation_steps: {
                         type: Type.ARRAY,
                         items: {
                           type: Type.OBJECT,
                           properties: {
-                            step: { type: Type.STRING }
-                          }
-                        }
+                            step: { type: Type.STRING },
+                          },
+                        },
                       },
                       macros: {
                         type: Type.OBJECT,
@@ -341,22 +367,22 @@ export const generateWeeklyMeals = async (
                           sugars: { type: Type.NUMBER },
                           protein: { type: Type.NUMBER },
                           salt: { type: Type.NUMBER },
-                          saturated_fats: { type: Type.NUMBER }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+                          saturated_fats: { type: Type.NUMBER },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
-  const parsed = JSON.parse(response.text || "{}");
-  
+  const parsed = JSON.parse(response.text || '{}');
+
   // Si solo generó 3 días, duplicamos/variamos para rellenar los 7 días
   if (parsed.week && parsed.week.length === 3) {
     const fullWeek = [
@@ -370,7 +396,7 @@ export const generateWeeklyMeals = async (
     ];
     parsed.week = fullWeek;
   }
-  
+
   return parsed;
 };
 
@@ -387,22 +413,22 @@ export const analyzeMealImage = async (base64Image: string) => {
   Sé lo más preciso posible basándote en lo que ves en la foto. Responde ÚNICAMENTE con el objeto JSON.`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: 'gemini-2.0-flash',
     contents: [
       {
         parts: [
           { text: prompt },
           {
             inlineData: {
-              mimeType: "image/jpeg",
-              data: base64Image.split(",")[1] || base64Image,
+              mimeType: 'image/jpeg',
+              data: base64Image.split(',')[1] || base64Image,
             },
           },
         ],
       },
     ],
     config: {
-      responseMimeType: "application/json",
+      responseMimeType: 'application/json',
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -412,11 +438,11 @@ export const analyzeMealImage = async (base64Image: string) => {
           carbs: { type: Type.NUMBER },
           fats: { type: Type.NUMBER },
           ingredients: { type: Type.STRING },
-          instructions: { type: Type.STRING }
-        }
-      }
-    }
+          instructions: { type: Type.STRING },
+        },
+      },
+    },
   });
 
-  return JSON.parse(response.text || "{}");
+  return JSON.parse(response.text || '{}');
 };

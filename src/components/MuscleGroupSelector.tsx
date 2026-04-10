@@ -19,13 +19,18 @@ const GROUPS: MuscleGroup[] = [
   'PIERNAS',
   'ABDOMEN',
   'BICEPS',
-  'TRICEPS'
+  'TRICEPS',
 ];
 
-export const MuscleGroupSelector: React.FC<MuscleGroupSelectorProps> = ({ selectedGroup, onChange }) => {
+export const MuscleGroupSelector: React.FC<MuscleGroupSelectorProps> = ({
+  selectedGroup,
+  onChange,
+}) => {
   return (
     <div className="space-y-4">
-      <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Grupo Muscular Objetivo</h3>
+      <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">
+        Grupo Muscular Objetivo
+      </h3>
       <div className="flex flex-wrap gap-2">
         {GROUPS.map((group) => {
           const isSelected = selectedGroup === group;

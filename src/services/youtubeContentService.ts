@@ -30,9 +30,9 @@ const RAW_VIDEOS = [
 ];
 
 export const getYoutubeExercises = (): ClassifiedExercise[] => {
-  return RAW_VIDEOS.map(v => classifyExercise(v.title, v.id));
+  return RAW_VIDEOS.map((v) => classifyExercise(v.title, v.id));
 };
 
 export const getStretchingVideos = (): ClassifiedExercise[] => {
-  return getYoutubeExercises().filter(ex => ex.isStretching);
+  return getYoutubeExercises().filter((ex) => ex.isStretching);
 };

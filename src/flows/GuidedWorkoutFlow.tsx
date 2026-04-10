@@ -38,7 +38,7 @@ type FlowState = 'idle' | 'preparing' | 'active' | 'finished';
 export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
   routine,
   onClose,
-  onFinish
+  onFinish,
 }) => {
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
@@ -55,7 +55,7 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
 
   const nextExercise = useCallback(() => {
     if (currentExerciseIndex < routine.exercises.length - 1) {
-      setCurrentExerciseIndex(prev => prev + 1);
+      setCurrentExerciseIndex((prev) => prev + 1);
     } else {
       finishWorkout();
     }
@@ -72,13 +72,13 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
     await saveWorkoutHistory({
       userId,
       durationSeconds: duration,
-      exercises: routine.exercises.map(ex => ({
+      exercises: routine.exercises.map((ex) => ({
         id: ex.id,
         title: ex.title,
         sets: ex.series,
         reps: ex.reps,
-        durationSeconds: ex.estSec
-      }))
+        durationSeconds: ex.estSec,
+      })),
     });
 
     // Check for achievements
@@ -86,18 +86,23 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
       try {
         const q = query(collection(db, 'workout_history'), where('userId', '==', userId));
         const snapshot = await getDocs(q);
-        const allWorkouts = snapshot.docs.map(doc => doc.data());
-        
+        const allWorkouts = snapshot.docs.map((doc) => doc.data());
+
         const stats = {
           totalWorkouts: allWorkouts.length,
-          totalMinutes: Math.floor(allWorkouts.reduce((acc, w) => acc + (w.durationSeconds || 0), 0) / 60),
+          totalMinutes: Math.floor(
+            allWorkouts.reduce((acc, w) => acc + (w.durationSeconds || 0), 0) / 60
+          ),
           totalRounds: allWorkouts.reduce((acc, w) => acc + (w.exercises?.length || 0), 0),
-          exercisesCompleted: allWorkouts.reduce((acc, w) => acc + (w.exercises?.length || 0), 0)
+          exercisesCompleted: allWorkouts.reduce((acc, w) => acc + (w.exercises?.length || 0), 0),
         };
 
         const unlocked = await checkAndUnlockAchievements(userId, stats);
         if (unlocked.length > 0) {
-          console.log('Nuevos logros desbloqueados:', unlocked.map(a => a.title));
+          console.log(
+            'Nuevos logros desbloqueados:',
+            unlocked.map((a) => a.title)
+          );
           // You could show a toast or modal here
         }
       } catch (error) {
@@ -107,7 +112,7 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
 
     onFinish({
       totalTime: duration,
-      completedExercises: routine.exercises.length
+      completedExercises: routine.exercises.length,
     });
   }, [startTime, routine.exercises, onFinish]);
 
@@ -116,7 +121,7 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
     let timer: NodeJS.Timeout;
     if (flowState === 'preparing' && preparationCountdown > 0) {
       timer = setInterval(() => {
-        setPreparationCountdown(prev => prev - 1);
+        setPreparationCountdown((prev) => prev - 1);
       }, 1000);
     } else if (flowState === 'preparing' && preparationCountdown === 0) {
       setFlowState('active');
@@ -142,10 +147,15 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
             className="min-h-screen flex flex-col p-6 max-w-2xl mx-auto"
           >
             <header className="flex items-center justify-between mb-8">
-              <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              >
                 <ArrowLeft className="w-6 h-6" />
               </button>
-              <span className="text-xs font-black uppercase tracking-widest text-primary">Resumen de Rutina</span>
+              <span className="text-xs font-black uppercase tracking-widest text-primary">
+                Resumen de Rutina
+              </span>
               <div className="w-10" />
             </header>
 
@@ -166,11 +176,16 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
 
               <div className="space-y-4 mb-12">
                 {routine.exercises.map((ex, i) => (
-                  <div key={ex.id} className="flex items-center gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+                  <div
+                    key={ex.id}
+                    className="flex items-center gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800"
+                  >
                     <span className="text-xl font-black text-slate-700">{i + 1}</span>
                     <div className="flex-1">
                       <h3 className="font-bold text-white">{ex.title}</h3>
-                      <p className="text-xs text-slate-500 uppercase font-black tracking-widest">{ex.series} series x {ex.reps}</p>
+                      <p className="text-xs text-slate-500 uppercase font-black tracking-widest">
+                        {ex.series} series x {ex.reps}
+                      </p>
                     </div>
                     <div className="text-primary font-bold text-xs">{ex.estSec}s</div>
                   </div>
@@ -197,7 +212,9 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
             exit={{ opacity: 0, scale: 1.2 }}
             className="min-h-screen flex flex-col items-center justify-center p-6"
           >
-            <span className="text-primary font-black uppercase tracking-[0.3em] mb-4">Prepárate</span>
+            <span className="text-primary font-black uppercase tracking-[0.3em] mb-4">
+              Prepárate
+            </span>
             <motion.div
               key={preparationCountdown}
               initial={{ scale: 0.5, opacity: 0 }}
@@ -219,10 +236,17 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
           >
             <header className="flex items-center justify-between mb-6">
               <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Ejercicio {currentExerciseIndex + 1} de {routine.exercises.length}</span>
-                <h2 className="text-xl font-black uppercase tracking-tight">{currentExercise.title}</h2>
+                <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+                  Ejercicio {currentExerciseIndex + 1} de {routine.exercises.length}
+                </span>
+                <h2 className="text-xl font-black uppercase tracking-tight">
+                  {currentExercise.title}
+                </h2>
               </div>
-              <button onClick={onClose} className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors">
+              <button
+                onClick={onClose}
+                className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors"
+              >
                 <X className="w-6 h-6" />
               </button>
             </header>
@@ -239,7 +263,10 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
                 <ExerciseDetailCard
                   id={currentExercise.id}
                   title={currentExercise.title}
-                  description={currentExercise.description || "Realiza el ejercicio manteniendo la técnica correcta."}
+                  description={
+                    currentExercise.description ||
+                    'Realiza el ejercicio manteniendo la técnica correcta.'
+                  }
                   muscles={currentExercise.muscles || []}
                   series={currentExercise.series}
                   reps={currentExercise.reps}
@@ -255,9 +282,11 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
                   roundsCount={1}
                   onCompleteSession={nextExercise}
                 />
-                
+
                 <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Controles de Sesión</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">
+                    Controles de Sesión
+                  </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       onClick={skipExercise}
@@ -290,16 +319,25 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
             <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center mb-6 border-2 border-primary/30">
               <Trophy className="w-12 h-12 text-primary" />
             </div>
-            <h1 className="text-4xl font-black uppercase tracking-tight mb-2">¡Entrenamiento Completado!</h1>
+            <h1 className="text-4xl font-black uppercase tracking-tight mb-2">
+              ¡Entrenamiento Completado!
+            </h1>
             <p className="text-slate-400 mb-12">Has demostrado una gran disciplina hoy.</p>
 
             <div className="grid grid-cols-2 gap-6 w-full max-w-md mb-12">
               <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1">Tiempo Total</span>
-                <span className="text-2xl font-black text-white">{Math.floor(totalTimeElapsed / 60)}:{(totalTimeElapsed % 60).toString().padStart(2, '0')}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1">
+                  Tiempo Total
+                </span>
+                <span className="text-2xl font-black text-white">
+                  {Math.floor(totalTimeElapsed / 60)}:
+                  {(totalTimeElapsed % 60).toString().padStart(2, '0')}
+                </span>
               </div>
               <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1">Ejercicios</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1">
+                  Ejercicios
+                </span>
                 <span className="text-2xl font-black text-white">{routine.exercises.length}</span>
               </div>
             </div>

@@ -32,15 +32,13 @@ export const generateAutomaticRoutine = (
   const stretchingPool = getStretchingVideos();
 
   // Filter main exercises
-  const filteredMain = allExercises.filter(ex => 
-    !ex.isStretching && 
-    ex.muscleGroup === muscleGroup && 
-    selectedTools.includes(ex.tool)
+  const filteredMain = allExercises.filter(
+    (ex) => !ex.isStretching && ex.muscleGroup === muscleGroup && selectedTools.includes(ex.tool)
   );
 
   // Select 4-6 exercises
   const selectedMain = filteredMain.sort(() => 0.5 - Math.random()).slice(0, 6);
-  
+
   // If we don't have enough, maybe relax tool constraints or just take what we have
   // For this implementation, we'll stick to the filtered list.
 
@@ -54,15 +52,15 @@ export const generateAutomaticRoutine = (
     series: 1,
     reps: '5 min',
     estSec: 300,
-    muscles: [muscleGroup]
+    muscles: [muscleGroup],
   });
 
   // 2. Main Exercises (45-50 min)
-  // 4-6 exercises, 3-4 series each. 
+  // 4-6 exercises, 3-4 series each.
   // Let's say each set takes 60s + 60s rest = 120s per set.
   // 4 sets * 120s = 480s (8 min) per exercise.
   // 6 exercises * 8 min = 48 min. Perfect.
-  selectedMain.forEach(ex => {
+  selectedMain.forEach((ex) => {
     routineExercises.push({
       id: ex.id,
       title: ex.title,
@@ -70,13 +68,13 @@ export const generateAutomaticRoutine = (
       series: 4,
       reps: 12,
       estSec: 480, // 8 minutes total for 4 sets with rest
-      muscles: [ex.muscleGroup]
+      muscles: [ex.muscleGroup],
     });
   });
 
   // 3. Stretching (5-7 min)
   const selectedStretches = stretchingPool.sort(() => 0.5 - Math.random()).slice(0, 2);
-  selectedStretches.forEach(ex => {
+  selectedStretches.forEach((ex) => {
     routineExercises.push({
       id: ex.id,
       title: `Estiramiento: ${ex.title}`,
@@ -84,7 +82,7 @@ export const generateAutomaticRoutine = (
       series: 1,
       reps: '3 min',
       estSec: 180,
-      muscles: [ex.muscleGroup]
+      muscles: [ex.muscleGroup],
     });
   });
 
@@ -95,6 +93,6 @@ export const generateAutomaticRoutine = (
     title: `Rutina Automática: ${muscleGroup}`,
     exercises: routineExercises,
     totalEstimatedMinutes: Math.ceil(totalSec / 60),
-    toolsUsed: selectedTools
+    toolsUsed: selectedTools,
   };
 };

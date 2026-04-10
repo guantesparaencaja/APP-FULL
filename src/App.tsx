@@ -17,12 +17,15 @@ import { Workouts } from './pages/Workouts';
 import { Calentamiento } from './pages/Calentamiento';
 import { Calendar } from './pages/Calendar';
 import { Profile } from './pages/Profile';
+import { Store } from './pages/Store';
+import { FundamentosBoxeo } from './pages/fundamentos/FundamentosBoxeo';
+import { FundamentosVideoPlayer } from './pages/fundamentos/FundamentosVideoPlayer';
 
 import { Meals } from './pages/Meals';
 import { Plans } from './pages/Plans';
 import { Payments } from './pages/Payments';
 import { PaymentReview } from './pages/PaymentReview';
-import { BoxeoModule } from './pages/BoxeoModule';
+
 import { Timer } from './pages/Timer';
 
 import { Chat } from './pages/Chat';
@@ -40,7 +43,13 @@ import { initSyncQueue, syncQueue } from './utils/syncQueue';
 
 const APP_VERSION = '1.0.1';
 
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
+function ProtectedRoute({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+}) {
   const user = useStore((state) => state.user);
   const navigate = useNavigate();
   const location = useLocation();
@@ -61,7 +70,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
 
     // Navigation Guards for students
     const isPublicPath = ['/profile', '/plans', '/payments', '/payment-review'].includes(pathname);
-    
+
     if (!user.plan_id || user.plan_status === 'none' || !user.plan_status) {
       if (pathname !== '/plans' && pathname !== '/profile') {
         navigate('/plans');
@@ -99,7 +108,7 @@ export default function App() {
         const data = snapshot.data();
         const serverVersion = data.version || '1.0.0';
         const downloadUrl = data.url || '';
-        
+
         if (serverVersion !== APP_VERSION) {
           setNewVersionInfo({ version: serverVersion, url: downloadUrl });
           setShowVersionModal(true);
@@ -115,10 +124,12 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
       root.classList.remove('light', 'dark');
       root.classList.add(systemTheme);
-      
+
       const listener = (e: MediaQueryListEvent) => {
         if (useStore.getState().theme === 'system') {
           root.classList.remove('light', 'dark');
@@ -126,7 +137,8 @@ export default function App() {
         }
       };
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
-      return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
+      return () =>
+        window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
     } else {
       root.classList.remove('light', 'dark');
       root.classList.add(theme);
@@ -135,12 +147,10 @@ export default function App() {
 
   useEffect(() => {
     let unsubUser: (() => void) | null = null;
-    
+
     // La lógica real de auth comienza aquí
 
-
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-
       // Clean up previous user snapshot listener if it exists
       if (unsubUser) {
         unsubUser();
@@ -149,43 +159,54 @@ export default function App() {
 
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
-        unsubUser = onSnapshot(userRef, async (userDoc) => {
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            const adminEmails = ['hernandezkevin001998@gmail.com'];
-            
-            // Handle role synchronization
-            const isAdminEmail = firebaseUser.email && adminEmails.includes(firebaseUser.email);
-            if (isAdminEmail && data.role !== 'admin') {
-              await updateDoc(userRef, { role: 'admin' });
-            } else if (!isAdminEmail && data.role === 'admin' && firebaseUser.email !== 'hernandezkevin001998@gmail.com') {
-              await updateDoc(userRef, { role: 'student' });
-            }
+        unsubUser = onSnapshot(
+          userRef,
+          async (userDoc) => {
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              const adminEmails = ['hernandezkevin001998@gmail.com'];
 
-            const userData = { id: firebaseUser.uid, ...data } as any;
-            const currentUser = useStore.getState().user;
-            
-            // Only update if data actually changed to avoid infinite re-renders or excessive updates
-            if (!currentUser || JSON.stringify(userData) !== JSON.stringify(currentUser)) {
-              setUser(userData);
+              // Handle role synchronization
+              const isAdminEmail = firebaseUser.email && adminEmails.includes(firebaseUser.email);
+              if (isAdminEmail && data.role !== 'admin') {
+                await updateDoc(userRef, { role: 'admin' });
+              } else if (
+                !isAdminEmail &&
+                data.role === 'admin' &&
+                firebaseUser.email !== 'hernandezkevin001998@gmail.com'
+              ) {
+                await updateDoc(userRef, { role: 'student' });
+              }
+
+              const userData = { id: firebaseUser.uid, ...data } as any;
+              const currentUser = useStore.getState().user;
+
+              // Only update if data actually changed to avoid infinite re-renders or excessive updates
+              if (!currentUser || JSON.stringify(userData) !== JSON.stringify(currentUser)) {
+                setUser(userData);
+              }
+              initializePushNotifications(firebaseUser.uid);
+            } else {
+              const adminEmails = ['hernandezkevin001998@gmail.com'];
+              const userData = {
+                name: firebaseUser.displayName || 'Usuario',
+                email: firebaseUser.email,
+                role:
+                  firebaseUser.email && adminEmails.includes(firebaseUser.email)
+                    ? 'admin'
+                    : 'student',
+                is_new_user: true,
+              };
+              await setDoc(userRef, userData);
+              setUser({ id: firebaseUser.uid, ...userData } as any);
             }
-            initializePushNotifications(firebaseUser.uid);
-          } else {
-            const adminEmails = ['hernandezkevin001998@gmail.com'];
-            const userData = {
-              name: firebaseUser.displayName || 'Usuario',
-              email: firebaseUser.email,
-              role: (firebaseUser.email && adminEmails.includes(firebaseUser.email)) ? 'admin' : 'student',
-              is_new_user: true
-            };
-            await setDoc(userRef, userData);
-            setUser({ id: firebaseUser.uid, ...userData } as any);
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Error syncing user data:', error);
+            setLoading(false);
           }
-          setLoading(false);
-        }, (error) => {
-          console.error("Error syncing user data:", error);
-          setLoading(false);
-        });
+        );
       } else {
         setUser(null);
         setLoading(false);
@@ -204,7 +225,7 @@ export default function App() {
     const alreadyAsked = localStorage.getItem('gpte_notif_asked');
     if (alreadyAsked) return;
     // Mostrar banner si el permiso aún no fue otorgado
-    const permission = (typeof Notification !== 'undefined') ? Notification.permission : 'denied';
+    const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
     if (permission === 'default' || Capacitor.isNativePlatform()) {
       const timer = setTimeout(() => setShowNotifBanner(true), 2500);
       return () => clearTimeout(timer);
@@ -220,7 +241,8 @@ export default function App() {
         // Automatic feature: Check if it's night time (>19:00 or <06:00)
         const hour = new Date().getHours();
         const isNight = hour >= 19 || hour < 6;
-        const systemTheme = (window.matchMedia('(prefers-color-scheme: dark)').matches || isNight) ? 'dark' : 'light';
+        const systemTheme =
+          window.matchMedia('(prefers-color-scheme: dark)').matches || isNight ? 'dark' : 'light';
         root.classList.add(systemTheme);
       } else {
         root.classList.add(currentTheme);
@@ -293,7 +315,7 @@ export default function App() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="bg-yellow-500 text-yellow-950 py-2 px-4 flex items-center justify-center gap-2 text-sm font-bold sticky top-0 z-[100] shadow-lg"
+            className="bg-yellow-500 text-yellow-950 py-2 px-4 flex items-center justify-center gap-2 text-sm font-bold sticky top-0 z-100 shadow-lg"
           >
             <WifiOff className="w-4 h-4" />
             <span>Sin conexión — tus acciones se guardarán cuando vuelvas</span>
@@ -305,32 +327,154 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            
-            <Route element={<Layout />}>
-              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-              <Route path="/saberes" element={<ProtectedRoute><Saberes /></ProtectedRoute>} />
-              <Route path="/workouts" element={<ProtectedRoute><Workouts /></ProtectedRoute>} />
-              <Route path="/calentamiento" element={<ProtectedRoute><Calentamiento /></ProtectedRoute>} />
-              <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
-              <Route path="/meals" element={<ProtectedRoute><Meals /></ProtectedRoute>} />
-              <Route path="/plans" element={<ProtectedRoute><Plans /></ProtectedRoute>} />
-              <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
-              <Route path="/payment-review" element={<ProtectedRoute><PaymentReview /></ProtectedRoute>} />
-              <Route path="/boxeo" element={<ProtectedRoute><BoxeoModule /></ProtectedRoute>} />
-              <Route path="/timer" element={<ProtectedRoute><Timer /></ProtectedRoute>} />
-              <Route path="/aprobacion" element={<ProtectedRoute><Saberes /></ProtectedRoute>} />
-              <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-              <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
+            <Route element={<Layout />}>
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Home />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/saberes"
+                element={
+                  <ProtectedRoute>
+                    <Saberes />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/saberes/fundamentos"
+                element={
+                  <ProtectedRoute>
+                    <FundamentosBoxeo />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/saberes/fundamentos/:videoId"
+                element={
+                  <ProtectedRoute>
+                    <FundamentosVideoPlayer />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/workouts"
+                element={
+                  <ProtectedRoute>
+                    <Workouts />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/calentamiento"
+                element={
+                  <ProtectedRoute>
+                    <Calentamiento />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute>
+                    <Calendar />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/meals"
+                element={
+                  <ProtectedRoute>
+                    <Meals />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/plans"
+                element={
+                  <ProtectedRoute>
+                    <Plans />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/payments"
+                element={
+                  <ProtectedRoute>
+                    <Payments />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/payment-review"
+                element={
+                  <ProtectedRoute>
+                    <PaymentReview />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/timer"
+                element={
+                  <ProtectedRoute>
+                    <Timer />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/aprobacion"
+                element={
+                  <ProtectedRoute>
+                    <Saberes />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/chat"
+                element={
+                  <ProtectedRoute>
+                    <Chat />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/recipes"
+                element={
+                  <ProtectedRoute>
+                    <Recipes />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/store"
+                element={
+                  <ProtectedRoute>
+                    <Store />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
           </Routes>
         </BrowserRouter>
       </ErrorBoundary>
 
-      <VersionCheckModal 
-        isOpen={showVersionModal} 
-        onClose={() => setShowVersionModal(false)} 
+      <VersionCheckModal
+        isOpen={showVersionModal}
+        onClose={() => setShowVersionModal(false)}
         newVersion={newVersionInfo.version}
         downloadUrl={newVersionInfo.url}
       />
@@ -343,14 +487,18 @@ export default function App() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-            className="fixed bottom-24 left-4 right-4 z-[200] bg-slate-900 border border-primary/30 rounded-3xl p-5 shadow-2xl shadow-black/50 flex items-start gap-4"
+            className="fixed bottom-24 left-4 right-4 z-200 bg-slate-900 border border-primary/30 rounded-3xl p-5 shadow-2xl shadow-black/50 flex items-start gap-4"
           >
             <div className="w-12 h-12 bg-primary/20 rounded-2xl flex items-center justify-center shrink-0">
               <span className="text-2xl">🔔</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-black text-white uppercase tracking-tight mb-1">¡Activa las notificaciones!</p>
-              <p className="text-xs text-slate-400 leading-relaxed mb-3">Recibe alertas de tus clases, pagos aprobados y mensajes del instructor.</p>
+              <p className="text-sm font-black text-white uppercase tracking-tight mb-1">
+                ¡Activa las notificaciones!
+              </p>
+              <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                Recibe alertas de tus clases, pagos aprobados y mensajes del instructor.
+              </p>
               <div className="flex gap-2">
                 <button
                   onClick={async () => {
@@ -365,7 +513,10 @@ export default function App() {
                   Activar
                 </button>
                 <button
-                  onClick={() => { localStorage.setItem('gpte_notif_asked', '1'); setShowNotifBanner(false); }}
+                  onClick={() => {
+                    localStorage.setItem('gpte_notif_asked', '1');
+                    setShowNotifBanner(false);
+                  }}
                   className="px-4 py-2.5 bg-slate-800 text-slate-400 font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-slate-700 transition-all"
                 >
                   Ahora no

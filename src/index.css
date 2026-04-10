@@ -1,29 +1,42 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark, .dark *));
 
 @theme {
-  --color-primary: #0077ff;
+  --color-primary: #a855f7; /* Púrpura Neón GPTE */
+  --color-primary-dark: #7e22ce;
+  --color-accent-purple: #c084fc;
   --color-background-light: #f8fafc;
-  --color-background-dark: #0f172a;
-  --color-surface: #1e293b;
-  --color-border-mute: #334155;
-  --color-text-mute: #94a3b8;
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-background-dark: #020617; /* Slate 950 ultra-oscuro */
+  --color-surface: #0f172a; /* Slate 900 */
+  --color-border-mute: #1e293b; /* Slate 800 */
+  --color-text-mute: #64748b;
+  --font-display: 'Outfit', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer utilities {
+  .neon-text {
+    text-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+  }
+  .neon-glow {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 0 30px rgba(168, 85, 247, 0.2);
+  }
+  .glass-card {
+    @apply bg-white/5 dark:bg-slate-900/40 backdrop-blur-xl border border-white/10 dark:border-slate-800/50 shadow-2xl transition-all duration-300;
+  }
 }
 
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
-    /* Safe area variables para notch iOS y barra Android */
     --safe-area-top: env(safe-area-inset-top, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-left: env(safe-area-inset-left, 0px);
     --safe-area-right: env(safe-area-inset-right, 0px);
   }
-  
+
   body {
     @apply antialiased;
     overscroll-behavior-y: none;
@@ -34,21 +47,19 @@
     padding-right: var(--safe-area-right);
   }
 
-  /* Custom Scrollbar for Boxing App */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-slate-900;
+    @apply bg-slate-950;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-primary/20 rounded-full border-2 border-slate-900;
+    @apply bg-primary/20 rounded-full border-2 border-slate-950;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     @apply bg-primary/40;
   }
 
-  /* Hide scrollbar for horizontal lists */
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -59,14 +70,25 @@
 }
 
 @layer utilities {
-  .neon-glow {
-    box-shadow: 0 0 20px rgba(0, 119, 255, 0.2);
+  .neon-glow-purple {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
   }
-  .neon-border {
-    border: 1px solid rgba(0, 119, 255, 0.2);
+  .neon-glow-white {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
   }
-  .glass-card {
-    @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-sm;
+  .neon-border-purple {
+    border: 1px solid rgba(168, 85, 247, 0.4);
+  }
+  .neon-border-white {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  .glass-card-premium {
+    @apply bg-slate-950/60 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+  .cyber-grid {
+    background-image: linear-gradient(rgba(168, 85, 247, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(168, 85, 247, 0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
   }
 }
 
@@ -79,7 +101,7 @@ html.dark {
 }
 
 body {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Inter', sans-serif;
   @apply text-slate-900;
 }
 

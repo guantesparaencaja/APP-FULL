@@ -16,7 +16,7 @@ export function calculateStreak(workoutDates: Date[]): StreakInfo {
 
   // Sort dates descending (newest first) and normalize to start of day
   const sortedDates = workoutDates
-    .map(d => startOfDay(d))
+    .map((d) => startOfDay(d))
     .sort((a, b) => b.getTime() - a.getTime());
 
   // Remove duplicates (multiple workouts in one day)
@@ -57,6 +57,6 @@ export function calculateStreak(workoutDates: Date[]): StreakInfo {
   return {
     currentStreak,
     bestStreak,
-    lastWorkoutDate: latestWorkout.toISOString()
+    lastWorkoutDate: latestWorkout.toISOString(),
   };
 }

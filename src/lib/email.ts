@@ -10,7 +10,7 @@ export const sendEmail = async (to: string | string[], subject: string, html: st
       message: {
         subject: subject,
         html: html,
-      }
+      },
     });
     console.log('Email queued for delivery to:', to);
   } catch (error) {

@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Play, Pause, SkipForward, Rewind, FastForward, CheckCircle2, Clock, Volume2, VolumeX } from 'lucide-react';
+import {
+  X,
+  Play,
+  Pause,
+  SkipForward,
+  Rewind,
+  FastForward,
+  CheckCircle2,
+  Clock,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { getYouTubeEmbedUrl } from '../services/geminiService';
 
 interface Exercise {
@@ -26,17 +37,17 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
-  
+
   const videoRef = useRef<HTMLIFrameElement>(null);
   const currentEx = exercises[currentExIndex];
 
   // Motivational messages
   const messages = [
-    "¡Vamos, tú puedes!",
-    "Mantén la postura correcta.",
-    "Respira profundo, controla el movimiento.",
-    "¡Un esfuerzo más!",
-    "Concéntrate en el músculo que estás trabajando."
+    '¡Vamos, tú puedes!',
+    'Mantén la postura correcta.',
+    'Respira profundo, controla el movimiento.',
+    '¡Un esfuerzo más!',
+    'Concéntrate en el músculo que estás trabajando.',
   ];
   const [currentMessage, setCurrentMessage] = useState(messages[0]);
 
@@ -44,14 +55,14 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
     let interval: any;
     if (isResting && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft(prev => prev - 1);
+        setTimeLeft((prev) => prev - 1);
       }, 1000);
     } else if (isResting && timeLeft === 0) {
       setIsResting(false);
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       // Play sound
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-      if (!isMuted) audio.play().catch(e => console.log(e));
+      if (!isMuted) audio.play().catch((e) => console.log(e));
     }
     return () => clearInterval(interval);
   }, [isResting, timeLeft, isMuted]);
@@ -66,7 +77,7 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
 
   const handleNextSet = () => {
     if (currentSet < currentEx.sets) {
-      setCurrentSet(prev => prev + 1);
+      setCurrentSet((prev) => prev + 1);
       setTimeLeft(currentEx.rest || 60);
       setIsResting(true);
     } else {
@@ -76,12 +87,12 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
 
   const handleNextExercise = () => {
     if (currentExIndex < exercises.length - 1) {
-      setCurrentExIndex(prev => prev + 1);
+      setCurrentExIndex((prev) => prev + 1);
       setCurrentSet(1);
       setTimeLeft(currentEx.rest || 60);
       setIsResting(true);
     } else {
-      alert("¡Entrenamiento Completado! 🎉");
+      alert('¡Entrenamiento Completado! 🎉');
       onClose();
     }
   };
@@ -92,7 +103,7 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const progress = ((currentExIndex * 100) + ((currentSet / currentEx.sets) * 100)) / exercises.length;
+  const progress = (currentExIndex * 100 + (currentSet / currentEx.sets) * 100) / exercises.length;
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col font-display text-white">
@@ -100,16 +111,24 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
       <div className="p-4 flex justify-between items-center bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div>
           <h2 className="font-bold text-lg text-primary">Entrenador Virtual</h2>
-          <p className="text-xs text-slate-400">Ejercicio {currentExIndex + 1} de {exercises.length}</p>
+          <p className="text-xs text-slate-400">
+            Ejercicio {currentExIndex + 1} de {exercises.length}
+          </p>
         </div>
-        <button onClick={onClose} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white">
+        <button
+          onClick={onClose}
+          className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
 
       {/* Progress Bar */}
       <div className="h-1 bg-slate-800 w-full">
-        <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }}></div>
+        <div
+          className="h-full bg-primary transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        ></div>
       </div>
 
       {/* Main Content */}
@@ -121,8 +140,8 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
             const isGif = videoSrc?.toLowerCase().endsWith('.gif');
             return videoSrc ? (
               isGif ? (
-                <img 
-                  src={videoSrc} 
+                <img
+                  src={videoSrc}
                   alt={currentEx.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
@@ -131,18 +150,20 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
                     target.style.display = 'none';
                     if (target.parentElement) {
                       const fallback = document.createElement('div');
-                      fallback.className = 'absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-slate-400 p-4 text-center';
-                      fallback.innerHTML = '<p class="text-sm font-bold mb-2">Animación no disponible</p><p class="text-xs">El enlace original ha expirado. Por favor, haz clic en "Regenerar Mi Rutina".</p>';
+                      fallback.className =
+                        'absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-slate-400 p-4 text-center';
+                      fallback.innerHTML =
+                        '<p class="text-sm font-bold mb-2">Animación no disponible</p><p class="text-xs">El enlace original ha expirado. Por favor, haz clic en "Regenerar Mi Rutina".</p>';
                       target.parentElement.appendChild(fallback);
                     }
                   }}
                 />
               ) : (
-                <video 
+                <video
                   ref={(el) => {
                     if (el) el.playbackRate = playbackRate;
                   }}
-                  src={videoSrc} 
+                  src={videoSrc}
                   className="w-full h-full object-cover"
                   controls={false}
                   autoPlay
@@ -155,17 +176,19 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
                     target.style.display = 'none';
                     if (target.parentElement) {
                       const fallback = document.createElement('div');
-                      fallback.className = 'absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-slate-400 p-4 text-center';
-                      fallback.innerHTML = '<p class="text-sm font-bold mb-2">Video no disponible</p><p class="text-xs">El enlace original ha expirado. Por favor, haz clic en "Regenerar Mi Rutina".</p>';
+                      fallback.className =
+                        'absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-slate-400 p-4 text-center';
+                      fallback.innerHTML =
+                        '<p class="text-sm font-bold mb-2">Video no disponible</p><p class="text-xs">El enlace original ha expirado. Por favor, haz clic en "Regenerar Mi Rutina".</p>';
                       target.parentElement.appendChild(fallback);
                     }
                   }}
                 />
               )
             ) : currentEx.youtube_search_term ? (
-              <iframe 
+              <iframe
                 ref={videoRef}
-                src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(currentEx.youtube_search_term)}&autoplay=1&mute=${isMuted ? 1 : 0}`} 
+                src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(currentEx.youtube_search_term)}&autoplay=1&mute=${isMuted ? 1 : 0}`}
                 className="w-full h-full"
                 allow="autoplay; encrypted-media"
                 allowFullScreen
@@ -176,17 +199,30 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
               </div>
             );
           })()}
-          
+
           {/* Video Controls Overlay */}
           <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent flex justify-between items-center">
             <div className="flex gap-2">
-              <button onClick={() => setIsMuted(!isMuted)} className="p-2 text-white hover:text-primary">
+              <button
+                onClick={() => setIsMuted(!isMuted)}
+                className="p-2 text-white hover:text-primary"
+              >
                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
             </div>
             <div className="flex gap-4">
-              <button className="text-white hover:text-primary text-xs font-bold px-2" onClick={() => setPlaybackRate(0.5)}>0.5x</button>
-              <button className="text-white hover:text-primary text-xs font-bold px-2" onClick={() => setPlaybackRate(1)}>1x</button>
+              <button
+                className="text-white hover:text-primary text-xs font-bold px-2"
+                onClick={() => setPlaybackRate(0.5)}
+              >
+                0.5x
+              </button>
+              <button
+                className="text-white hover:text-primary text-xs font-bold px-2"
+                onClick={() => setPlaybackRate(1)}
+              >
+                1x
+              </button>
             </div>
           </div>
         </div>
@@ -206,7 +242,9 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
             </div>
           </div>
 
-          <p className="text-sm text-slate-300 mb-6 flex-1">{currentEx.description || 'Sigue el video para realizar la técnica correcta.'}</p>
+          <p className="text-sm text-slate-300 mb-6 flex-1">
+            {currentEx.description || 'Sigue el video para realizar la técnica correcta.'}
+          </p>
 
           {/* Virtual Coach Message */}
           <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 mb-6 relative overflow-hidden shrink-0">
@@ -219,9 +257,13 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
             {isResting ? (
               <div className="bg-slate-800 rounded-2xl p-6 text-center border border-slate-700 animate-in zoom-in-95">
                 <Clock className="w-8 h-8 text-primary mx-auto mb-2 animate-pulse" />
-                <p className="text-sm text-slate-400 font-bold uppercase mb-1">Tiempo de Descanso</p>
-                <p className="text-5xl font-bold text-white mb-4 font-mono">{formatTime(timeLeft)}</p>
-                <button 
+                <p className="text-sm text-slate-400 font-bold uppercase mb-1">
+                  Tiempo de Descanso
+                </p>
+                <p className="text-5xl font-bold text-white mb-4 font-mono">
+                  {formatTime(timeLeft)}
+                </p>
+                <button
                   onClick={() => setTimeLeft(0)}
                   className="text-xs font-bold text-slate-400 hover:text-white underline"
                 >
@@ -229,7 +271,7 @@ export function VirtualCoach({ exercises, onClose }: VirtualCoachProps) {
                 </button>
               </div>
             ) : (
-              <button 
+              <button
                 onClick={handleNextSet}
                 className="w-full bg-primary text-white font-bold py-5 rounded-2xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 hover:bg-primary/90 transition-all text-lg"
               >

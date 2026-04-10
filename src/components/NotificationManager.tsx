@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, orderBy, limit } from 'firebase/fire
 import { sendPushNotification } from '../lib/fcmService';
 
 export function NotificationManager() {
-  const user = useStore(s => s.user);
+  const user = useStore((s) => s.user);
   const [lastCheck, setLastCheck] = useState<number>(Date.now());
 
   useEffect(() => {
@@ -15,12 +15,14 @@ export function NotificationManager() {
       const now = Date.now();
       const storageKey = `last_notif_checks_${user.id}`;
       const savedData = localStorage.getItem(storageKey);
-      const checks = savedData ? JSON.parse(savedData) : {
-        hydration: 0,
-        motivation: 0,
-        weekly: 0,
-        classes: {}
-      };
+      const checks = savedData
+        ? JSON.parse(savedData)
+        : {
+            hydration: 0,
+            motivation: 0,
+            weekly: 0,
+            classes: {},
+          };
 
       // 1. HYDRATION (Every 2 hours)
       if (now - checks.hydration > 2 * 60 * 60 * 1000) {
@@ -35,30 +37,26 @@ export function NotificationManager() {
       // 2. MOTIVATION (Once a day if no training)
       const todayStr = new Date().toISOString().split('T')[0];
       const lastMotivationDate = new Date(checks.motivation).toISOString().split('T')[0];
-      
+
       if (todayStr !== lastMotivationDate) {
         // Check if user has a booking today
         const q = query(
-          collection(db, 'bookings'), 
+          collection(db, 'bookings'),
           where('user_id', '==', String(user.id)),
           where('date', '==', todayStr),
           where('status', '==', 'active')
         );
         const snap = await getDocs(q);
-        
+
         if (snap.empty) {
           const quotes = [
-            "¡El único entrenamiento malo es el que no sucedió! 🥊",
-            "La disciplina es el puente entre tus metas y tus logros. 💪",
-            "No te detengas hasta que estés orgulloso. 🔥",
-            "El boxeo no se trata de qué tan fuerte golpeas, sino de cuánto puedes recibir y seguir adelante."
+            '¡El único entrenamiento malo es el que no sucedió! 🥊',
+            'La disciplina es el puente entre tus metas y tus logros. 💪',
+            'No te detengas hasta que estés orgulloso. 🔥',
+            'El boxeo no se trata de qué tan fuerte golpeas, sino de cuánto puedes recibir y seguir adelante.',
           ];
           const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-          await sendPushNotification(
-            String(user.id),
-            '🔥 ¡No te rindas!',
-            randomQuote
-          );
+          await sendPushNotification(String(user.id), '🔥 ¡No te rindas!', randomQuote);
         }
         checks.motivation = now;
       }
@@ -71,8 +69,8 @@ export function NotificationManager() {
         where('status', '==', 'active')
       );
       const bookingsSnap = await getDocs(bookingsQ);
-      
-      bookingsSnap.forEach(doc => {
+
+      bookingsSnap.forEach((doc) => {
         const data = doc.data();
         if (!data.time || typeof data.time !== 'string') return; // ✅ guard undefined
         // ✅ El tiempo puede ser "09:00" o "09:00 - 11:00" (formato admin)
@@ -84,7 +82,7 @@ export function NotificationManager() {
         if (isNaN(hour) || isNaN(minute)) return;
         const classTime = new Date();
         classTime.setHours(hour, minute, 0, 0);
-        
+
         const diffMs = classTime.getTime() - now;
         const diffHours = diffMs / (1000 * 60 * 60);
 

@@ -1,5 +1,15 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, RotateCw, Settings, Info, Maximize, Minimize, AlertCircle } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  RotateCw,
+  Settings,
+  Info,
+  Maximize,
+  Minimize,
+  AlertCircle,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getCachedVideo, cacheVideo, isOnline } from '../utils/cacheManager';
 
@@ -26,7 +36,7 @@ export const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({
   onPause,
   onSeek,
   onComplete,
-  onOpenDetails
+  onOpenDetails,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -92,7 +102,7 @@ export const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({
     const resolveVideo = async () => {
       setOfflineError(false);
       const cachedUrl = await getCachedVideo(videoUrl);
-      
+
       if (cachedUrl) {
         setVideoSource(cachedUrl);
       } else {
@@ -170,7 +180,7 @@ export const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({
   };
 
   return (
-    <div 
+    <div
       className="relative w-full aspect-video bg-black rounded-xl overflow-hidden group"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
@@ -187,8 +197,10 @@ export const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({
         <div className="absolute inset-0 z-20 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
           <h3 className="text-xl font-black uppercase tracking-tight mb-2">Sin Conexión</h3>
-          <p className="text-slate-400 text-sm mb-6">Este video no está en cache y no tienes conexión a internet.</p>
-          <button 
+          <p className="text-slate-400 text-sm mb-6">
+            Este video no está en cache y no tienes conexión a internet.
+          </p>
+          <button
             onClick={() => window.location.reload()}
             className="bg-white text-black font-black px-8 py-3 rounded-xl uppercase text-xs tracking-widest pointer-events-auto"
           >
@@ -211,14 +223,17 @@ export const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({
               <div className="flex flex-col">
                 <h3 className="text-white font-bold text-lg leading-tight">{title}</h3>
                 <div className="flex gap-2 mt-1">
-                  {muscles.map(m => (
-                    <span key={m} className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full border border-primary/30 uppercase font-black">
+                  {muscles.map((m) => (
+                    <span
+                      key={m}
+                      className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full border border-primary/30 uppercase font-black"
+                    >
                       {m}
                     </span>
                   ))}
                 </div>
               </div>
-              <button 
+              <button
                 onClick={onOpenDetails}
                 className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
                 title="Detalles del ejercicio"
@@ -232,10 +247,17 @@ export const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePlay();
+                }}
                 className="p-6 bg-primary/80 text-white rounded-full shadow-xl pointer-events-auto"
               >
-                {isPlaying ? <Pause className="w-10 h-10 fill-current" /> : <Play className="w-10 h-10 fill-current ml-1" />}
+                {isPlaying ? (
+                  <Pause className="w-10 h-10 fill-current" />
+                ) : (
+                  <Play className="w-10 h-10 fill-current ml-1" />
+                )}
               </motion.button>
             </div>
 
@@ -259,32 +281,49 @@ export const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <button onClick={() => handleSeek(-10)} className="text-white hover:text-primary transition-colors">
+                  <button
+                    onClick={() => handleSeek(-10)}
+                    className="text-white hover:text-primary transition-colors"
+                  >
                     <RotateCcw className="w-6 h-6" />
                   </button>
-                  <button onClick={togglePlay} className="text-white hover:text-primary transition-colors">
-                    {isPlaying ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current" />}
+                  <button
+                    onClick={togglePlay}
+                    className="text-white hover:text-primary transition-colors"
+                  >
+                    {isPlaying ? (
+                      <Pause className="w-7 h-7 fill-current" />
+                    ) : (
+                      <Play className="w-7 h-7 fill-current" />
+                    )}
                   </button>
-                  <button onClick={() => handleSeek(10)} className="text-white hover:text-primary transition-colors">
+                  <button
+                    onClick={() => handleSeek(10)}
+                    className="text-white hover:text-primary transition-colors"
+                  >
                     <RotateCw className="w-6 h-6" />
                   </button>
                 </div>
 
                 <div className="flex items-center gap-4 relative">
                   <div className="flex flex-col items-end mr-2">
-                    <span className="text-[10px] text-white/50 uppercase font-bold tracking-widest">Series x Reps</span>
-                    <span className="text-sm font-black text-white">{series} x {reps}</span>
+                    <span className="text-[10px] text-white/50 uppercase font-bold tracking-widest">
+                      Series x Reps
+                    </span>
+                    <span className="text-sm font-black text-white">
+                      {series} x {reps}
+                    </span>
                   </div>
 
                   <div className="relative">
-                    <button 
+                    <button
                       onClick={() => setShowSpeedMenu(!showSpeedMenu)}
                       className="flex items-center gap-1 text-white bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition-colors text-xs font-bold"
                     >
                       <Settings className="w-4 h-4" />
                       {playbackRate}x
                     </button>
-                    
+
                     <AnimatePresence>
                       {showSpeedMenu && (
                         <motion.div
@@ -293,7 +332,7 @@ export const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({
                           exit={{ opacity: 0, y: 10 }}
                           className="absolute bottom-full right-0 mb-2 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl min-w-[80px]"
                         >
-                          {[0.5, 0.75, 1, 1.25, 1.5].map(rate => (
+                          {[0.5, 0.75, 1, 1.25, 1.5].map((rate) => (
                             <button
                               key={rate}
                               onClick={() => handleSpeedChange(rate)}

@@ -25,7 +25,7 @@ const TOOLS: { id: Tool; icon: any }[] = [
 export const ToolSelector: React.FC<ToolSelectorProps> = ({ selectedTools, onChange }) => {
   const toggleTool = (tool: Tool) => {
     if (selectedTools.includes(tool)) {
-      onChange(selectedTools.filter(t => t !== tool));
+      onChange(selectedTools.filter((t) => t !== tool));
     } else {
       onChange([...selectedTools, tool]);
     }
@@ -33,7 +33,9 @@ export const ToolSelector: React.FC<ToolSelectorProps> = ({ selectedTools, onCha
 
   return (
     <div className="space-y-4">
-      <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Herramientas Disponibles</h3>
+      <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">
+        Herramientas Disponibles
+      </h3>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {TOOLS.map(({ id, icon: Icon }) => {
           const isSelected = selectedTools.includes(id);
@@ -42,12 +44,14 @@ export const ToolSelector: React.FC<ToolSelectorProps> = ({ selectedTools, onCha
               key={id}
               onClick={() => toggleTool(id)}
               className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left ${
-                isSelected 
-                  ? 'bg-primary/10 border-primary text-primary' 
+                isSelected
+                  ? 'bg-primary/10 border-primary text-primary'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
               }`}
             >
-              <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-white' : 'bg-slate-800'}`}>
+              <div
+                className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-white' : 'bg-slate-800'}`}
+              >
                 <Icon className="w-4 h-4" />
               </div>
               <div className="flex-1">
