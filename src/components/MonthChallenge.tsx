@@ -152,8 +152,8 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
       </AnimatePresence>
 
       {!showDaySelector && challenge && (
-        <div className="glass-card p-6 sm:p-8 rounded-[2.5rem]">
-          <div className="flex items-center justify-between mb-8">
+        <div className="glass-card p-4 sm:p-6 mx-auto max-w-lg rounded-3xl">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
                 <Trophy className="w-6 h-6 text-primary" />
@@ -177,7 +177,7 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-2 sm:gap-4">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'].map((day, i) => (
               <div
                 key={i}
@@ -214,10 +214,10 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
               return (
                 <motion.button
                   key={dateStr}
-                  whileTap={!isPast || isCurrent ? { scale: 0.9 } : undefined}
-                  onClick={() => (!isPast || isCurrent) && toggleCompletion(day)}
+                  whileTap={isCurrent ? { scale: 0.9 } : undefined}
+                  onClick={() => isCurrent && toggleCompletion(day)}
                   className={twMerge(
-                    'aspect-square flex flex-col items-center justify-center rounded-2xl border-2 transition-all relative overflow-hidden',
+                    'aspect-square flex flex-col items-center justify-center rounded-xl border-2 transition-all relative overflow-hidden',
                     isCompleted
                       ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20'
                       : isFailed

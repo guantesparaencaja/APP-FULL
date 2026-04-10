@@ -11,7 +11,7 @@ import { InteractiveLesson } from '../components/InteractiveLesson';
 import { BoxingGlossary } from '../components/BoxingGlossary';
 import { VendajeTutorial } from '../components/VendajeTutorial';
 import { BoxeoModule } from './BoxeoModule';
-import { uploadVideoToDrive } from '../lib/driveService';
+// driveService removido: upload directo a Firebase Storage
 
 interface Tutorial {
   id: string;
@@ -418,29 +418,35 @@ export function Saberes() {
     if (adminVideoInputRef.current) adminVideoInputRef.current.value = '';
   };
 
-  // ✅ Confirmar subida: Usando Google Drive exclusivo (n8n)
+  // ✅ Confirmar subida: Firebase Storage directo → combo_progress
   const handleConfirmVideoUpload = async (file: File, isAdmin = false) => {
     setUploadProgress(0);
     try {
       if (isAdmin && editingCombo) {
-        // Admin: sube el video de referencia a Google Drive
-        const videoUrl = await uploadVideoToDrive(
-          file,
-          'admin',
-          (prog) => setUploadProgress(prog),
-          { type: 'combo_reference', comboId: editingCombo.id }
-        );
-        await updateDoc(doc(db, 'combos', editingCombo.id), { video_url: videoUrl });
+        // Admin: sube el video de referencia a Firebase Storage
+        const storageRef = ref(storage, `combos/reference/${editingCombo.id}_${Date.now()}.mp4`);
+        const task = uploadBytesResumable(storageRef, file);
+        const url = await new Promise<string>((resolve, reject) => {
+          task.on('state_changed',
+            s => setUploadProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+            reject,
+            async () => resolve(await getDownloadURL(task.snapshot.ref))
+          );
+        });
+        await updateDoc(doc(db, 'combos', editingCombo.id), { video_url: url });
         setEditingCombo(null);
-        alert('✅ Video de referencia subido a Drive correctamente.');
+        alert('✅ Video de referencia subido correctamente.');
       } else if (videoPreview?.comboId && user) {
-        // Estudiante: sube a Google Drive → combo_progress
-        const videoUrl = await uploadVideoToDrive(
-          file,
-          user.id,
-          (prog) => setUploadProgress(prog),
-          { type: 'combo_evaluation', comboId: videoPreview.comboId }
-        );
+        // Estudiante: sube a Firebase Storage → combo_progress
+        const storageRef = ref(storage, `combos/evaluations/${user.id}_${videoPreview.comboId}_${Date.now()}.mp4`);
+        const task = uploadBytesResumable(storageRef, file);
+        const videoUrl = await new Promise<string>((resolve, reject) => {
+          task.on('state_changed',
+            s => setUploadProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+            reject,
+            async () => resolve(await getDownloadURL(task.snapshot.ref))
+          );
+        });
         
         await addDoc(collection(db, 'combo_progress'), {
           combo_id: videoPreview.comboId,
