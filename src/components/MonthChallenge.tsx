@@ -152,7 +152,7 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
       </AnimatePresence>
 
       {!showDaySelector && challenge && (
-        <div className="glass-card p-4 sm:p-6 mx-auto max-w-lg rounded-3xl">
+        <div className="glass-card p-3 sm:p-6 mx-auto w-full max-w-sm sm:max-w-lg rounded-3xl">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
@@ -178,10 +178,10 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
           </div>
 
           <div className="grid grid-cols-7 gap-1 sm:gap-2">
-            {['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'].map((day, i) => (
+            {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((day, i) => (
               <div
                 key={i}
-                className="text-center text-[10px] font-black text-slate-600 uppercase tracking-widest py-2"
+                className="text-center text-[9px] sm:text-[10px] font-black text-slate-600 uppercase tracking-widest py-1 sm:py-2"
               >
                 {day}
               </div>
@@ -227,7 +227,7 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
                           : 'bg-white/5 border-white/10 text-slate-500'
                   )}
                 >
-                  <span className="text-xs font-black">{format(day, 'd')}</span>
+                  <span className="text-[10px] sm:text-xs font-black leading-none">{format(day, 'd')}</span>
                   <div className="mt-1">
                     {isCompleted ? (
                       <Trophy className="w-4 h-4 fill-current" />
@@ -248,7 +248,7 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
             })}
           </div>
 
-          <div className="mt-8 pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="mt-6 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-emerald-500 rounded-full" />

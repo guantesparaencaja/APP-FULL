@@ -11,7 +11,7 @@ import { InteractiveLesson } from '../components/InteractiveLesson';
 import { BoxingGlossary } from '../components/BoxingGlossary';
 import { VendajeTutorial } from '../components/VendajeTutorial';
 import { BoxeoModule } from './BoxeoModule';
-// driveService removido: upload directo a Firebase Storage
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 interface Tutorial {
   id: string;
@@ -712,7 +712,9 @@ export function Saberes() {
 
       {activeTab === 'Aprender' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 -mx-4 h-full">
-          <BoxeoModule isEmbedded={true} />
+          <ErrorBoundary>
+            <BoxeoModule isEmbedded={true} />
+          </ErrorBoundary>
         </div>
       )}
 

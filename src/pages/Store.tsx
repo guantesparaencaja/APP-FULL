@@ -67,9 +67,12 @@ export function Store() {
     return () => unsubscribe();
   }, []);
 
+  const [orderError, setOrderError] = useState<string | null>(null);
+
   const handleOrder = async (product: Product) => {
     if (!user) return;
     setOrderStatus('loading');
+    setOrderError(null);
     
     try {
       await addDoc(collection(db, 'orders'), {
@@ -83,15 +86,17 @@ export function Store() {
         created_at: serverTimestamp()
       });
       
-      // Notify Admin (optional, handled by Firestore trigger or Admin Panel)
       setOrderStatus('success');
       setTimeout(() => {
         setOrderStatus('idle');
         setSelectedProduct(null);
       }, 3000);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error placing order:', e);
-      setOrderStatus('idle');
+      setOrderError('No se pudo procesar el pedido. Inténtalo de nuevo o contacta al admin.');
+    } finally {
+      // Only reset to idle if not success (success resets via setTimeout)
+      setOrderStatus(prev => prev === 'loading' ? 'idle' : prev);
     }
   };
 
@@ -414,9 +419,10 @@ export function Store() {
                 {/* Left: Image */}
                 <div className="relative aspect-square md:aspect-auto">
                   <img 
-                    src={selectedProduct.image_url} 
+                    src={selectedProduct.image_url || 'https://images.unsplash.com/photo-1549713486-82f8d386248a?q=80&w=600'} 
                     alt={selectedProduct.name}
                     className="w-full h-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1549713486-82f8d386248a?q=80&w=600'; }}
                   />
                 </div>
 
@@ -477,6 +483,12 @@ export function Store() {
                       </div>
                     </div>
 
+                    {orderError && (
+                      <div className="w-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold py-3 px-4 rounded-2xl text-center mb-4">
+                        ❌ {orderError}
+                      </div>
+                    )}
+
                     {orderStatus === 'success' ? (
                       <motion.div 
                         initial={{ scale: 0.8, opacity: 0 }}
@@ -492,7 +504,7 @@ export function Store() {
                         whileTap={{ scale: 0.98 }}
                         disabled={orderStatus === 'loading'}
                         onClick={() => handleOrder(selectedProduct)}
-                        className="w-full bg-primary text-white py-6 rounded-3xl font-black uppercase tracking-widest shadow-2xl shadow-primary/30 flex items-center justify-center gap-4 hover:bg-primary-dark transition-all"
+                        className="w-full bg-primary text-white py-6 rounded-3xl font-black uppercase tracking-widest shadow-2xl shadow-primary/30 flex items-center justify-center gap-4 hover:bg-primary-dark transition-all disabled:opacity-60"
                       >
                         {orderStatus === 'loading' ? (
                           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

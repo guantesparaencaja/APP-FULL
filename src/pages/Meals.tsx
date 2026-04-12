@@ -1005,13 +1005,25 @@ export function Meals() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {HEALTHY_TIPS.map((tip) => (
               <div
                 key={tip.id}
-                className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg"
+                className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg flex flex-col gap-3"
               >
-                <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-500/10 rounded-xl shrink-0">
+                    <Lightbulb className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-1">
+                      {tip.categoria}
+                    </span>
+                    <h4 className="font-bold text-white text-sm leading-tight">{tip.titulo}</h4>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-300 leading-relaxed pl-11">{tip.contenido}</p>
+                <div className="flex items-center justify-between pt-3 border-t border-slate-700/50 mt-auto">
                   <span className="text-[9px] text-slate-500 uppercase tracking-widest">
                     Fuente: {tip.fuente}
                   </span>

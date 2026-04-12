@@ -42,23 +42,26 @@ export class ErrorBoundary extends React.Component<Props, State> {
   public render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4">
-          <h1 className="text-2xl font-bold text-red-500 mb-4">Something went wrong.</h1>
-          <pre className="bg-slate-900 p-4 rounded-lg overflow-auto max-w-full text-sm text-red-400">
-            {this.state.error?.message}
-            {'\n'}
-            {this.state.error?.stack}
-          </pre>
+        <div className="flex flex-col items-center justify-center p-8 text-center gap-4 min-h-[40vh]">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-3xl">
+            🥊
+          </div>
+          <h2 className="text-xl font-black text-white uppercase tracking-tight">
+            Sección No Disponible
+          </h2>
+          <p className="text-sm text-slate-400 max-w-xs leading-relaxed">
+            Hubo un error cargando este módulo. Por favor intenta de nuevo. Si el problema persiste, contacta al administrador.
+          </p>
           <button
-            className="mt-6 bg-primary text-black px-6 py-2 rounded-lg font-bold"
+            className="mt-2 bg-primary text-white px-6 py-3 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-primary/90 transition-all active:scale-95"
             onClick={() => window.location.reload()}
           >
-            Reload Page
+            🔄 Reintentar
           </button>
         </div>
       );
     }
 
-    return (this as any).props.children;
+    return this.props.children;
   }
 }

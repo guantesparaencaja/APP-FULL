@@ -140,6 +140,20 @@ export function Calendar() {
   const [loading, setLoading] = useState(false);
   const [exceptions, setExceptions] = useState<{ slot_id: string; date: string }[]>([]);
   const [confirmTimeSlot, setConfirmTimeSlot] = useState<string | null>(null);
+  // T1+T2: Inline admin editing of description and rules
+  const [editingField, setEditingField] = useState<'description' | 'rules' | null>(null);
+  const [editingFieldValue, setEditingFieldValue] = useState('');
+  const handleSaveField = async () => {
+    if (!selectedTime || !editingField) return;
+    try {
+      await updateDoc(doc(db, 'availabilities', selectedTime.id), {
+        [editingField]: editingFieldValue,
+      });
+      setEditingField(null);
+    } catch (err) {
+      console.error('Error saving field:', err);
+    }
+  };
 
   // delete confirmation modal state
   const [deleteSlotConfirm, setDeleteSlotConfirm] = useState<{
@@ -746,42 +760,97 @@ export function Calendar() {
                     </div>
                   </div>
 
-                  <div className="space-y-6 pt-4">
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] flex items-center gap-2">
-                        <Info className="w-3 h-3" /> Descripción
-                      </p>
-                      <p className="text-sm leading-relaxed text-slate-400 italic">
-                        {selectedTime?.description ||
-                          'Sesión técnica y física diseñada por Coach GPTE para mejorar tu golpeo, reflejos y resistencia cardiovascular.'}
-                      </p>
-                    </div>
-
-                    {(selectedTime?.rules || selectedTime?.materials) && (
-                      <div className="space-y-4 pt-4 border-t border-slate-800/50">
-                        {selectedTime?.rules && (
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em]">
-                              Reglas & Cancelación
-                            </p>
-                            <p className="text-xs leading-relaxed text-slate-500">
-                              {selectedTime.rules}
-                            </p>
+                    <div className="space-y-6 pt-4">
+                      {/* DESCRIPTION */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] flex items-center gap-2">
+                            <Info className="w-3 h-3" /> Descripción
+                          </p>
+                          {isAdmin && selectedTime && editingField !== 'description' && (
+                            <button
+                              onClick={() => {
+                                setEditingField('description');
+                                setEditingFieldValue(selectedTime.description || '');
+                              }}
+                              className="text-primary/60 hover:text-primary transition-colors"
+                              title="Editar descripción"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        {editingField === 'description' ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={editingFieldValue}
+                              onChange={(e) => setEditingFieldValue(e.target.value)}
+                              className="w-full bg-slate-800 border border-primary/30 rounded-xl px-3 py-2 text-sm text-white resize-none h-24 outline-none focus:border-primary"
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={handleSaveField} className="flex-1 py-2 bg-primary text-white rounded-lg text-xs font-black uppercase">Guardar</button>
+                              <button onClick={() => setEditingField(null)} className="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg text-xs font-bold">Cancelar</button>
+                            </div>
                           </div>
-                        )}
-                        {selectedTime?.materials && (
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em]">
-                              Materiales Necesarios
-                            </p>
-                            <p className="text-xs leading-relaxed text-slate-500">
-                              {selectedTime.materials}
-                            </p>
-                          </div>
+                        ) : (
+                          <p className="text-sm leading-relaxed text-slate-400 italic">
+                            {selectedTime?.description || 'Sesión técnica y física diseñada por Coach GPTE para mejorar tu golpeo, reflejos y resistencia cardiovascular.'}
+                          </p>
                         )}
                       </div>
-                    )}
-                  </div>
+
+                      {/* RULES — siempre visibles */}
+                      <div className="space-y-2 pt-4 border-t border-slate-800/50">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em]">
+                            📋 Reglas Importantes
+                          </p>
+                          {isAdmin && selectedTime && editingField !== 'rules' && (
+                            <button
+                              onClick={() => {
+                                setEditingField('rules');
+                                setEditingFieldValue(selectedTime.rules || '');
+                              }}
+                              className="text-emerald-500/60 hover:text-emerald-400 transition-colors"
+                              title="Editar reglas"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        {editingField === 'rules' ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={editingFieldValue}
+                              onChange={(e) => setEditingFieldValue(e.target.value)}
+                              className="w-full bg-slate-800 border border-emerald-500/30 rounded-xl px-3 py-2 text-sm text-white resize-none h-24 outline-none focus:border-emerald-500"
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={handleSaveField} className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-xs font-black uppercase">Guardar</button>
+                              <button onClick={() => setEditingField(null)} className="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg text-xs font-bold">Cancelar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs leading-relaxed text-slate-500 whitespace-pre-line">
+                            {selectedTime?.rules || '• Cancelación con mínimo 2 horas de anticipación.\n• Llegar 5 minutos antes.\n• Traer guantes, vendas e hidratación.'}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* MATERIALS */}
+                      {selectedTime?.materials && (
+                        <div className="space-y-1 pt-4 border-t border-slate-800/50">
+                          <p className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em]">
+                            Materiales Necesarios
+                          </p>
+                          <p className="text-xs leading-relaxed text-slate-500">
+                            {selectedTime.materials}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                 </div>
 
                 <div className="mt-auto pt-8 flex items-center gap-4 border-t border-slate-800/50">
