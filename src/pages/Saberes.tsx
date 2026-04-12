@@ -320,25 +320,26 @@ export function Saberes() {
       video.preload = 'metadata';
       video.onloadedmetadata = async () => {
         window.URL.revokeObjectURL(video.src);
-        if (video.duration > 80) {
-          alert('El video no puede durar más de 80 segundos.');
+        // Admin puede subir hasta 5 minutos (300s)
+        if (video.duration > 300) {
+          alert('El video no puede durar más de 5 minutos (300 segundos).');
         } else {
           setTutorialUploadProgress(0);
-          // ✅ Convertir a base64 para evitar errores de Firebase Storage
-          const reader = new FileReader();
-          reader.onprogress = (ev) => {
-            if (ev.lengthComputable) setTutorialUploadProgress(Math.round((ev.loaded / ev.total) * 100));
-          };
-          reader.onload = (ev) => {
-            const base64 = ev.target?.result as string;
-            setNewTutorial(prev => ({ ...prev, video_url: base64 }));
-            setTutorialUploadProgress(null);
-          };
-          reader.onerror = () => {
-            alert('Error al leer el archivo de video.');
-            setTutorialUploadProgress(null);
-          };
-          reader.readAsDataURL(file);
+          // Upload directly to Firebase Storage for admin tutorial videos
+          const storageRef = ref(storage, `tutorials/${Date.now()}_${file.name}`);
+          const task = uploadBytesResumable(storageRef, file);
+          task.on('state_changed',
+            s => setTutorialUploadProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+            err => {
+              alert('Error al subir el video: ' + err.message);
+              setTutorialUploadProgress(null);
+            },
+            async () => {
+              const url = await getDownloadURL(task.snapshot.ref);
+              setNewTutorial(prev => ({ ...prev, video_url: url }));
+              setTutorialUploadProgress(null);
+            }
+          );
         }
       };
       video.src = URL.createObjectURL(file);
@@ -393,19 +394,24 @@ export function Saberes() {
       return;
     }
 
-    // Validar duración antes de previsualizar
+    // Validar duración: Admin = 300s (5 min), Estudiante = 180s (3 min)
+    const maxDuration = user?.role === 'admin' ? 300 : 180;
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.onloadedmetadata = () => {
       window.URL.revokeObjectURL(video.src);
-      if (video.duration > 80) {
-        alert('El video no puede durar más de 80 segundos.');
+      if (video.duration > maxDuration) {
+        if (user?.role === 'admin') {
+          alert('El video no puede durar más de 5 minutos (300 segundos).');
+        } else {
+          alert('Tu video no puede durar más de 3 minutos (180 segundos). Recórtalo e inténtalo de nuevo.');
+        }
         return;
       }
       // ✅ Mostrar preview antes de confirmar
       const previewUrl = URL.createObjectURL(file);
       if (user?.role === 'admin' && editingCombo) {
-        // Admin: se sube inmediatamente (va a base64)
+        // Admin: sube directamente a Storage
         handleConfirmVideoUpload(file, true);
       } else if (uploadingComboId) {
         setVideoPreview({ file, previewUrl, comboId: uploadingComboId });

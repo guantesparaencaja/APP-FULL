@@ -175,19 +175,35 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('video/')) { alert('Solo archivos de video.'); return; }
-    setUploading(true);
-    const storageRef = ref(storage, `boxeo/${Date.now()}_${file.name}`);
-    const task = uploadBytesResumable(storageRef, file);
-    task.on('state_changed',
-      s => setUploadPct(Math.round(s.bytesTransferred / s.totalBytes * 100)),
-      err => { alert('Error: ' + err.message); setUploading(false); },
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        setAddForm(f => ({ ...f, url_directa: url }));
-        setUploading(false);
-        setUploadPct(0);
+
+    // ✅ Validar duración antes de subir (admin: máx 5 min = 300s)
+    const tempVideo = document.createElement('video');
+    tempVideo.preload = 'metadata';
+    tempVideo.onloadedmetadata = () => {
+      URL.revokeObjectURL(tempVideo.src);
+      if (tempVideo.duration > 300) {
+        alert('El video no puede durar más de 5 minutos (300 segundos).');
+        if (videoFileRef.current) videoFileRef.current.value = '';
+        return;
       }
-    );
+      // Auto-rellenar duración en el formulario
+      setAddForm(f => ({ ...f, duracion_seg: Math.round(tempVideo.duration) }));
+      setUploading(true);
+      setUploadPct(0);
+      const storageRef = ref(storage, `boxeo/${Date.now()}_${file.name}`);
+      const task = uploadBytesResumable(storageRef, file);
+      task.on('state_changed',
+        s => setUploadPct(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+        err => { alert('Error: ' + err.message); setUploading(false); setUploadPct(0); },
+        async () => {
+          const url = await getDownloadURL(task.snapshot.ref);
+          setAddForm(f => ({ ...f, url_directa: url }));
+          setUploading(false);
+          setUploadPct(100); // Mantener en 100 para mostrar ✅
+        }
+      );
+    };
+    tempVideo.src = URL.createObjectURL(file);
   };
 
   // ── Admin: Add or Edit video ────────────────────────────────────────────────
@@ -337,19 +353,27 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                     <select value={addForm.nivel} onChange={e => setAddForm(f => ({...f, nivel: e.target.value}))} className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm">
                       {['Principiante','Intermedio','Avanzado'].map(n => <option key={n}>{n}</option>)}
                     </select>
-                    <input type="number" placeholder="Duración (seg)" value={addForm.duracion_seg} onChange={e => setAddForm(f => ({...f, duracion_seg: parseInt(e.target.value)}))} max={60} className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm" />
+                    <input type="number" placeholder="Duración (seg)" value={addForm.duracion_seg} onChange={e => setAddForm(f => ({...f, duracion_seg: parseInt(e.target.value)}))} max={300} min={1} className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm" />
                   </div>
                   <textarea placeholder="Descripción" value={addForm.descripcion} onChange={e => setAddForm(f => ({...f, descripcion: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm resize-none h-20" />
                   <textarea placeholder="Puntos clave (uno por línea)" value={addForm.puntos_clave} onChange={e => setAddForm(f => ({...f, puntos_clave: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm resize-none h-20" />
                   <textarea placeholder="Errores comunes (uno por línea)" value={addForm.errores_comunes} onChange={e => setAddForm(f => ({...f, errores_comunes: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm resize-none h-20" />
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Video (Drive URL o subir archivo)</label>
-                    <input type="url" placeholder="https://drive.google.com/uc?id=..." value={addForm.url_directa} onChange={e => setAddForm(f => ({...f, url_directa: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm" />
-                    <input ref={videoFileRef} type="file" accept="video/*" onChange={handleFileSelect} className="hidden" />
-                    <button type="button" onClick={() => videoFileRef.current?.click()} disabled={uploading} className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
-                      <Upload className="w-4 h-4" /> {uploading ? `Subiendo ${uploadPct}%` : 'Subir Video'}
-                    </button>
-                  </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Video (Drive URL o subir archivo — máx 5 min)</label>
+                      <input type="url" placeholder="https://drive.google.com/uc?id=..." value={addForm.url_directa} onChange={e => setAddForm(f => ({...f, url_directa: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm" />
+                      <input ref={videoFileRef} type="file" accept="video/*" onChange={handleFileSelect} className="hidden" />
+                      <button type="button" onClick={() => { setUploadPct(0); videoFileRef.current?.click(); }} disabled={uploading} className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
+                        <Upload className="w-4 h-4" />
+                        {uploading
+                          ? `Subiendo ${uploadPct}%`
+                          : uploadPct === 100 && addForm.url_directa
+                          ? '✅ Video listo — presiona Guardar'
+                          : 'Subir Video desde Dispositivo'}
+                      </button>
+                      {uploadPct === 100 && addForm.url_directa && !uploading && (
+                        <p className="text-emerald-400 text-xs font-bold text-center animate-pulse">✅ Video subido. Ahora presiona "{editingVideoId ? 'Actualizar Video' : 'Guardar Video'}" para confirmar.</p>
+                      )}
+                    </div>
                   <button type="submit" className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest">{editingVideoId ? 'Actualizar Video' : 'Guardar Video'}</button>
                 </form>
               </motion.div>
