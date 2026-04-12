@@ -623,12 +623,29 @@ export function Home() {
                 </div>
               )}
               {currentChallenge.url ? (
-                <div className="aspect-video rounded-lg overflow-hidden bg-black relative shadow-2xl">
-                  <LazyVideoWrapper
-                    src={currentChallenge.url}
-                    controls
-                    className="w-full h-full object-contain"
-                  />
+                <div className="space-y-4">
+                  <div className="aspect-video rounded-2xl overflow-hidden bg-black relative shadow-2xl border border-slate-800">
+                    <LazyVideoWrapper
+                      src={currentChallenge.url}
+                      controls
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  {(currentChallenge.title || currentChallenge.text) && (
+                    <div className="p-4 sm:p-6 bg-slate-900/40 rounded-2xl border border-slate-800">
+                      {currentChallenge.title && (
+                        <h4 className="text-base sm:text-lg font-bold text-white mb-2 flex items-center gap-2">
+                          <Target className="w-5 h-5 text-primary shrink-0" />
+                          {currentChallenge.title}
+                        </h4>
+                      )}
+                      {currentChallenge.text && (
+                        <p className="text-slate-300 text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
+                          {currentChallenge.text}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="p-5 sm:p-8 bg-slate-900/40 rounded-2xl sm:rounded-3xl border border-slate-800 shadow-inner">
@@ -641,6 +658,7 @@ export function Home() {
                   </p>
                 </div>
               )}
+
 
               <div className="flex flex-wrap gap-3">
                 {currentChallenge.categoria && (
