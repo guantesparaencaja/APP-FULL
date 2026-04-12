@@ -293,68 +293,6 @@ export const UserProgressDashboard: React.FC = () => {
             </p>
           </section>
 
-          {/* Golpe Counter - Mejorado para Producción */}
-          <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
-            
-            <h3 className="text-sm font-black uppercase tracking-widest text-white mb-2 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-primary animate-pulse" />
-              Contador de Golpes
-            </h3>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">
-              Volumen de hoy: Saco / Sombra
-            </p>
-            
-            <div className="flex gap-2 mb-6">
-              <input
-                type="number"
-                placeholder="Ej. 500"
-                value={punchInput}
-                onChange={(e) => setPunchInput(e.target.value)}
-                className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white w-full outline-none focus:border-primary transition-all font-black"
-                onKeyPress={(e) => e.key === 'Enter' && handleRegisterPunches()}
-              />
-              <button
-                onClick={handleRegisterPunches}
-                className="bg-primary text-white font-black px-6 rounded-xl hover:bg-primary-dark active:scale-95 transition-all shadow-lg shadow-primary/20 flex items-center justify-center"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-slate-950/50 p-5 rounded-2xl border border-slate-800/50 flex items-center justify-between">
-                <div>
-                  <span className="text-[9px] uppercase font-black text-slate-500 tracking-[0.2em] mb-1 block">
-                    Total Acumulado Hoy
-                  </span>
-                  <span className="font-black text-3xl text-white tracking-tighter">
-                    {punchesToday?.toLocaleString() || 0}
-                  </span>
-                </div>
-                <div className="text-right">
-                   <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
-                      <Target className="w-5 h-5 text-primary" />
-                   </div>
-                </div>
-              </div>
-
-              {/* Progress visual indicator (basado en meta diaria sugerida de 2000 golpes) */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-slate-500">
-                  <span>Meta Diaria Sugerida</span>
-                  <span>{Math.min(100, Math.round(((punchesToday || 0) / 2000) * 100))}%</span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(100, ((punchesToday || 0) / 2000) * 100)}%` }}
-                    className="h-full bg-gradient-to-r from-primary to-orange-500 rounded-full"
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
 
           <section>
             <h2 className="text-xl font-black uppercase tracking-tight mb-4 flex items-center gap-2">

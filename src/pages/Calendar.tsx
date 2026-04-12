@@ -24,6 +24,8 @@ import {
   Check as CheckIcon,
   X as XIcon,
   Loader2 as LoaderIcon,
+  Dumbbell,
+  Lock,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -124,16 +126,21 @@ export function Calendar() {
     duration_minutes: 120,
     max_students: 4,
   });
+  const [isUpdatingPlan, setIsUpdatingPlan] = useState(false);
+  const [editingAvailabilityId, setEditingAvailabilityId] = useState<string | null>(null);
+
+  // Estados para edición del Sidebar
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState('');
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [tempDescription, setTempDescription] = useState('');
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+
   const [isEditingRules, setIsEditingRules] = useState(false);
   const [tempRules, setTempRules] = useState('');
   const [isSavingRules, setIsSavingRules] = useState(false);
-  const [selectedStudentForSchedule, setSelectedStudentForSchedule] = useState<User | null>(null);
-  const [scheduleMode, setScheduleMode] = useState<'plan' | 'payment'>('plan');
-  const [isEditingPlan, setIsEditingPlan] = useState(false);
-  const [newPlanCount, setNewPlanCount] = useState<number>(0);
-  const [totalPlanCount, setTotalPlanCount] = useState<number>(0);
-  const [isUpdatingPlan, setIsUpdatingPlan] = useState(false);
-  const [editingAvailabilityId, setEditingAvailabilityId] = useState<string | null>(null);
   const [alertModal, setAlertModal] = useState<{
     show: boolean;
     message: string;
@@ -151,11 +158,39 @@ export function Calendar() {
     mode: 'today_only' | 'permanent';
   }>({ show: false, slot: null, mode: 'permanent' });
 
+  const [selectedStudentForSchedule, setSelectedStudentForSchedule] = useState<User | null>(null);
+  const [scheduleMode, setScheduleMode] = useState<'plan' | 'payment'>('plan');
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
+  const [newPlanCount, setNewPlanCount] = useState<number>(0);
+  const [totalPlanCount, setTotalPlanCount] = useState<number>(0);
+
   const navigate = useNavigate();
 
   // Helper for conditional classes
   const cn = (...classes: (string | boolean | undefined | null)[]) =>
     classes.filter(Boolean).join(' ');
+
+  // Helper para limpiar datos antes de enviar a Firestore (Evita error de 'constructor ilegal')
+  const sanitizeAvailability = (data: any) => {
+    const allowedFields = [
+      'day_of_week',
+      'start_time',
+      'end_time',
+      'title',
+      'description',
+      'duration_minutes',
+      'max_students',
+      'rules',
+      'materials',
+    ];
+    const sanitized: any = {};
+    allowedFields.forEach((field) => {
+      if (data[field] !== undefined) {
+        sanitized[field] = data[field];
+      }
+    });
+    return sanitized;
+  };
 
   const handleUpdatePlan = async () => {
     if (!selectedStudentForSchedule) return;
@@ -732,15 +767,66 @@ export function Calendar() {
           ) : (
             <>
               {/* Column 1: Event Details (Calendly Left Sidebar) */}
-              <div className="w-full md:w-80 lg:w-[400px] bg-slate-950/40 p-8 sm:p-12 border-b md:border-b-0 md:border-r border-slate-800 space-y-8 flex flex-col">
-                <div className="space-y-6">
-                  <div className="w-20 h-20 bg-primary/20 rounded-4xl flex items-center justify-center border border-primary/30 shadow-xl shadow-primary/10">
-                    <ShieldCheck className="w-10 h-10 text-primary" />
+              <div className="w-full md:w-72 lg:w-96 bg-slate-950/40 p-6 sm:p-10 border-b md:border-b-0 md:border-r border-slate-800 space-y-6 flex flex-col overflow-y-auto max-h-screen custom-scrollbar">
+                <div className="space-y-4">
+                  <div className="w-16 h-16 bg-primary/20 rounded-3xl flex items-center justify-center border border-primary/30 shadow-xl shadow-primary/10">
+                    <ShieldCheck className="w-8 h-8 text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-3xl font-black uppercase italic tracking-tighter text-white mb-2 leading-tight">
-                      {selectedTime?.title || 'Clase de Boxeo GPTE'}
-                    </h2>
+                    {isEditingTitle ? (
+                      <div className="space-y-2 mb-4">
+                        <input
+                          type="text"
+                          value={tempTitle}
+                          onChange={(e) => setTempTitle(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-lg font-black text-white outline-none focus:border-primary"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!selectedTime) return;
+                              setIsSavingTitle(true);
+                              try {
+                                await updateDoc(doc(db, 'availabilities', selectedTime.id), {
+                                  title: tempTitle,
+                                });
+                                setSelectedTime({ ...selectedTime, title: tempTitle });
+                                setIsEditingTitle(false);
+                              } catch (err) {
+                                console.error('Error saving title:', err);
+                              } finally {
+                                setIsSavingTitle(false);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-primary text-white text-[10px] font-black rounded-lg uppercase"
+                          >
+                            {isSavingTitle ? '...' : 'Guardar'}
+                          </button>
+                          <button
+                            onClick={() => setIsEditingTitle(false)}
+                            className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-black rounded-lg uppercase"
+                          >
+                            X
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <h2 className="text-3xl font-black uppercase italic tracking-tighter text-white mb-2 leading-tight flex items-center gap-2 group">
+                        {selectedTime?.title || 'Clase de Boxeo GPTE'}
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              setTempTitle(selectedTime?.title || 'Clase de Boxeo GPTE');
+                              setIsEditingTitle(true);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 bg-slate-800 rounded-lg transition-all"
+                          >
+                            <Edit2 className="w-3 h-3 text-primary" />
+                          </button>
+                        )}
+                      </h2>
+                    )}
                     <div className="flex items-center gap-2 text-slate-500">
                       <Clock className="w-5 h-5 text-primary" />
                       <span className="font-bold text-sm tracking-widest uppercase">
@@ -749,92 +835,140 @@ export function Calendar() {
                     </div>
                   </div>
 
-                  <div className="space-y-6 pt-4">
+                  <div className="space-y-4 pt-4">
+                    {/* DESCRIPCIÓN */}
                     <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] flex items-center gap-2">
-                        <Info className="w-3 h-3" /> Descripción
-                      </p>
-                      <p className="text-sm leading-relaxed text-slate-400 italic">
-                        {selectedTime?.description ||
-                          'Sesión técnica y física diseñada por Coach GPTE para mejorar tu golpeo, reflejos y resistencia cardiovascular.'}
-                      </p>
+                      <div className="flex justify-between items-center">
+                        <p className="text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] flex items-center gap-2">
+                          <Info className="w-3 h-3" /> Descripción
+                        </p>
+                        {isAdmin && !isEditingDescription && (
+                          <button
+                            onClick={() => {
+                              setTempDescription(
+                                selectedTime?.description ||
+                                  'Sesión técnica y física diseñada por Coach GPTE para mejorar tu golpeo, reflejos y resistencia cardiovascular.'
+                              );
+                              setIsEditingDescription(true);
+                            }}
+                            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3 h-3" /> Editar
+                          </button>
+                        )}
+                      </div>
+                      {isEditingDescription ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={tempDescription}
+                            onChange={(e) => setTempDescription(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-300 min-h-[100px] outline-none focus:border-primary"
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!selectedTime) return;
+                                setIsSavingDescription(true);
+                                try {
+                                  await updateDoc(doc(db, 'availabilities', selectedTime.id), { description: tempDescription });
+                                  setSelectedTime({ ...selectedTime, description: tempDescription });
+                                  setIsEditingDescription(false);
+                                } catch (err) {
+                                  console.error('Error saving description:', err);
+                                } finally {
+                                  setIsSavingDescription(false);
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-primary text-white text-[10px] font-black rounded-lg uppercase"
+                            >
+                              {isSavingDescription ? '...' : 'Guardar'}
+                            </button>
+                            <button
+                              onClick={() => setIsEditingDescription(false)}
+                              className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-black rounded-lg uppercase"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs leading-relaxed text-slate-400 italic">
+                          {selectedTime?.description || 'Sesión técnica y física diseñada por Coach GPTE para mejorar tu golpeo, reflejos y resistencia cardiovascular.'}
+                        </p>
+                      )}
                     </div>
 
-                    {(selectedTime?.rules || selectedTime?.materials) && (
-                      <div className="space-y-4 pt-4 border-t border-slate-800/50">
-                        {selectedTime?.rules && (
-                          <div className="space-y-1">
-                            <div className="flex justify-between items-center">
-                              <p className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em]">
-                                Reglas & Cancelación
-                              </p>
-                              {isAdmin && !isEditingRules && (
-                                <button
-                                  onClick={() => {
-                                    setTempRules(selectedTime.rules);
-                                    setIsEditingRules(true);
-                                  }}
-                                  className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-                                >
-                                  <Edit2 className="w-3 h-3" /> Editar
-                                </button>
-                              )}
-                            </div>
-                            {isEditingRules ? (
-                              <div className="space-y-2 mt-2">
-                                <textarea
-                                  value={tempRules}
-                                  onChange={(e) => setTempRules(e.target.value)}
-                                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-300 min-h-[100px] outline-none focus:border-primary"
-                                />
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={async () => {
-                                      setIsSavingRules(true);
-                                      try {
-                                        await updateDoc(
-                                          doc(db, 'availabilities', selectedTime.id),
-                                          { rules: tempRules }
-                                        );
-                                        setSelectedTime({ ...selectedTime, rules: tempRules });
-                                        setIsEditingRules(false);
-                                      } catch (err) {
-                                        console.error('Error saving rules:', err);
-                                      } finally {
-                                        setIsSavingRules(false);
-                                      }
-                                    }}
-                                    disabled={isSavingRules}
-                                    className="px-3 py-1.5 bg-primary text-white text-[10px] font-black rounded-lg uppercase"
-                                  >
-                                    {isSavingRules ? 'Guardando...' : 'Guardar'}
-                                  </button>
-                                  <button
-                                    onClick={() => setIsEditingRules(false)}
-                                    className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-black rounded-lg uppercase"
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="text-xs leading-relaxed text-slate-500">
-                                {selectedTime.rules}
-                              </p>
-                            )}
-                          </div>
+                    {/* REGLAS & CANCELACIÓN */}
+                    <div className="space-y-2 pt-3 border-t border-slate-800/50">
+                      <div className="flex justify-between items-center">
+                        <p className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em]">
+                          Reglas &amp; Cancelación
+                        </p>
+                        {isAdmin && !isEditingRules && (
+                          <button
+                            onClick={() => {
+                              setTempRules(selectedTime?.rules || '');
+                              setIsEditingRules(true);
+                            }}
+                            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3 h-3" /> {selectedTime?.rules ? 'Editar' : 'Añadir'}
+                          </button>
                         )}
-                        {selectedTime?.materials && (
-                          <div className="space-y-1 pt-2 border-t border-slate-800/30 mt-2">
-                            <p className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] flex items-center gap-2">
-                              <Dumbbell className="w-3 h-3" />
-                              Materiales Necesarios
-                            </p>
-                            <p className="text-xs leading-relaxed text-slate-400 italic">
-                              {selectedTime?.materials || 'No especificados'}
-                            </p>
+                      </div>
+                      {isEditingRules ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={tempRules}
+                            onChange={(e) => setTempRules(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-300 min-h-[100px] outline-none focus:border-primary"
+                            placeholder="Ej: Cancelación con 2h de anticipación..."
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!selectedTime) return;
+                                setIsSavingRules(true);
+                                try {
+                                  await updateDoc(doc(db, 'availabilities', selectedTime.id), { rules: tempRules });
+                                  setSelectedTime({ ...selectedTime, rules: tempRules });
+                                  setIsEditingRules(false);
+                                } catch (err) {
+                                  console.error('Error saving rules:', err);
+                                } finally {
+                                  setIsSavingRules(false);
+                                }
+                              }}
+                              disabled={isSavingRules}
+                              className="px-3 py-1.5 bg-primary text-white text-[10px] font-black rounded-lg uppercase"
+                            >
+                              {isSavingRules ? '...' : 'Guardar'}
+                            </button>
+                            <button
+                              onClick={() => setIsEditingRules(false)}
+                              className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-black rounded-lg uppercase"
+                            >
+                              Cancelar
+                            </button>
                           </div>
-                        )}
+                        </div>
+                      ) : (
+                        <p className="text-xs leading-relaxed text-slate-500 italic">
+                          {selectedTime?.rules || (isAdmin ? 'Sin reglas — pulsa Añadir para configurar' : '')}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* MATERIALES */}
+                    {selectedTime?.materials && (
+                      <div className="space-y-1 pt-3 border-t border-slate-800/30">
+                        <p className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] flex items-center gap-2">
+                          <Dumbbell className="w-3 h-3" /> Materiales Necesarios
+                        </p>
+                        <p className="text-xs leading-relaxed text-slate-400 italic">
+                          {selectedTime.materials}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1129,7 +1263,9 @@ export function Calendar() {
           onSubmit={async (e) => {
             e.preventDefault();
             try {
-              const finalAvailability = { ...newAvailability, duration_minutes: 120 };
+              const cleanedData = sanitizeAvailability(newAvailability);
+              const finalAvailability = { ...cleanedData, duration_minutes: 120 };
+              
               if (editingAvailabilityId) {
                 await updateDoc(doc(db, 'availabilities', editingAvailabilityId), finalAvailability);
               } else {
