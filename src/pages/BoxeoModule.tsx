@@ -4,7 +4,7 @@ import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize2, RefreshCw,
   Trash2, Plus, ChevronRight, ChevronLeft, RotateCcw, Eye, EyeOff,
   Upload, X, Check, Loader2, Shield, Footprints, Zap, Target,
-  Dumbbell, Wind, Flame, Heart, AlertCircle, Star, Edit2
+  Dumbbell, Wind, Flame, Heart, AlertCircle, Star, Edit2, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { db, storage } from '../lib/firebase';

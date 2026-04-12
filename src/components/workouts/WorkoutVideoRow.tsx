@@ -101,37 +101,14 @@ export function WorkoutVideoRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`group relative flex flex-col sm:flex-row rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 ${statusCfg.border ?? 'border-slate-200 dark:border-slate-800'} ${isPending && isAdmin ? 'ring-2 ring-amber-400/40' : ''}`}
+      className={`group relative flex flex-row rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 min-h-[160px] ${statusCfg.border ?? 'border-slate-200 dark:border-slate-800'} ${isPending && isAdmin ? 'ring-2 ring-amber-400/40' : ''}`}
     >
-      {/* ── LEFT: Video thumbnail (60%) ── */}
+      {/* ── LEFT: Video thumbnail (40% en mobile, 60% en desktop para verse bien) ── */}
       <div
-        className="relative sm:w-[60%] flex-shrink-0 cursor-pointer overflow-hidden"
-        style={{ paddingBottom: 'clamp(0px, 42%, 300px)' }}
+        className="relative w-[40%] sm:w-[60%] flex-shrink-0 cursor-pointer overflow-hidden"
         onClick={() => onPlay(video)}
       >
-        {/* Mobile: fixed height */}
-        <div className="sm:hidden relative w-full" style={{ paddingBottom: '56.25%' }}>
-          {video.cover_url ? (
-            <img
-              src={video.cover_url}
-              alt={video.title}
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-              referrerPolicy="no-referrer"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <InlineVideoPreview video={video} />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-white/20 backdrop-blur-sm border border-white/30 p-4 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300">
-              <Play className="w-6 h-6 text-white fill-white" />
-            </div>
-          </div>
-        </div>
-
-        {/* Desktop: absolute fill inside 60% column */}
-        <div className="hidden sm:block absolute inset-0">
+        <div className="absolute inset-0">
           {video.cover_url ? (
             <img
               src={video.cover_url}
@@ -146,22 +123,22 @@ export function WorkoutVideoRow({
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/10 to-black/30" />
           {/* Play button center */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-white/20 backdrop-blur-sm border border-white/30 p-4 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-90 group-hover:scale-100">
-              <Play className="w-7 h-7 text-white fill-white" />
+            <div className="bg-white/20 backdrop-blur-sm border border-white/30 p-2 sm:p-4 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-90 group-hover:scale-100">
+              <Play className="w-5 h-5 sm:w-7 sm:h-7 text-white fill-white" />
             </div>
           </div>
           {/* Status badge (admin only) */}
           {isAdmin && status !== 'approved' && (
-            <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-sm bg-black/40 border ${statusCfg.border}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} animate-pulse`} />
-              <span className="text-[9px] font-black text-white uppercase tracking-widest">{statusCfg.label}</span>
+            <div className={`absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full backdrop-blur-sm bg-black/40 border ${statusCfg.border}`}>
+              <span className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${statusCfg.dot} animate-pulse`} />
+              <span className="hidden sm:inline text-[9px] font-black text-white uppercase tracking-widest">{statusCfg.label}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── RIGHT: Info panel (40%) ── */}
-      <div className="flex flex-col gap-2 p-4 sm:p-5 sm:w-[40%] flex-1 justify-between">
+      {/* ── RIGHT: Info panel (60% en mobile, 40% en desktop) ── */}
+      <div className="flex flex-col gap-1.5 p-3 sm:p-5 w-[60%] sm:w-[40%] flex-1 justify-between">
         <div className="flex flex-col gap-2">
 
           {/* Categoría */}
