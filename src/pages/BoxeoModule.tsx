@@ -139,17 +139,31 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     load();
   }, [user?.id]);
 
-  // ── Seed ───────────────────────────────────────────────────────────────────
+  // ── Seed (Lyfta URLs) ──────────────────────────────────────────────────────
+  const [seedMsg, setSeedMsg] = useState('');
   const handleSeed = async () => {
-    if (seeding || videos.length > 0) return;
+    if (seeding) return;
     setSeeding(true);
+    setSeedMsg('Cargando videos de Lyfta...');
     try {
-      for (const v of SEED_VIDEOS) {
-        await addDoc(collection(db, 'boxeo_videos'), { ...v, creado_en: serverTimestamp(), activo: true });
+      // Si no hay videos, crear los de semilla básica
+      if (videos.length === 0) {
+        for (const v of SEED_VIDEOS) {
+          await addDoc(collection(db, 'boxeo_videos'), { ...v, creado_en: serverTimestamp(), activo: true });
+        }
       }
-    } catch (e) { console.error(e); }
-    finally { setSeeding(false); }
+      // Siempre actualizar con URLs de Lyfta
+      const { seedBoxeoVideos } = await import('../scripts/seedVideos');
+      const result = await seedBoxeoVideos();
+      setSeedMsg(`✅ ${result.added} videos actualizados con Lyfta. ${result.skipped} ya tenían video.`);
+      setTimeout(() => setSeedMsg(''), 6000);
+    } catch (e: any) {
+      setSeedMsg('❌ Error: ' + e.message);
+    } finally {
+      setSeeding(false);
+    }
   };
+
 
   // ── Hide video ─────────────────────────────────────────────────────────────
   const handleHide = async (video: BoxeoVideo) => {
@@ -511,12 +525,18 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
         <p className="text-[11px] font-black text-red-400 uppercase tracking-[0.3em] mb-2">CORE DE LA APP</p>
         <h2 className="text-2xl font-black italic text-white leading-tight">Domina el Arte<br />del Boxeo</h2>
         <p className="text-slate-400 text-sm mt-2">Desde técnica básica hasta sparring profesional</p>
-        {isAdmin && videos.length === 0 && (
-          <button onClick={handleSeed} disabled={seeding}
-            className="mt-4 bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2">
-            {seeding ? <><Loader2 className="w-4 h-4 animate-spin" /> Cargando...</> : '⚡ Cargar Contenido Inicial'}
-          </button>
+        {isAdmin && (
+          <div className="mt-4 flex flex-col gap-2">
+            <button onClick={handleSeed} disabled={seeding}
+              className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2">
+              {seeding ? <><Loader2 className="w-4 h-4 animate-spin" /> Procesando...</> : '⚡ Sincronizar Videos Lyfta'}
+            </button>
+            {seedMsg && (
+              <p className="text-emerald-400 text-xs font-bold bg-emerald-400/10 rounded-xl px-3 py-2 border border-emerald-400/20">{seedMsg}</p>
+            )}
+          </div>
         )}
+
       </div>
 
       {/* Subcategory grid */}
