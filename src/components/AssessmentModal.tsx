@@ -33,6 +33,9 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean; onClose:
   });
 
   if (!isOpen) return null;
+  // Si el usuario acaba de terminar el onboarding en esta sesión, no mostrar
+  // (el onboarding ya setea assessment_completed: true)
+  if (!user) return null;
 
   const handleSave = async () => {
     if (!user) return;
