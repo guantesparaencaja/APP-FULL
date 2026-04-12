@@ -420,44 +420,25 @@ export function Workouts() {
     } catch (err) { console.error(err); }
   };
 
-  const seedLyftaVideos = async () => {
+  const [syncMsg, setSyncMsg] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncLyfta = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncMsg('Buscando siguiente lote...');
     try {
-      const getCategoryId = async (name: string) => {
-        const q = query(collection(db, 'workout_categories'), where('name', '==', name));
-        const snap = await getDocs(q);
-        if (!snap.empty) return snap.docs[0].id;
-        const ref_ = await addDoc(collection(db, 'workout_categories'), { name });
-        return ref_.id;
-      };
-
-      // Sample Lyfta videos (deduplication-safe)
-      const samples = [
-        { title: 'Flexiones de Brazo', category: 'Casa', difficulty: 'principiante', equipment: 'Sin equipo', tipo: 'casa', video_url: 'https://apilyfta.com/static/GymvisualMP4/06621201-Push-up-m_Chest.mp4', description: 'Básico fundamental de empuje.' },
-        { title: 'Sentadilla Profunda', category: 'Casa', difficulty: 'principiante', equipment: 'Sin equipo', tipo: 'casa', video_url: 'https://apilyfta.com/static/GymvisualMP4/00431201-Barbell-Full-Squat_Thighs.mp4', description: 'Fortalecimiento de tren inferior.' },
-        { title: 'Plancha Abdominal', category: 'Casa', difficulty: 'principiante', equipment: 'Sin equipo', tipo: 'casa', video_url: 'https://apilyfta.com/static/GymvisualMP4/01501201-Cable-Bar-Lateral-Pulldown_Back.mp4', description: 'Core y estabilidad.' },
-      ];
-
-      const existingSnap = await getDocs(collection(db, 'workout_videos'));
-      const existingTitles = new Set(existingSnap.docs.map((d) => d.data().title?.trim().toLowerCase()));
-      const existingUrls = new Set(existingSnap.docs.map((d) => d.data().video_url));
-      const rejectedSnap = await getDocs(collection(db, 'rejected_videos'));
-      const rejectedUrls = new Set(rejectedSnap.docs.map((d) => d.data().video_url));
-
-      let added = 0, skipped = 0;
-      for (const ex of samples) {
-        if (existingTitles.has(ex.title.toLowerCase()) || existingUrls.has(ex.video_url) || rejectedUrls.has(ex.video_url)) {
-          skipped++; continue;
-        }
-        const catId = await getCategoryId(ex.category);
-        await addDoc(collection(db, 'workout_videos'), {
-          ...ex, category_id: catId, createdAt: new Date().toISOString(),
-          createdBy: 'system', status: 'pending', isApproved: false,
-        });
-        added++;
-      }
-      alert(`Sincronización: ${added} nuevos (pendientes), ${skipped} omitidos.`);
-    } catch (err) { console.error(err); }
+      const { syncWorkoutBatch } = await import('../scripts/seedVideos');
+      const result = await syncWorkoutBatch(user?.id || 'admin');
+      setSyncMsg(result.message);
+      setTimeout(() => setSyncMsg(''), 8000);
+    } catch (err: any) {
+      setSyncMsg('❌ Error: ' + (err?.message || 'desconocido'));
+    } finally {
+      setIsSyncing(false);
+    }
   };
+
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -490,12 +471,13 @@ export function Workouts() {
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setShowLyftaImporter(true)}
-              id="lyfta-importer-trigger"
-              className="px-3 py-2 bg-emerald-500/10 text-emerald-500 rounded-xl border border-emerald-500/20 text-[10px] font-black uppercase hover:bg-emerald-500/20 transition-all flex items-center gap-1"
-              title="Importar video de Lyfta"
+              onClick={handleSyncLyfta}
+              disabled={isSyncing}
+              id="lyfta-sync-trigger"
+              className="px-3 py-2 bg-emerald-500/10 text-emerald-500 rounded-xl border border-emerald-500/20 text-[10px] font-black uppercase hover:bg-emerald-500/20 transition-all flex items-center gap-1 disabled:opacity-50"
+              title="Sincronizar siguiente lote de videos Lyfta"
             >
-              <Download className="w-4 h-4" />
+              {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             </button>
             <button
               onClick={() => setShowAdminPanel(true)}
@@ -512,6 +494,15 @@ export function Workouts() {
             >
               <Plus className="w-7 h-7" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── SyncMsg Toast ── */}
+      {syncMsg && (
+        <div className="fixed bottom-40 right-4 z-40 max-w-xs">
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl px-4 py-3 shadow-2xl">
+            <p className="text-xs text-emerald-400 font-bold">{syncMsg}</p>
           </div>
         </div>
       )}
