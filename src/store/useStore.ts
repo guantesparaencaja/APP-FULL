@@ -57,7 +57,7 @@ export interface User {
   classes_per_month?: number;
   classes_remaining?: number;
   gender?: 'male' | 'female';
-  steps?: number;
+  steps?: number; // Legacy: se mantiene por compatibilidad, pero la lógica de sensores está desactivada.
   last_workout?: string;
 }
 

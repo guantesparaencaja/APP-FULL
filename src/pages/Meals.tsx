@@ -561,7 +561,7 @@ export function Meals() {
               })}
             </div>
 
-            {!showAddForm && (
+            {user?.role === 'admin' && !showAddForm && (
               <div className="grid grid-cols-1 gap-3 mb-6">
                 <button
                   onClick={() => setShowAddForm(true)}
@@ -776,7 +776,7 @@ export function Meals() {
                         {meal.name}
                       </h3>
                       <div className="flex gap-2">
-                        {user && (user.role === 'admin' || meal.created_by === String(user.id)) && (
+                        {user?.role === 'admin' && (
                           <>
                             <button
                               onClick={() => handleEditMealClick(meal)}

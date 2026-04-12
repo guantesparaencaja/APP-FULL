@@ -242,18 +242,6 @@ export function Profile() {
     });
 
     if (user) {
-      // ✅ Sincronización de Pasos (Pedometer) al entrar
-      if ('ondevicemotion' in window) {
-        window.addEventListener('devicemotion', (event) => {
-          // Lógica simplificada de detección de pasos para Web
-          // En Capacitor real usaríamos el plugin nativo
-          const acc = event.accelerationIncludingGravity;
-          if (acc && Math.abs(acc.y || 0) > 12) {
-            // Detección de impacto
-          }
-        });
-      }
-
       const allQ = query(collection(db, 'bookings'), where('user_id', '==', String(user.id)));
       unsubAttendance = onSnapshot(
         allQ,
@@ -1275,19 +1263,6 @@ export function Profile() {
               </span>
               <span className="text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] mt-2">
                 Días Seguidos
-              </span>
-            </motion.div>
-            <motion.div
-              whileHover={{ y: -5 }}
-              className="glass-card p-6 rounded-[2.5rem] flex flex-col items-center justify-center text-center relative overflow-hidden group"
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110"></div>
-              <Monitor className="w-10 h-10 text-emerald-500 mb-3" />
-              <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                {user.steps || 0}
-              </span>
-              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-2">
-                Pasos Hoy
               </span>
             </motion.div>
             <motion.div

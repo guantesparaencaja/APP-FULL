@@ -990,8 +990,9 @@ export function Saberes() {
               {levelCombos.map((combo, index) => {
                 const globalIndex = visibleCombos.indexOf(combo);
                 const isCompleted = combo.video_approved && combo.manillas_approved && combo.contacto_approved && combo.desarrollo_approved;
-                const isActive = globalIndex === 0 || (visibleCombos[globalIndex - 1]?.video_approved && visibleCombos[globalIndex - 1]?.manillas_approved && visibleCombos[globalIndex - 1]?.contacto_approved && visibleCombos[globalIndex - 1]?.desarrollo_approved);
-                const isLocked = !isActive && !isCompleted && user?.role !== 'admin';
+                // El combo está bloqueado si su nivel es mayor al nivel de licencia del usuario
+                const isLocked = combo.level > (user?.license_level || 1) && user?.role !== 'admin';
+                const isActive = !isLocked && !isCompleted;
 
                 return (
                   <div key={combo.id} className={`group relative flex flex-col gap-4 p-4 rounded-xl border transition-colors mb-3 ${

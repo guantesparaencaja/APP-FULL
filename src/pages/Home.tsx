@@ -712,9 +712,12 @@ export function Home() {
 
       {user.role === 'student' && (
         <section className="mb-16">
-          <div className="glass-card p-8 rounded-[2.5rem]">
+          <div
+            onClick={() => navigate('/saberes')}
+            className="glass-card p-8 rounded-[2.5rem] cursor-pointer hover:border-primary/40 transition-all group"
+          >
             <div className="flex flex-col md:flex-row gap-8 items-center">
-              <div className="shrink-0">
+              <div className="shrink-0 group-hover:scale-105 transition-transform duration-500">
                 <EvolvingAvatar
                   gender={user.gender || 'male'}
                   level={
@@ -732,13 +735,13 @@ export function Home() {
                 <div className="flex justify-between items-end mb-6">
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.25em] text-primary mb-3">
-                      Progreso de Licencia
+                      Mi Licencia
                     </p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-                      Nivel {user.license_level}
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight group-hover:text-primary transition-colors">
+                      Domina el Arte del Boxeo
                     </p>
                   </div>
-                  <div className="p-4 bg-yellow-500/10 rounded-2xl border border-yellow-500/20">
+                  <div className="p-4 bg-yellow-500/10 rounded-2xl border border-yellow-500/20 group-hover:rotate-12 transition-transform">
                     <Trophy className="w-9 h-9 text-yellow-500" />
                   </div>
                 </div>
@@ -748,9 +751,12 @@ export function Home() {
                     style={{ width: '35%' }}
                   ></div>
                 </div>
-                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
-                  35% para el siguiente nivel
-                </p>
+                <div className="flex justify-between items-center">
+                  <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                    Nivel {user.license_level} • 35% para el siguiente nivel
+                  </p>
+                  <ChevronRight className="w-5 h-5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0" />
+                </div>
               </div>
             </div>
           </div>

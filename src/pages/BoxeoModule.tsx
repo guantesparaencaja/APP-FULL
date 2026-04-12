@@ -256,6 +256,15 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     ? visibleVideos.filter(v => v.subcategoria === selectedSub && (levelFilter === 'Todos' || v.nivel === levelFilter))
     : [];
 
+  const getNumericLevel = (nivel: string) => {
+    switch (nivel) {
+      case 'Principiante': return 1;
+      case 'Intermedio': return 5;
+      case 'Avanzado': return 9;
+      default: return 1;
+    }
+  };
+
   const subCounts = SUBCATEGORIAS.reduce<Record<string, number>>((acc, s) => {
     acc[s.id] = visibleVideos.filter(v => v.subcategoria === s.id).length;
     return acc;
@@ -384,30 +393,46 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                 {isAdmin ? 'Agrega el primer video con el botón +' : 'Próximamente'}
               </p>
             </div>
-          ) : subVideos.map((v) => (
-            <motion.div key={v.id} layout className={`bg-slate-900 rounded-2xl border ${v.activo ? 'border-slate-800' : 'border-slate-800 opacity-50'} overflow-hidden`}>
-              <button className="w-full flex items-center gap-4 p-4 text-left" onClick={() => setSelectedVideo(v)}>
+          ) : subVideos.map((v) => {
+            const isLocked = getNumericLevel(v.nivel) > (user?.license_level || 1) && !isAdmin;
+            return (
+            <motion.div key={v.id} layout className={`bg-slate-900 rounded-2xl border ${v.activo ? 'border-slate-800' : 'border-slate-800 opacity-50'} ${isLocked ? 'opacity-40 grayscale pointer-events-none' : ''} overflow-hidden`}>
+              <button 
+                className="w-full flex items-center gap-4 p-4 text-left" 
+                onClick={() => {
+                  if (isLocked) {
+                    alert('Este video requiere un nivel de licencia superior.');
+                    return;
+                  }
+                  setSelectedVideo(v);
+                }}
+              >
                 {/* Thumbnail / placeholder */}
                 <div className="w-24 h-16 flex-shrink-0 bg-slate-800 rounded-xl flex items-center justify-center overflow-hidden relative">
-                  {v.miniatura_url ? <img src={v.miniatura_url} alt={v.nombre} className="w-full h-full object-cover" /> :
-                    <span className="text-2xl">{subConfig.icon}</span>}
-                  {v.url_directa && <div className="absolute inset-0 bg-black/20 flex items-center justify-center"><Play className="w-6 h-6 text-white/80" /></div>}
+                  {isLocked ? (
+                    <Lock className="w-8 h-8 text-slate-600" />
+                  ) : v.miniatura_url ? (
+                    <img src={v.miniatura_url} alt={v.nombre} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl">{subConfig.icon}</span>
+                  )}
+                  {!isLocked && v.url_directa && <div className="absolute inset-0 bg-black/20 flex items-center justify-center"><Play className="w-6 h-6 text-white/80" /></div>}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-black text-white text-sm truncate">{v.nombre}</h3>
+                  <h3 className="font-black text-white text-sm truncate">{isLocked ? 'Contenido Bloqueado' : v.nombre}</h3>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
                       v.nivel === 'Principiante' ? 'bg-emerald-500/20 text-emerald-400' :
                       v.nivel === 'Intermedio' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
                     }`}>{v.nivel}</span>
                     <span className="text-[9px] text-slate-500 font-bold">{v.duracion_seg}s</span>
-                    {!v.url_directa && <span className="text-[9px] text-amber-400 font-bold">Sin video</span>}
+                    {!isLocked && !v.url_directa && <span className="text-[9px] text-amber-400 font-bold">Sin video</span>}
                   </div>
-                  {v.puntos_clave?.length > 0 && (
+                  {v.puntos_clave?.length > 0 && !isLocked && (
                     <p className="text-[10px] text-slate-500 mt-1 truncate">✓ {v.puntos_clave[0]}</p>
                   )}
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-600 shrink-0" />
+                {isLocked ? <Lock className="w-5 h-5 text-slate-700 shrink-0" /> : <ChevronRight className="w-5 h-5 text-slate-600 shrink-0" />}
               </button>
               {isAdmin && (
                 <div className="flex flex-wrap gap-2 px-4 pb-4">
@@ -423,8 +448,9 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                 </div>
               )}
             </motion.div>
-          ))}
-        </div>
+          );
+        })}
+      </div>
 
         {/* Undo bar */}
         <AnimatePresence>

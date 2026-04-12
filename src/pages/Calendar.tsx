@@ -121,9 +121,12 @@ export function Calendar() {
     rules:
       'Qué llevar: Guantes, vendas, hidratación. Cancelación con mínimo 2 horas de anticipación.',
     materials: 'Guantes, vendas, toalla, agua.',
-    duration_minutes: 60,
+    duration_minutes: 120,
     max_students: 4,
   });
+  const [isEditingRules, setIsEditingRules] = useState(false);
+  const [tempRules, setTempRules] = useState('');
+  const [isSavingRules, setIsSavingRules] = useState(false);
   const [selectedStudentForSchedule, setSelectedStudentForSchedule] = useState<User | null>(null);
   const [scheduleMode, setScheduleMode] = useState<'plan' | 'payment'>('plan');
   const [isEditingPlan, setIsEditingPlan] = useState(false);
@@ -741,7 +744,7 @@ export function Calendar() {
                     <div className="flex items-center gap-2 text-slate-500">
                       <Clock className="w-5 h-5 text-primary" />
                       <span className="font-bold text-sm tracking-widest uppercase">
-                        {selectedTime?.duration_minutes || 60} MIN
+                        {selectedTime?.duration_minutes || 120} MIN
                       </span>
                     </div>
                   </div>
@@ -761,21 +764,74 @@ export function Calendar() {
                       <div className="space-y-4 pt-4 border-t border-slate-800/50">
                         {selectedTime?.rules && (
                           <div className="space-y-1">
-                            <p className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em]">
-                              Reglas & Cancelación
-                            </p>
-                            <p className="text-xs leading-relaxed text-slate-500">
-                              {selectedTime.rules}
-                            </p>
+                            <div className="flex justify-between items-center">
+                              <p className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em]">
+                                Reglas & Cancelación
+                              </p>
+                              {isAdmin && !isEditingRules && (
+                                <button
+                                  onClick={() => {
+                                    setTempRules(selectedTime.rules);
+                                    setIsEditingRules(true);
+                                  }}
+                                  className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                >
+                                  <Edit2 className="w-3 h-3" /> Editar
+                                </button>
+                              )}
+                            </div>
+                            {isEditingRules ? (
+                              <div className="space-y-2 mt-2">
+                                <textarea
+                                  value={tempRules}
+                                  onChange={(e) => setTempRules(e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-300 min-h-[100px] outline-none focus:border-primary"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={async () => {
+                                      setIsSavingRules(true);
+                                      try {
+                                        await updateDoc(
+                                          doc(db, 'availabilities', selectedTime.id),
+                                          { rules: tempRules }
+                                        );
+                                        setSelectedTime({ ...selectedTime, rules: tempRules });
+                                        setIsEditingRules(false);
+                                      } catch (err) {
+                                        console.error('Error saving rules:', err);
+                                      } finally {
+                                        setIsSavingRules(false);
+                                      }
+                                    }}
+                                    disabled={isSavingRules}
+                                    className="px-3 py-1.5 bg-primary text-white text-[10px] font-black rounded-lg uppercase"
+                                  >
+                                    {isSavingRules ? 'Guardando...' : 'Guardar'}
+                                  </button>
+                                  <button
+                                    onClick={() => setIsEditingRules(false)}
+                                    className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-black rounded-lg uppercase"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-xs leading-relaxed text-slate-500">
+                                {selectedTime.rules}
+                              </p>
+                            )}
                           </div>
                         )}
                         {selectedTime?.materials && (
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em]">
+                          <div className="space-y-1 pt-2 border-t border-slate-800/30 mt-2">
+                            <p className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] flex items-center gap-2">
+                              <Dumbbell className="w-3 h-3" />
                               Materiales Necesarios
                             </p>
-                            <p className="text-xs leading-relaxed text-slate-500">
-                              {selectedTime.materials}
+                            <p className="text-xs leading-relaxed text-slate-400 italic">
+                              {selectedTime?.materials || 'No especificados'}
                             </p>
                           </div>
                         )}
@@ -1073,10 +1129,11 @@ export function Calendar() {
           onSubmit={async (e) => {
             e.preventDefault();
             try {
+              const finalAvailability = { ...newAvailability, duration_minutes: 120 };
               if (editingAvailabilityId) {
-                await updateDoc(doc(db, 'availabilities', editingAvailabilityId), newAvailability);
+                await updateDoc(doc(db, 'availabilities', editingAvailabilityId), finalAvailability);
               } else {
-                await addDoc(collection(db, 'availabilities'), newAvailability);
+                await addDoc(collection(db, 'availabilities'), finalAvailability);
               }
               setAlertModal({
                 show: true,
@@ -1156,19 +1213,22 @@ export function Calendar() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1">
-                  Duración (min)
+                  Duración Stándard (min)
                 </label>
-                <input
-                  type="number"
-                  value={newAvailability.duration_minutes || 60}
-                  onChange={(e) =>
-                    setNewAvailability({
-                      ...newAvailability,
-                      duration_minutes: Number(e.target.value),
-                    })
-                  }
-                  className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={120}
+                    readOnly
+                    className="w-full bg-slate-900 border border-slate-700/50 rounded-2xl px-5 py-4 text-slate-400 text-sm cursor-not-allowed font-black"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <Lock className="w-4 h-4 text-slate-600" />
+                  </div>
+                </div>
+                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mt-1 ml-1">
+                  Duración fija para clases GPTE
+                </p>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1">
