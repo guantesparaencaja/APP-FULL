@@ -152,17 +152,17 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
       </AnimatePresence>
 
       {!showDaySelector && challenge && (
-        <div className="glass-card p-3 sm:p-6 mx-auto w-full max-w-sm sm:max-w-lg rounded-3xl">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
-                <Trophy className="w-6 h-6 text-primary" />
+        <div className="glass-card p-4 sm:p-6 mx-auto w-full max-w-sm sm:max-w-lg rounded-3xl">
+          <div className="flex items-center justify-between mb-5 sm:mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 sm:p-3 bg-primary/10 rounded-2xl border border-primary/20">
+                <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               </div>
               <div>
-                <h3 className="text-xl font-black uppercase tracking-tight text-white">
+                <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white">
                   Meta del Mes
                 </h3>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">
                   {format(new Date(), 'MMMM yyyy', { locale: es })}
                 </p>
               </div>
@@ -177,11 +177,11 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 mb-1">
             {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((day, i) => (
               <div
                 key={i}
-                className="text-center text-[9px] sm:text-[10px] font-black text-slate-600 uppercase tracking-widest py-1 sm:py-2"
+                className="text-center text-[10px] sm:text-xs font-black text-slate-600 uppercase tracking-widest py-1 sm:py-2"
               >
                 {day}
               </div>
@@ -227,7 +227,7 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
                           : 'bg-white/5 border-white/10 text-slate-500'
                   )}
                 >
-                  <span className="text-[10px] sm:text-xs font-black leading-none">{format(day, 'd')}</span>
+                  <span className="text-xs sm:text-sm font-black leading-none">{format(day, 'd')}</span>
                   <div className="mt-1">
                     {isCompleted ? (
                       <Trophy className="w-4 h-4 fill-current" />
@@ -248,24 +248,24 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
             })}
           </div>
 
-          <div className="mt-6 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mt-5 pt-5 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-emerald-500 rounded-full" />
-                <span className="text-[10px] font-black uppercase text-slate-500">Logrado</span>
+                <span className="text-xs font-black uppercase text-slate-500">Logrado</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-red-500 rounded-full" />
-                <span className="text-[10px] font-black uppercase text-slate-500">No Cumplido</span>
+                <span className="text-xs font-black uppercase text-slate-500">No Cumplido</span>
               </div>
             </div>
 
             {challenge.completions?.length > 0 && (
-              <div className="px-6 py-3 bg-primary/10 rounded-2xl border border-primary/20 flex items-center gap-3">
-                <span className="text-[10px] font-black uppercase text-primary tracking-widest">
+              <div className="px-5 py-3 bg-primary/10 rounded-2xl border border-primary/20 flex items-center gap-3">
+                <span className="text-xs font-black uppercase text-primary tracking-widest">
                   Racha Actual
                 </span>
-                <span className="text-xl font-black text-primary">{challenge.streak || 0}</span>
+                <span className="text-2xl font-black text-primary">{challenge.streak || 0}</span>
                 <Flame className="w-5 h-5 text-primary fill-current" />
               </div>
             )}

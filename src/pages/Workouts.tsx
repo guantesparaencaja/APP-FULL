@@ -22,6 +22,7 @@ import { Modal } from '../components/Modal';
 import { LazyVideoWrapper } from '../components/LazyVideoWrapper';
 import { compressImage } from '../utils/imageUtils';
 import { WorkoutVideoCard } from '../components/workouts/WorkoutVideoCard';
+import { WorkoutVideoRow } from '../components/workouts/WorkoutVideoRow';
 import { WorkoutFilterModal } from '../components/workouts/WorkoutFilterModal';
 import { WorkoutAdminPanel } from '../components/workouts/WorkoutAdminPanel';
 import { LyftaImporter } from '../components/workouts/LyftaImporter';
@@ -832,27 +833,19 @@ export function Workouts() {
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="flex flex-col gap-3">
               {filteredVideos.map((video, i) => (
-                <motion.div
+                <WorkoutVideoRow
                   key={video.id}
-                  layout
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: Math.min(i * 0.04, 0.3) }}
-                >
-                  <WorkoutVideoCard
-                    video={video}
-                    category={categories.find((c) => c.id === video.category_id)}
-                    isAdmin={!!isAdmin}
-                    onPlay={handleVideoClick}
-                    onApprove={isAdmin ? handleApproveVideo : undefined}
-                    onReject={isAdmin ? handleRejectVideo : undefined}
-                    onEdit={isAdmin ? startEditVideo : undefined}
-                    onDelete={isAdmin ? handleDeleteVideo : undefined}
-                  />
-                </motion.div>
+                  video={video}
+                  category={categories.find((c) => c.id === video.category_id)}
+                  isAdmin={!!isAdmin}
+                  onPlay={handleVideoClick}
+                  onApprove={isAdmin ? handleApproveVideo : undefined}
+                  onReject={isAdmin ? handleRejectVideo : undefined}
+                  onEdit={isAdmin ? startEditVideo : undefined}
+                  onDelete={isAdmin ? handleDeleteVideo : undefined}
+                />
               ))}
             </div>
           </AnimatePresence>
