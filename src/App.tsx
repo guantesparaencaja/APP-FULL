@@ -181,9 +181,27 @@ export default function App() {
               const userData = { id: firebaseUser.uid, ...data } as any;
               const currentUser = useStore.getState().user;
 
-              // Only update if data actually changed to avoid infinite re-renders or excessive updates
-              if (!currentUser || JSON.stringify(userData) !== JSON.stringify(currentUser)) {
-                setUser(userData);
+              // ✅ BLOQUE B FIX: Merge profundo para preservar campos del admin
+              // Si Firestore no tiene un campo (undefined) pero el estado local sí lo tiene,
+              // conservamos el valor local. Esto evita que height, weight, dominant_hand
+              // se pierdan en actualizaciones parciales de Firestore.
+              const mergedUser = currentUser
+                ? {
+                    ...currentUser,   // base: estado actual
+                    ...userData,      // Firestore sobreescribe (es la fuente de verdad)
+                    // Para campos críticos: solo sobreescribir si Firestore tiene un valor real
+                    height: userData.height ?? currentUser.height,
+                    weight: userData.weight ?? currentUser.weight,
+                    dominant_hand: userData.dominant_hand ?? currentUser.dominant_hand,
+                    age: userData.age ?? currentUser.age,
+                    gender: userData.gender ?? currentUser.gender,
+                    profile_pic: userData.profile_pic ?? currentUser.profile_pic,
+                  }
+                : userData;
+
+              // Only update if data actually changed to avoid infinite re-renders
+              if (!currentUser || JSON.stringify(mergedUser) !== JSON.stringify(currentUser)) {
+                setUser(mergedUser);
               }
               initializePushNotifications(firebaseUser.uid);
             } else {

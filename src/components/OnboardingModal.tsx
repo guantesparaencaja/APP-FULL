@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 import { db } from '../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Tutorial } from './Tutorial';
+import { sendWelcomeEmail } from '../lib/email';
 
 export function OnboardingModal() {
   const user = useStore((state) => state.user);
@@ -98,6 +99,14 @@ export function OnboardingModal() {
 
       await updateDoc(userRef, updatedData);
       setUser({ ...user, ...updatedData } as any);
+
+      // ✉️ Correo de bienvenida al completar el onboarding (silencioso)
+      sendWelcomeEmail({
+        nombre: formData.name,
+        email: user.email || '',
+        userId: String(user.id),
+      }).catch(() => {});
+
       setTimeout(() => {
         setShowTutorial(true);
       }, 100);
