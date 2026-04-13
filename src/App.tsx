@@ -187,16 +187,16 @@ export default function App() {
               // se pierdan en actualizaciones parciales de Firestore.
               const mergedUser = currentUser
                 ? {
-                    ...currentUser,   // base: estado actual
-                    ...userData,      // Firestore sobreescribe (es la fuente de verdad)
-                    // Para campos críticos: solo sobreescribir si Firestore tiene un valor real
-                    height: userData.height ?? currentUser.height,
-                    weight: userData.weight ?? currentUser.weight,
-                    dominant_hand: userData.dominant_hand ?? currentUser.dominant_hand,
-                    age: userData.age ?? currentUser.age,
-                    gender: userData.gender ?? currentUser.gender,
-                    profile_pic: userData.profile_pic ?? currentUser.profile_pic,
-                  }
+                  ...currentUser,   // base: estado actual
+                  ...userData,      // Firestore sobreescribe (es la fuente de verdad)
+                  // Para campos críticos: solo sobreescribir si Firestore tiene un valor real
+                  height: userData.height ?? currentUser.height,
+                  weight: userData.weight ?? currentUser.weight,
+                  dominant_hand: userData.dominant_hand ?? currentUser.dominant_hand,
+                  age: userData.age ?? currentUser.age,
+                  gender: userData.gender ?? currentUser.gender,
+                  profile_pic: userData.profile_pic ?? currentUser.profile_pic,
+                }
                 : userData;
 
               // Only update if data actually changed to avoid infinite re-renders

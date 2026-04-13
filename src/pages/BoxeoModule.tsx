@@ -452,7 +452,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                 }}
               >
                 {/* Thumbnail / placeholder */}
-                <div className="w-24 h-16 flex-shrink-0 bg-slate-800 rounded-xl flex items-center justify-center overflow-hidden relative">
+                <div className="w-24 h-16 shrink-0 bg-slate-800 rounded-xl flex items-center justify-center overflow-hidden relative">
                   {isLocked ? (
                     <Lock className="w-8 h-8 text-slate-600" />
                   ) : v.miniatura_url ? (
@@ -526,7 +526,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
       )}
 
       {/* Hero banner */}
-      <div className="mx-4 mb-6 rounded-3xl bg-gradient-to-br from-red-900/60 via-slate-900 to-slate-950 border border-red-900/30 p-6 relative overflow-hidden">
+      <div className="mx-4 mb-6 rounded-3xl bg-linear-to-br from-red-900/60 via-slate-900 to-slate-950 border border-red-900/30 p-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-48 h-48 bg-red-600/10 rounded-full blur-3xl -mr-12 -mt-12" />
         <p className="text-[11px] font-black text-red-400 uppercase tracking-[0.3em] mb-2">CORE DE LA APP</p>
         <h2 className="text-2xl font-black italic text-white leading-tight">Domina el Arte<br />del Boxeo</h2>
@@ -551,7 +551,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                 }
                 setSelectedSub(sub.id);
               }}
-              className={`relative overflow-hidden rounded-2xl p-5 text-left bg-gradient-to-br ${sub.color} border border-white/10 shadow-lg ${
+              className={`relative overflow-hidden rounded-2xl p-5 text-left bg-linear-to-br ${sub.color} border border-white/10 shadow-lg ${
                 isSubLocked ? 'opacity-50 grayscale cursor-not-allowed' : ''
               }`}
             >

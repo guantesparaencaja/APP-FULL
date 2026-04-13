@@ -36,10 +36,10 @@ export const LazyVideoWrapper: React.FC<LazyVideoWrapperProps> = ({
   return (
     <div
       ref={wrapperRef}
-      className={`relative ${className || ''} min-h-[200px] w-full bg-slate-900/10 rounded-lg flex items-center justify-center overflow-hidden`}
+      className={`${className?.includes('absolute') ? '' : 'relative'} ${className || ''} min-h-[200px] w-full bg-slate-900/10 rounded-lg flex items-center justify-center overflow-hidden`}
     >
       {!isVisible ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 animate-pulse">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 animate-pulse bg-slate-900/40">
           <Video className="w-10 h-10 mb-2 opacity-50" />
           <span className="text-xs font-bold uppercase tracking-widest">Cargando...</span>
         </div>

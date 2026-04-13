@@ -73,6 +73,7 @@ function InlineVideoPreview({ video }: { video: WorkoutVideo }) {
       controls={false}
       muted
       playsInline
+      autoPlay
     />
   );
 }
@@ -114,7 +115,7 @@ function VideoFullscreenModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-200 bg-black/95 backdrop-blur-md flex flex-col"
+        className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col"
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
         {/* Header bar */}
@@ -131,7 +132,7 @@ function VideoFullscreenModal({
           </div>
           <button
             onClick={onClose}
-            className="ml-4 p-2 sm:p-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white flex-shrink-0"
+            className="ml-4 p-2 sm:p-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white shrink-0"
             id="video-modal-close"
           >
             <X className="w-5 h-5" />
@@ -304,7 +305,7 @@ export function WorkoutVideoRow({
             ) : (
               <InlineVideoPreview video={video} />
             )}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/10 to-black/30" />
+            <div className="absolute inset-0 bg-linear-to-r from-transparent via-black/10 to-black/30" />
 
             {/* Play overlay */}
             <div className="absolute inset-0 flex items-center justify-center">

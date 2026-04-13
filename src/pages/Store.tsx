@@ -298,7 +298,7 @@ export function Store() {
           className="flex flex-col items-center justify-center py-24 text-center"
         >
           <div className="relative mb-8">
-            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center border border-primary/20">
+            <div className="w-32 h-32 rounded-full bg-linear-to-br from-primary/20 to-purple-500/20 flex items-center justify-center border border-primary/20">
               <ShoppingBag className="w-14 h-14 text-primary/60" />
             </div>
             <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary flex items-center justify-center animate-bounce">
@@ -341,7 +341,7 @@ export function Store() {
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1549713486-82f8d386248a?q=80&w=600'; }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-transparent" />
 
                   {/* Admin Actions */}
                   {showAdminPanel && isAdmin && (
@@ -496,7 +496,7 @@ export function Store() {
               className="relative w-full max-w-md bg-slate-950 border-l border-slate-800 h-full flex flex-col overflow-hidden shadow-2xl"
             >
               {/* Cart Header */}
-              <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 flex-shrink-0">
+              <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 shrink-0">
                 <div className="flex items-center gap-3">
                   <ShoppingCart className="w-5 h-5 text-primary" />
                   <h3 className="font-black text-white text-lg uppercase tracking-tight">
@@ -524,7 +524,7 @@ export function Store() {
                           <img
                             src={product.image_url || 'https://images.unsplash.com/photo-1549713486-82f8d386248a?q=80&w=200'}
                             alt={product.name}
-                            className="w-16 h-16 object-cover rounded-xl flex-shrink-0"
+                            className="w-16 h-16 object-cover rounded-xl shrink-0"
                             onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1549713486-82f8d386248a?q=80&w=200'; }}
                           />
                           <div className="flex-1 min-w-0">
@@ -549,7 +549,7 @@ export function Store() {
                   </div>
 
                   {cart.length > 0 && (
-                    <div className="p-5 border-t border-slate-800 flex-shrink-0">
+                    <div className="p-5 border-t border-slate-800 shrink-0">
                       <div className="flex items-center justify-between mb-4">
                         <span className="text-slate-400 font-bold uppercase text-xs tracking-widest">Total</span>
                         <span className="text-2xl font-black text-primary">${cartTotal.toLocaleString()}</span>
@@ -606,13 +606,13 @@ export function Store() {
 
                     {orderError && (
                       <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold py-3 px-4 rounded-2xl">
-                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <AlertCircle className="w-4 h-4 shrink-0" />
                         {orderError}
                       </div>
                     )}
                   </div>
 
-                  <div className="p-5 border-t border-slate-800 space-y-3 flex-shrink-0">
+                  <div className="p-5 border-t border-slate-800 space-y-3 shrink-0">
                     <button
                       onClick={handlePlaceOrder}
                       disabled={isSubmitting || !paymentFile}

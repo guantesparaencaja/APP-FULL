@@ -162,7 +162,7 @@ export function Chat() {
       className="flex flex-col h-[calc(100vh-10rem)] bg-slate-950 rounded-[2.5rem] overflow-hidden border border-slate-800 shadow-2xl"
     >
       {/* ── Header ── */}
-      <header className="px-6 py-4 flex items-center justify-between backdrop-blur-md bg-white/5 border-b border-white/10 z-10 flex-shrink-0">
+      <header className="px-6 py-4 flex items-center justify-between backdrop-blur-md bg-white/5 border-b border-white/10 z-10 shrink-0">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
@@ -198,7 +198,7 @@ export function Chat() {
 
       {/* ── Admin: student selector ── */}
       {isAdmin && (
-        <div className="px-4 py-2 bg-slate-900/60 border-b border-white/5 flex items-center gap-3 flex-shrink-0">
+        <div className="px-4 py-2 bg-slate-900/60 border-b border-white/5 flex items-center gap-3 shrink-0">
           <Users className="w-4 h-4 text-primary shrink-0" />
           <select
             value={selectedStudentId || ''}
@@ -284,7 +284,7 @@ export function Chat() {
       </div>
 
       {/* ── Input area ── */}
-      <div className="p-4 sm:p-6 bg-white/5 border-t border-white/10 backdrop-blur-xl flex-shrink-0">
+      <div className="p-4 sm:p-6 bg-white/5 border-t border-white/10 backdrop-blur-xl shrink-0">
         <form
           onSubmit={handleSendMessage}
           className="flex items-center gap-3 bg-slate-950 p-2 rounded-4xl border border-white/10 shadow-2xl"

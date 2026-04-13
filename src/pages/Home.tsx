@@ -1161,8 +1161,8 @@ export function Home() {
             {dailyJokes.dark.length > 0 && (
               <div className="bg-slate-900/50 p-6 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-700/50 shadow-inner relative overflow-hidden">
                 <div className="absolute -right-4 -top-4 text-4xl sm:text-6xl opacity-10">🦇</div>
-                <span className="text-[10px] sm:text-[11px] font-black text-purple-400 uppercase tracking-[0.25em] mb-4 sm:mb-6 block flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 sm:w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+                <span className="text-[10px] sm:text-[11px] font-black text-purple-400 uppercase tracking-[0.25em] mb-4 sm:mb-6 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-purple-500 animate-pulse"></span>
                   Humor Negro 💀
                 </span>
                 <div className="space-y-4 sm:space-y-6 relative z-10">
