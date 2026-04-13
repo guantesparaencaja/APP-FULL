@@ -12,7 +12,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadVideoToDrive } from '../lib/driveService';
 
 interface VendajeVideo {
   id: string;
@@ -76,21 +76,32 @@ export function VendajeTutorial() {
       alert('Por favor, selecciona un archivo de video.');
       return;
     }
-    setUploadProgress(10);
-    try {
-      const storageRef = ref(
-        storage,
-        `vendaje_videos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
-      );
-      const snapshot = await uploadBytes(storageRef, file);
-      setUploadProgress(90);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      setNewVideo((prev) => ({ ...prev, video_url: downloadURL }));
-      setUploadProgress(null);
-    } catch (error: any) {
-      alert('Error al subir el video: ' + error.message);
-      setUploadProgress(null);
-    }
+
+    const tempVideo = document.createElement('video');
+    tempVideo.preload = 'metadata';
+    tempVideo.onloadedmetadata = async () => {
+      URL.revokeObjectURL(tempVideo.src);
+      if (tempVideo.duration > 300) {
+        alert('El video no puede durar más de 5 minutos (300 segundos).');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+      setUploadProgress(0);
+      try {
+        const downloadURL = await uploadVideoToDrive(
+          file,
+          String(user?.id || 'admin'),
+          (progress) => setUploadProgress(progress),
+          { title: file.name, type: 'vendaje' }
+        );
+        setNewVideo((prev) => ({ ...prev, video_url: downloadURL }));
+      } catch (error: any) {
+        alert('Error al subir el video: ' + error.message);
+      } finally {
+        setUploadProgress(null);
+      }
+    };
+    tempVideo.src = URL.createObjectURL(file);
   };
 
   const handleAddVideo = async (e: React.FormEvent) => {

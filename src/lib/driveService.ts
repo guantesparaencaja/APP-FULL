@@ -12,9 +12,10 @@ import {
 import { ref, deleteObject } from 'firebase/storage';
 import { AuditEntry } from '../types/workout.types';
 
+const emailBase = (import.meta as any).env.VITE_N8N_EMAIL_BASE || 'https://gpte.app.n8n.cloud/webhook';
 const N8N_WEBHOOK_URL =
   (import.meta as any).env.VITE_N8N_DRIVE_WEBHOOK ||
-  'https://n8n.tu-instancia.com/webhook/gpte-drive-upload';
+  `${emailBase.replace(/\/$/, '')}/gpte-drive-upload`;
 
 // ─── Upload Video to Drive ────────────────────────────────────────────────────
 
