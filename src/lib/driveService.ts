@@ -53,8 +53,13 @@ export async function uploadVideoToDrive({
     });
 
     if (!initRes.ok) {
-      console.error(await initRes.text());
-      throw new Error('No se pudo inicializar la subida en Drive. Verifica los permisos.');
+      const errText = await initRes.text();
+      let msg = 'No se pudo inicializar la subida en Drive. ';
+      if (errText.includes('SERVICE_DISABLED') || errText.includes('disabled')) {
+         msg = 'ERROR CRÍTICO: La API de Google Drive está DESACTIVADA en tu Google Cloud. Debes entrar a Google Cloud Console (project: gpte007) y Habilitar la Google Drive API.';
+      }
+      console.error('Google Native Error:', errText);
+      throw new Error(msg);
     }
 
     const uploadUrl = initRes.headers.get('Location');

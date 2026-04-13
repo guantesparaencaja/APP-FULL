@@ -119,10 +119,10 @@ export function VideoPlayerModal({
         exit={{ opacity: 0 }}
       >
         {/* ── Header ── */}
-        <div className="flex items-center gap-3 px-4 py-3 bg-black/80 backdrop-blur-md flex-shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3 bg-black/80 backdrop-blur-md shrink-0">
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors text-white flex-shrink-0 flex items-center gap-2"
+            className="p-2 rounded-full hover:bg-white/10 transition-colors text-white shrink-0 flex items-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" />
             <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Volver</span>
@@ -135,7 +135,7 @@ export function VideoPlayerModal({
               <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest truncate">{subtitle}</p>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {level && (
               <span className={`text-[9px] font-black px-2 py-1 rounded-full bg-white/10 border border-white/20 uppercase ${levelColor}`}>
                 {level}
@@ -201,7 +201,7 @@ export function VideoPlayerModal({
 
         {/* ── Controls bar ── */}
         {videoUrl && !error && (
-          <div className="bg-black/90 px-4 pt-2 pb-1 flex-shrink-0">
+          <div className="bg-black/90 px-4 pt-2 pb-1 shrink-0">
             {/* Progress bar */}
             <div
               className="w-full h-1 bg-white/20 rounded-full mb-2 cursor-pointer"
@@ -235,7 +235,7 @@ export function VideoPlayerModal({
         )}
 
         {/* ── Info panel compacto ── */}
-        <div className="bg-slate-950 flex-shrink-0 border-t border-slate-800">
+        <div className="bg-slate-950 shrink-0 border-t border-slate-800">
           <div className="px-4 py-3 space-y-2">
 
             {/* Key points — chips horizontales */}
@@ -278,7 +278,7 @@ export function VideoPlayerModal({
                       <div className="pt-2 space-y-1">
                         {commonErrors.map((e, i) => (
                           <p key={i} className="text-[10px] text-slate-400 flex items-start gap-2 leading-snug">
-                            <span className="text-red-500 mt-0.5 flex-shrink-0">✗</span> {e}
+                            <span className="text-red-500 mt-0.5 shrink-0">✗</span> {e}
                           </p>
                         ))}
                       </div>

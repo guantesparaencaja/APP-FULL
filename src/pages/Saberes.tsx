@@ -645,7 +645,7 @@ export function Saberes() {
 
       {/* ✅ Modal Fullscreen Tutorial */}
       {fullscreenVideo && (
-        <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+        <div className="fixed inset-0 z-60 bg-black flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3 bg-slate-950/80 backdrop-blur-md border-b border-slate-800">
             <div className="flex-1 min-w-0">
@@ -826,7 +826,7 @@ export function Saberes() {
               animate={{ opacity: 0.15, scale: 1 }}
               exit={{ opacity: 0, scale: 1.2 }}
               transition={{ duration: 1, ease: "easeOut" }}
-              className={`absolute inset-0 blur-3xl bg-gradient-to-tr ${
+              className={`absolute inset-0 blur-3xl bg-linear-to-tr ${
                 (user?.license_level || 1) >= 10 ? 'from-slate-100 via-white to-slate-200' :
                 (user?.license_level || 1) >= 8 ? 'from-red-600 via-orange-500 to-red-400' :
                 (user?.license_level || 1) >= 5 ? 'from-yellow-400 via-yellow-600 to-amber-400' :
@@ -976,7 +976,7 @@ export function Saberes() {
                   </h3>
                   <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Clasificación de Poder Nivel {level}</p>
                 </div>
-                <div className={`h-px flex-1 bg-gradient-to-r transition-all duration-1000 ${
+                <div className={`h-px flex-1 bg-linear-to-r transition-all duration-1000 ${
                   parseInt(level) >= 10 ? 'from-slate-100 to-transparent' :
                   parseInt(level) >= 8 ? 'from-red-600 to-transparent' :
                   parseInt(level) >= 5 ? 'from-yellow-400 to-transparent' :
@@ -998,7 +998,7 @@ export function Saberes() {
                     'bg-slate-800/50 border-slate-700 opacity-60'
                   }`}>
                     <div className="flex items-center gap-4">
-                      <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
+                      <div className={`shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
                         isCompleted ? 'bg-primary/20 text-primary' : 
                         isActive || user?.role === 'admin' ? 'bg-slate-700 text-slate-400' : 
                         'bg-slate-700 text-slate-500'
@@ -1113,18 +1113,18 @@ export function Saberes() {
                             <div className="mt-1">
                               {myProgress?.status === 'pending' ? (
                                 <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2">
-                                  <Loader2 className="w-4 h-4 text-yellow-400 animate-spin flex-shrink-0" />
+                                  <Loader2 className="w-4 h-4 text-yellow-400 animate-spin shrink-0" />
                                   <p className="text-xs text-yellow-400 font-bold">Video enviado — en revisión por el profe</p>
                                 </div>
                               ) : myProgress?.status === 'approved' ? (
                                 <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
-                                  <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                                   <p className="text-xs text-emerald-400 font-bold">Combo completamente aprobado</p>
                                 </div>
                               ) : myProgress?.status === 'rejected' ? (
                                 <div className="flex flex-col gap-2">
                                   <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
-                                    <X className="w-4 h-4 text-red-400 flex-shrink-0" />
+                                    <X className="w-4 h-4 text-red-400 shrink-0" />
                                     <p className="text-xs text-red-400 font-bold">Video/Combo rechazado — revisa e intenta de nuevo</p>
                                   </div>
                                   <button
