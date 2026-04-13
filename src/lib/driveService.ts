@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { AuditEntry } from '../types/workout.types';
+import { getGoogleDriveToken } from './googleAuth';
 
 const emailBase = (import.meta as any).env.VITE_N8N_EMAIL_BASE || 'https://gpte.app.n8n.cloud/webhook';
 const N8N_WEBHOOK_URL =
@@ -19,61 +20,78 @@ const N8N_WEBHOOK_URL =
 
 // ─── Upload Video to Drive ────────────────────────────────────────────────────
 
-export async function uploadVideoToDrive(
-  file: File,
-  userId: string,
-  onProgress?: (progress: number) => void,
-  metadata: any = {}
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.append('video', file);
-    formData.append('userId', userId);
-    formData.append('fileName', `${Date.now()}_${file.name}`);
-    formData.append('metadata', JSON.stringify(metadata));
+export async function uploadVideoToDrive({
+  video,
+  name,
+  onProgress
+}: {
+  video: File;
+  name: string;
+  onProgress?: (pct: number) => void;
+}): Promise<string> {
+  onProgress?.(5);
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', N8N_WEBHOOK_URL, true);
+  try {
+    const token = await getGoogleDriveToken();
+    onProgress?.(15);
 
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && onProgress) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        onProgress(percent);
-      }
+    const metadata = {
+      name: `${Date.now()}_${name.replace(/[^a-zA-Z0-9.-]/g, '_')}`,
+      mimeType: video.type || 'video/mp4'
     };
 
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          if (data.videoUrl) {
-            resolve(data.videoUrl);
-          } else {
-            reject(new Error('n8n no devolvió una URL de video válida'));
-          }
-        } catch (e) {
-          reject(new Error('Error al parsear la respuesta de n8n'));
-        }
-      } else {
-        reject(new Error(`Error servidor n8n: ${xhr.status}`));
-      }
-    };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', video);
 
-    xhr.onerror = () => reject(new Error('Error de red al subir a n8n'));
-    xhr.send(formData);
-  });
+    onProgress?.(30);
+
+    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: form
+    });
+
+    if (!uploadRes.ok) {
+      console.error(await uploadRes.text());
+      throw new Error('No se pudo subir a Drive directamente.');
+    }
+
+    onProgress?.(80);
+    const result = await uploadRes.json();
+    const fileId = result.id;
+
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+
+    onProgress?.(100);
+    return `https://drive.google.com/file/d/${fileId}/preview`;
+  } catch (error: any) {
+    onProgress?.(0);
+    throw new Error('Fallo crítico al subir video a Drive: ' + error.message);
+  }
 }
 
 // ─── Delete Video from Drive ──────────────────────────────────────────────────
 
 export async function deleteVideoFromDrive(videoUrl: string): Promise<boolean> {
-  if (!videoUrl || !videoUrl.includes('drive.google.com')) return false;
+  const match = videoUrl.match(/file\/d\/(.*?)\//);
+  const fileId = match ? match[1] : null;
+  if (!fileId) return false;
 
   try {
-    const response = await fetch(N8N_WEBHOOK_URL.replace('upload', 'delete'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete', videoUrl }),
+    const token = await getGoogleDriveToken();
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
     });
 
     return response.ok;

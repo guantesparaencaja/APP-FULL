@@ -12,6 +12,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
+import { uploadVideoToDrive } from '../lib/driveService';
 
 interface VendajeVideo {
   id: string;
@@ -85,8 +86,21 @@ export function VendajeTutorial() {
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
-      alert('FALTA LLAVE JSON: Comandante, para subir el video directamente a Google Drive sin usar Firebase ni N8N, me informaste que me darías la llave nuevamente. Mándame el texto del archivo JSON del Service Account (drive-firestore-sync) para conectarlo. Por ahora, sube tu video a Drive manualmente y pega el ENLACE (URL) de Drive en la casilla de abajo.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      
+      setUploadProgress(0);
+      try {
+        const url = await uploadVideoToDrive({
+          video: file,
+          name: `vendaje_${Date.now()}_${file.name}`,
+          onProgress: (pct) => setUploadProgress(pct)
+        });
+        setNewVideo(prev => ({ ...prev, video_url: url }));
+      } catch (err: any) {
+        alert('Error Drive: ' + err.message);
+      } finally {
+        setUploadProgress(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
     };
     tempVideo.src = URL.createObjectURL(file);
   };

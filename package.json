@@ -41,6 +41,7 @@
     "firebase": "^12.10.0",
     "google-auth-library": "^10.6.2",
     "html5-qrcode": "^2.3.8",
+    "jose": "^6.2.2",
     "logrocket": "^12.1.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",

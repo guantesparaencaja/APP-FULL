@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 import { PlayCircle, CheckCircle, Lock, ArrowLeft, Upload, Check, Video, Plus, X, Edit2, Trash2, Play, Loader2, Award, Shield, AlertTriangle, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import { uploadVideoToDrive } from '../lib/driveService';
 import { storage, db } from '../lib/firebase';
 import { ref, deleteObject } from 'firebase/storage';
 import { collection, getDocs, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, where, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
@@ -324,8 +325,20 @@ export function Saberes() {
         if (video.duration > 300) {
           alert('El video no puede durar más de 5 minutos (300 segundos).');
         } else {
-          alert('FALTA LLAVE JSON: Comandante, para subir el video directamente a Google Drive sin usar Firebase ni N8N, mándame el archivo JSON del Service Account. Por ahora, debes usar la URL directa de Drive conectada abajo.');
-          if (tutorialFileInputRef.current) tutorialFileInputRef.current.value = '';
+          setTutorialUploadProgress(0);
+          try {
+            const url = await uploadVideoToDrive({
+              video: file,
+              name: `tutorial_${Date.now()}_${file.name}`,
+              onProgress: (pct) => setTutorialUploadProgress(pct)
+            });
+            setNewTutorial(prev => ({ ...prev, video_url: url }));
+          } catch (err: any) {
+            alert('Error en Drive: ' + err.message);
+          } finally {
+            setTutorialUploadProgress(null);
+            if (tutorialFileInputRef.current) tutorialFileInputRef.current.value = '';
+          }
         }
       };
       video.src = URL.createObjectURL(file);
@@ -415,15 +428,20 @@ export function Saberes() {
     setUploadProgress(0);
     try {
       if (isAdmin && editingCombo) {
-        alert('FALTA LLAVE JSON: Para subir desde archivo local a Drive, requiero el JSON del Service Account. Sube a Drive e ingresa la URL.');
-        setUploadProgress(null);
-        if (comboFileInputRef.current) comboFileInputRef.current.value = '';
-        return;
+        const url = await uploadVideoToDrive({
+          video: file,
+          name: `ref_${editingCombo.id}_${Date.now()}.mp4`,
+          onProgress: (pct) => setUploadProgress(pct)
+        });
+        await updateDoc(doc(db, 'combos', editingCombo.id), { video_url: url });
+        setEditingCombo(null);
+        alert('✅ Video de referencia subido a Drive correctamente.');
       } else if (videoPreview?.comboId && user) {
-        alert('FALTA LLAVE JSON: Para evaluaciones necesitamos integrarlo directo a Drive. Habla con el admin para configurar el JSON.');
-        setUploadProgress(null);
-        setVideoPreview(null);
-        return;
+        const videoUrl = await uploadVideoToDrive({
+          video: file,
+          name: `eval_${user.id}_${videoPreview.comboId}_${Date.now()}.mp4`,
+          onProgress: (pct) => setUploadProgress(pct)
+        });
         
         await addDoc(collection(db, 'combo_progress'), {
           combo_id: videoPreview.comboId,
