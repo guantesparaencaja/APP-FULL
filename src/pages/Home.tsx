@@ -27,6 +27,7 @@ import {
   Info,
   Clock,
   Plus,
+  X,
   Users,
   Send,
 } from 'lucide-react';
@@ -145,9 +146,12 @@ export function Home() {
     categoria?: string;
     dificultad?: string;
     objetivo?: string;
+    tasks?: string[];
+    period?: 'dia' | 'semana' | 'mes';
     createdAt?: any;
   } | null>(null);
   const [isChallengeCompleted, setIsChallengeCompleted] = useState(false);
+  const [checkedTasks, setCheckedTasks] = useState<Set<number>>(new Set());
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [appSettings, setAppSettings] = useState({
     workouts_unlocked: false,
@@ -162,7 +166,11 @@ export function Home() {
     categoria: 'Boxeo',
     dificultad: 'intermedio',
     objetivo: 'general',
+    tasks: [] as string[],
+    period: 'dia' as 'dia' | 'semana' | 'mes',
   });
+  // Helper: manage task items in the form
+  const [newTaskInput, setNewTaskInput] = useState('');
   const [allUsersCount, setAllUsersCount] = useState(0);
   const [topUsers, setTopUsers] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
@@ -349,12 +357,18 @@ export function Home() {
       if (filtered.length > 0) {
         const challenge = filtered[0];
         setCurrentChallenge(challenge);
+        setCheckedTasks(new Set()); // reset task checks when challenge changes
 
         // Check if completed today using the subcollection
         const todayStr = new Date().toISOString().split('T')[0];
         const recordRef = doc(db, 'challenge_completions', user.id, 'records', todayStr);
-        onSnapshot(recordRef, (doc) => {
-          setIsChallengeCompleted(doc.exists());
+        onSnapshot(recordRef, (snap) => {
+          setIsChallengeCompleted(snap.exists());
+          // restore checked tasks from firestore
+          const data = snap.data();
+          if (data?.checkedTasks) {
+            setCheckedTasks(new Set(data.checkedTasks as number[]));
+          }
         });
       } else {
         setCurrentChallenge(null);
@@ -450,8 +464,8 @@ export function Home() {
 
   const handleChallengeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!challengeForm.text || !challengeForm.title) {
-      showAlert('Error', 'Título y descripción son obligatorios.', 'error');
+    if (!challengeForm.title) {
+      showAlert('Error', 'El título es obligatorio.', 'error');
       return;
     }
     try {
@@ -467,11 +481,14 @@ export function Home() {
         categoria: 'Boxeo',
         dificultad: 'intermedio',
         objetivo: 'general',
+        tasks: [],
+        period: 'dia',
       });
-      alert('Éxito: Reto publicado correctamente.');
+      setNewTaskInput('');
+      showAlert('Éxito', 'Reto publicado correctamente.', 'success');
     } catch (error) {
       console.error('Error saving challenge:', error);
-      alert('Error: No se pudo guardar el reto.');
+      showAlert('Error', 'No se pudo guardar el reto.', 'error');
     }
   };
 
@@ -671,10 +688,63 @@ export function Home() {
                     {currentChallenge.dificultad}
                   </span>
                 )}
+                {currentChallenge.period && currentChallenge.period !== 'dia' && (
+                  <span className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-xl text-xs font-black uppercase tracking-widest">
+                    {currentChallenge.period === 'semana' ? '📅 Reto semanal' : '🗓️ Reto mensual'}
+                  </span>
+                )}
               </div>
+
+              {/* ── Checklist de tareas ── */}
+              {currentChallenge.tasks && currentChallenge.tasks.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Tareas ({checkedTasks.size}/{currentChallenge.tasks.length})
+                  </p>
+                  {currentChallenge.tasks.map((task, idx) => {
+                    const done = checkedTasks.has(idx);
+                    return (
+                      <motion.button
+                        key={idx}
+                        onClick={async () => {
+                          if (isChallengeCompleted) return;
+                          const next = new Set(checkedTasks);
+                          done ? next.delete(idx) : next.add(idx);
+                          setCheckedTasks(next);
+                          const today = new Date().toISOString().split('T')[0];
+                          try {
+                            await setDoc(doc(db, 'challenge_completions', user.id, 'records', today), {
+                              challengeId: currentChallenge.id,
+                              userId: user.id,
+                              checkedTasks: Array.from(next),
+                            }, { merge: true });
+                          } catch (_) {}
+                        }}
+                        whileTap={{ scale: 0.97 }}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all text-sm font-bold ${
+                          done
+                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                            : 'bg-slate-900/40 border-slate-700 text-slate-300 hover:border-primary/40'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                          done ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'
+                        }`}>
+                          {done && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                        </div>
+                        <span className={done ? 'line-through opacity-60' : ''}>{task}</span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
 
               {!isChallengeCompleted ? (
                 <button
+                  disabled={
+                    !!(currentChallenge.tasks?.length) &&
+                    checkedTasks.size < (currentChallenge.tasks?.length ?? 0)
+                  }
                   onClick={async () => {
                     try {
                       setIsChallengeCompleted(true);
@@ -683,6 +753,7 @@ export function Home() {
                         challengeId: currentChallenge.id,
                         completedAt: new Date().toISOString(),
                         userId: user.id,
+                        checkedTasks: Array.from(checkedTasks),
                       });
 
                       // Log to Activity Feed
@@ -709,9 +780,12 @@ export function Home() {
                       );
                     }
                   }}
-                  className="w-full bg-primary text-white font-black py-4 sm:py-5 rounded-2xl sm:rounded-3xl uppercase text-xs sm:text-base tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 sm:gap-3"
+                  className="w-full bg-primary text-white font-black py-4 sm:py-5 rounded-2xl sm:rounded-3xl uppercase text-xs sm:text-base tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 sm:gap-3 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
                 >
-                  <Flame className="w-4 h-4 sm:w-5 sm:h-5 fill-current" /> Completar Reto del Día
+                  <Flame className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
+                  {currentChallenge.tasks?.length && checkedTasks.size < currentChallenge.tasks.length
+                    ? `Completa ${currentChallenge.tasks.length - checkedTasks.size} tarea${currentChallenge.tasks.length - checkedTasks.size !== 1 ? 's' : ''} más`
+                    : 'Completar Reto del Día'}
                 </button>
               ) : (
                 <div className="w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-black py-4 sm:py-5 rounded-2xl sm:rounded-3xl uppercase text-xs sm:text-base tracking-[0.2em] flex items-center justify-center gap-2 sm:gap-3">
@@ -1290,6 +1364,82 @@ export function Home() {
                 <option value="mantener">Mantener</option>
                 <option value="aumentar">Aumentar Masa</option>
               </select>
+            </div>
+
+            {/* Período */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                Período del Reto
+              </label>
+              <div className="flex gap-2">
+                {(['dia', 'semana', 'mes'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setChallengeForm({ ...challengeForm, period: p })}
+                    className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border ${
+                      challengeForm.period === p
+                        ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-primary'
+                    }`}
+                  >
+                    {p === 'dia' ? '📅 Día' : p === 'semana' ? '🗓️ Semana' : '🏆 Mes'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Lista de Tareas */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                Lista de Tareas (Opcional)
+              </label>
+              {challengeForm.tasks.map((task, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white text-sm font-bold">
+                    {task}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setChallengeForm({
+                      ...challengeForm,
+                      tasks: challengeForm.tasks.filter((_, i) => i !== idx)
+                    })}
+                    className="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Ej: 3 rounds de saltar cuerda"
+                  value={newTaskInput}
+                  onChange={(e) => setNewTaskInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (!newTaskInput.trim()) return;
+                      setChallengeForm({ ...challengeForm, tasks: [...challengeForm.tasks, newTaskInput.trim()] });
+                      setNewTaskInput('');
+                    }
+                  }}
+                  className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3 text-slate-900 dark:text-white outline-none focus:border-primary transition-all text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newTaskInput.trim()) return;
+                    setChallengeForm({ ...challengeForm, tasks: [...challengeForm.tasks, newTaskInput.trim()] });
+                    setNewTaskInput('');
+                  }}
+                  className="px-4 py-3 bg-emerald-500/10 text-emerald-500 rounded-2xl font-black text-xs uppercase hover:bg-emerald-500/20 transition-all border border-emerald-500/20"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <button

@@ -16,6 +16,67 @@ export interface Exercise {
   reps: string;
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Normalize ingredients from any source (array of objects OR plain string).
+ *  Always returns [{ name, amount, measure, icon }] — safe to map in the UI. */
+const normalizeIngredients = (raw: any): { name: string; amount: string; measure: string; icon: string }[] => {
+  if (!raw) return [];
+  if (typeof raw === 'string') {
+    // Split by comma or newline
+    return raw.split(/[,\n]+/).filter(Boolean).map((s: string) => ({
+      name: s.trim(),
+      amount: '',
+      measure: '',
+      icon: '🥗',
+    }));
+  }
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => {
+      if (typeof item === 'string') return { name: item, amount: '', measure: '', icon: '🥗' };
+      return {
+        name: item.name || item.ingredient || '',
+        amount: item.amount || item.quantity || '',
+        measure: item.measure || item.unit || '',
+        icon: item.icon || '🥗',
+      };
+    });
+  }
+  return [];
+};
+
+/** Normalize preparation_steps similarly */
+const normalizeSteps = (raw: any, fallback?: string): { step: string }[] => {
+  if (!raw && !fallback) return [];
+  if (typeof raw === 'string') return raw.split(/\n+/).filter(Boolean).map((s: string) => ({ step: s.trim() }));
+  if (Array.isArray(raw)) {
+    return raw.map((s: any) => {
+      if (typeof s === 'string') return { step: s };
+      return { step: s.step || s.description || '' };
+    });
+  }
+  if (fallback) return [{ step: fallback }];
+  return [];
+};
+
+/** Build a safe meal object from any source (local catalog or Firestore doc) */
+const safeMeal = (m: any, fallback: any) => {
+  const source = m || fallback;
+  return {
+    name: source.name || 'Comida',
+    category: source.category,
+    image_keyword: source.image_url || source.image_keyword || '',
+    ingredients: normalizeIngredients(source.ingredients),
+    preparation_steps: normalizeSteps(source.preparation_steps, source.instructions),
+    macros: source.macros || {
+      calories: source.calories || 0,
+      protein: source.protein || 0,
+      carbs: source.carbs || 0,
+      fats: source.fats || 0,
+    },
+  };
+};
+
 export const generateLocalMeals = (
   goal: string,
   weight: number,
@@ -23,82 +84,49 @@ export const generateLocalMeals = (
   dietaryRestrictions: string,
   customMeals?: any[]
 ) => {
-  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  // Semana empieza en Domingo (como lo pidió el usuario)
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
   const catalogToUse = customMeals && customMeals.length > 0 ? customMeals : MEAL_CATALOG;
 
-  const breakfasts = catalogToUse.filter((m) => m.category.toLowerCase() === 'desayuno');
-  const lunches = catalogToUse.filter((m) => m.category.toLowerCase() === 'almuerzo');
-  const dinners = catalogToUse.filter((m) => m.category.toLowerCase() === 'cena');
-  const snacks = catalogToUse.filter((m) => m.category.toLowerCase() === 'snack');
+  const byCategory = (cat: string) =>
+    catalogToUse.filter((m) => (m.category || '').toLowerCase() === cat.toLowerCase());
 
-  const getRandomMeal = (meals: any[]) =>
-    meals.length > 0 ? meals[Math.floor(Math.random() * meals.length)] : null;
+  const breakfasts = byCategory('desayuno');
+  const lunches = byCategory('almuerzo');
+  const dinners = byCategory('cena');
+  const snacks = byCategory('snack');
 
-  const week = days.map((day) => {
-    const b = getRandomMeal(breakfasts) || MEAL_CATALOG.find((m) => m.category === 'Desayuno');
-    const l = getRandomMeal(lunches) || MEAL_CATALOG.find((m) => m.category === 'Almuerzo');
-    const d = getRandomMeal(dinners) || MEAL_CATALOG.find((m) => m.category === 'Cena');
-    const s = getRandomMeal(snacks) || MEAL_CATALOG.find((m) => m.category === 'Snack');
+  // Fallbacks from static catalog
+  const fbBreakfast = MEAL_CATALOG.find((m) => m.category === 'Desayuno')!;
+  const fbLunch = MEAL_CATALOG.find((m) => m.category === 'Almuerzo')!;
+  const fbDinner = MEAL_CATALOG.find((m) => m.category === 'Cena')!;
+  const fbSnack = MEAL_CATALOG.find((m) => m.category === 'Snack')!;
 
-    return {
-      day,
-      meals: [
-        {
-          name: b.name,
-          category: b.category,
-          image_keyword: b.image_url || b.image_keyword,
-          ingredients: b.ingredients,
-          preparation_steps: b.preparation_steps || [{ step: b.instructions }],
-          macros: b.macros || {
-            calories: b.calories,
-            protein: b.protein,
-            carbs: b.carbs,
-            fats: b.fats,
-          },
-        },
-        {
-          name: l.name,
-          category: l.category,
-          image_keyword: l.image_url || l.image_keyword,
-          ingredients: l.ingredients,
-          preparation_steps: l.preparation_steps || [{ step: l.instructions }],
-          macros: l.macros || {
-            calories: l.calories,
-            protein: l.protein,
-            carbs: l.carbs,
-            fats: l.fats,
-          },
-        },
-        {
-          name: d.name,
-          category: d.category,
-          image_keyword: d.image_url || d.image_keyword,
-          ingredients: d.ingredients,
-          preparation_steps: d.preparation_steps || [{ step: d.instructions }],
-          macros: d.macros || {
-            calories: d.calories,
-            protein: d.protein,
-            carbs: d.carbs,
-            fats: d.fats,
-          },
-        },
-        {
-          name: s.name,
-          category: s.category,
-          image_keyword: s.image_url || s.image_keyword,
-          ingredients: s.ingredients,
-          preparation_steps: s.preparation_steps || [{ step: s.instructions }],
-          macros: s.macros || {
-            calories: s.calories,
-            protein: s.protein,
-            carbs: s.carbs,
-            fats: s.fats,
-          },
-        },
-      ],
-    };
-  });
+  // Shuffle with seed per category for variety across days
+  const shuffle = <T>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const sBreakfasts = shuffle(breakfasts.length > 0 ? breakfasts : [fbBreakfast]);
+  const sLunches = shuffle(lunches.length > 0 ? lunches : [fbLunch]);
+  const sDinners = shuffle(dinners.length > 0 ? dinners : [fbDinner]);
+  const sSnacks = shuffle(snacks.length > 0 ? snacks : [fbSnack]);
+
+  const week = days.map((day, i) => ({
+    day,
+    meals: [
+      safeMeal(sBreakfasts[i % sBreakfasts.length], fbBreakfast),
+      safeMeal(sLunches[i % sLunches.length], fbLunch),
+      safeMeal(sDinners[i % sDinners.length], fbDinner),
+      safeMeal(sSnacks[i % sSnacks.length], fbSnack),
+    ],
+  }));
 
   return { week };
 };

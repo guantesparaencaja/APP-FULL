@@ -35,15 +35,16 @@ interface BoxeoVideo {
 }
 
 // ─── Subcategories config ─────────────────────────────────────────────────────
+// min_level = nivel mínimo de licencia para acceder (1 = siempre desbloqueado)
 const SUBCATEGORIAS = [
-  { id: 'Tecnica-Basica',  label: 'Técnica Básica',    icon: '🥊', color: 'from-red-600 to-red-800',     desc: 'Golpes fundamentales del boxeo' },
-  { id: 'Footwork',        label: 'Footwork',           icon: '👣', color: 'from-blue-600 to-blue-800',    desc: 'Movimiento y posicionamiento' },
-  { id: 'Defensa',         label: 'Defensa',            icon: '🛡️', color: 'from-emerald-600 to-emerald-800', desc: 'Esquivas y bloqueos' },
-  { id: 'Combinaciones',   label: 'Combinaciones',      icon: '💥', color: 'from-orange-600 to-orange-800', desc: 'Secuencias de golpes' },
-  { id: 'Saco',            label: 'Saco',               icon: '🎯', color: 'from-purple-600 to-purple-800', desc: 'Trabajo en el saco' },
-  { id: 'Sombra',          label: 'Sombra',             icon: '👻', color: 'from-slate-500 to-slate-700',  desc: 'Shadow boxing' },
-  { id: 'Fisico',          label: 'Físico para Boxeo',  icon: '💪', color: 'from-yellow-600 to-yellow-800', desc: 'Acondicionamiento físico' },
-  { id: 'Calentamiento',   label: 'Calentamiento',      icon: '🔥', color: 'from-pink-600 to-pink-800',   desc: 'Movilidad y estiramiento' },
+  { id: 'Tecnica-Basica',  label: 'Técnica Básica',    icon: '🥊', color: 'from-red-600 to-red-800',     desc: 'Golpes fundamentales del boxeo',      min_level: 1 },
+  { id: 'Calentamiento',   label: 'Calentamiento',      icon: '🔥', color: 'from-pink-600 to-pink-800',   desc: 'Movilidad y estiramiento',            min_level: 1 },
+  { id: 'Fisico',          label: 'Físico para Boxeo',  icon: '💪', color: 'from-yellow-600 to-yellow-800', desc: 'Acondicionamiento físico',           min_level: 1 },
+  { id: 'Footwork',        label: 'Footwork',           icon: '👣', color: 'from-blue-600 to-blue-800',    desc: 'Movimiento y posicionamiento',        min_level: 2 },
+  { id: 'Defensa',         label: 'Defensa',            icon: '🛡️', color: 'from-emerald-600 to-emerald-800', desc: 'Esquivas y bloqueos',             min_level: 2 },
+  { id: 'Sombra',          label: 'Sombra',             icon: '👻', color: 'from-slate-500 to-slate-700',  desc: 'Shadow boxing',                       min_level: 3 },
+  { id: 'Combinaciones',   label: 'Combinaciones',      icon: '💥', color: 'from-orange-600 to-orange-800', desc: 'Secuencias de golpes',              min_level: 4 },
+  { id: 'Saco',            label: 'Saco',               icon: '🎯', color: 'from-purple-600 to-purple-800', desc: 'Trabajo en el saco',                min_level: 4 },
 ];
 
 // ─── Seed data ────────────────────────────────────────────────────────────────
@@ -537,24 +538,45 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
 
       {/* Subcategory grid */}
       <div className="px-4 grid grid-cols-2 gap-4">
-        {SUBCATEGORIAS.map(sub => (
-          <motion.button
-            key={sub.id}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setSelectedSub(sub.id)}
-            className={`relative overflow-hidden rounded-2xl p-5 text-left bg-gradient-to-br ${sub.color} border border-white/10 shadow-lg`}
-          >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-2xl -mr-5 -mt-5" />
-            <span className="text-3xl block mb-3">{sub.icon}</span>
-            <h3 className="font-black text-white text-sm uppercase tracking-tight leading-tight">{sub.label}</h3>
-            <p className="text-white/60 text-[10px] mt-1">{sub.desc}</p>
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-white/80 text-[10px] font-black">{subCounts[sub.id] || 0} videos</span>
-              <ChevronRight className="w-4 h-4 text-white/60" />
-            </div>
-          </motion.button>
-        ))}
+        {SUBCATEGORIAS.map(sub => {
+          const userLevel = user?.license_level || 1;
+          const isSubLocked = !isAdmin && sub.min_level > userLevel;
+          return (
+            <motion.button
+              key={sub.id}
+              whileHover={isSubLocked ? {} : { scale: 1.02 }}
+              whileTap={isSubLocked ? {} : { scale: 0.97 }}
+              onClick={() => {
+                if (isSubLocked) {
+                  alert(`🔒 Desbloquea ${sub.label} llegando al nivel ${sub.min_level} en Combos.`);
+                  return;
+                }
+                setSelectedSub(sub.id);
+              }}
+              className={`relative overflow-hidden rounded-2xl p-5 text-left bg-gradient-to-br ${sub.color} border border-white/10 shadow-lg ${
+                isSubLocked ? 'opacity-50 grayscale cursor-not-allowed' : ''
+              }`}
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-2xl -mr-5 -mt-5" />
+              {/* Lock overlay */}
+              {isSubLocked && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 rounded-2xl z-10 gap-1">
+                  <Lock className="w-7 h-7 text-white/70" />
+                  <span className="text-[9px] font-black text-white/70 uppercase tracking-widest">Nivel {sub.min_level}</span>
+                </div>
+              )}
+              <span className="text-3xl block mb-3">{isSubLocked ? '🔒' : sub.icon}</span>
+              <h3 className="font-black text-white text-sm uppercase tracking-tight leading-tight">{sub.label}</h3>
+              <p className="text-white/60 text-[10px] mt-1">{isSubLocked ? `Requiere nivel ${sub.min_level}` : sub.desc}</p>
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-white/80 text-[10px] font-black">
+                  {isSubLocked ? `🔒 Bloqueado` : `${subCounts[sub.id] || 0} videos`}
+                </span>
+                {isSubLocked ? <Lock className="w-4 h-4 text-white/50" /> : <ChevronRight className="w-4 h-4 text-white/60" />}
+              </div>
+            </motion.button>
+          );
+        })}
       </div>
     </div>
   );
