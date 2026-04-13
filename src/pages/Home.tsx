@@ -597,6 +597,12 @@ export function Home() {
             </div>
             {isSpecialUser && (
               <div className="flex gap-2">
+                <button
+                  onClick={() => setShowChallengeModal(true)}
+                  className="px-3 py-2.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-xl transition-colors shrink-0 flex items-center gap-1.5 text-xs font-bold border border-emerald-500/20"
+                >
+                  <Plus className="w-4 h-4" /> Crear Reto
+                </button>
                 <label className="cursor-pointer p-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2 text-xs font-bold">
                   <Upload className="w-4 h-4" /> Subir Video
                   <input
@@ -803,9 +809,9 @@ export function Home() {
               )}
             </div>
           ) : (
-            <div className="aspect-video rounded-lg border-2 border-dashed border-slate-700 flex flex-col items-center justify-center bg-slate-900/30 text-slate-500">
-              <Video className="w-10 h-10 mb-2 opacity-20" />
-              <p className="text-xs">No hay reto disponible para hoy</p>
+            <div className="p-6 md:p-8 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500 transition-all">
+              <Trophy className="w-8 h-8 mb-2 opacity-30" />
+              <p className="text-[11px] font-bold uppercase tracking-widest">Aún no hay reto para hoy</p>
             </div>
           )}
         </div>
