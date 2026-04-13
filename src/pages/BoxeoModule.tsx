@@ -8,7 +8,6 @@ import { useNavigate } from 'react-router-dom';
 import { db, storage } from '../lib/firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -211,26 +210,10 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
 
   const handleConfirmUpload = async () => {
     if (!selectedFile) return;
-    setUploading(true);
-    setUploadPct(0);
-    const storageRef = ref(storage, `boxeo/${Date.now()}_${selectedFile.name}`);
-    const task = uploadBytesResumable(storageRef, selectedFile);
-    task.on('state_changed',
-      s => setUploadPct(Math.round(s.bytesTransferred / s.totalBytes * 100)),
-      err => { alert('Error al subir video: ' + err.message); setUploading(false); },
-      async () => {
-        try {
-          const url = await getDownloadURL(task.snapshot.ref);
-          setAddForm(f => ({ ...f, url_directa: url }));
-          setSelectedFile(null);
-        } catch (err: any) {
-          alert('Error al obtener URL: ' + err.message);
-        } finally {
-          setUploading(false);
-          if (videoFileRef.current) videoFileRef.current.value = '';
-        }
-      }
-    );
+    alert('FALTA LLAVE JSON: Comandante, para subir el video local directamente a Google Drive sin usar Firebase ni N8N, mándame el archivo JSON del Service Account (drive-firestore-sync). Por ahora cancela este archivo y pega directamente el ENLACE (URL) de Drive abajo.');
+    setUploading(false);
+    setSelectedFile(null);
+    if (videoFileRef.current) videoFileRef.current.value = '';
   };
 
   const handleCancelFile = () => {

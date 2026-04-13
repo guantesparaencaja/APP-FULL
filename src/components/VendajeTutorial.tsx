@@ -12,7 +12,6 @@ import {
   deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface VendajeVideo {
   id: string;
@@ -86,26 +85,8 @@ export function VendajeTutorial() {
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
-      setUploadProgress(0);
-      const storageRef = ref(storage, `vendaje_videos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`);
-      const task = uploadBytesResumable(storageRef, file);
-      task.on('state_changed',
-        s => setUploadProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)),
-        err => {
-          alert('Error al subir el video: ' + err.message);
-          setUploadProgress(null);
-        },
-        async () => {
-          try {
-            const downloadURL = await getDownloadURL(task.snapshot.ref);
-            setNewVideo((prev) => ({ ...prev, video_url: downloadURL }));
-          } catch (error: any) {
-            alert('Error al obtener URL: ' + error.message);
-          } finally {
-            setUploadProgress(null);
-          }
-        }
-      );
+      alert('FALTA LLAVE JSON: Comandante, para subir el video directamente a Google Drive sin usar Firebase ni N8N, me informaste que me darías la llave nuevamente. Mándame el texto del archivo JSON del Service Account (drive-firestore-sync) para conectarlo. Por ahora, sube tu video a Drive manualmente y pega el ENLACE (URL) de Drive en la casilla de abajo.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
     };
     tempVideo.src = URL.createObjectURL(file);
   };
