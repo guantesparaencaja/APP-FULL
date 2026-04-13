@@ -12,7 +12,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { uploadVideoToDrive } from '../lib/driveService';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface VendajeVideo {
   id: string;
@@ -87,19 +87,25 @@ export function VendajeTutorial() {
         return;
       }
       setUploadProgress(0);
-      try {
-        const downloadURL = await uploadVideoToDrive(
-          file,
-          String(user?.id || 'admin'),
-          (progress) => setUploadProgress(progress),
-          { title: file.name, type: 'vendaje' }
-        );
-        setNewVideo((prev) => ({ ...prev, video_url: downloadURL }));
-      } catch (error: any) {
-        alert('Error al subir el video: ' + error.message);
-      } finally {
-        setUploadProgress(null);
-      }
+      const storageRef = ref(storage, `vendaje_videos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`);
+      const task = uploadBytesResumable(storageRef, file);
+      task.on('state_changed',
+        s => setUploadProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+        err => {
+          alert('Error al subir el video: ' + err.message);
+          setUploadProgress(null);
+        },
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(task.snapshot.ref);
+            setNewVideo((prev) => ({ ...prev, video_url: downloadURL }));
+          } catch (error: any) {
+            alert('Error al obtener URL: ' + error.message);
+          } finally {
+            setUploadProgress(null);
+          }
+        }
+      );
     };
     tempVideo.src = URL.createObjectURL(file);
   };

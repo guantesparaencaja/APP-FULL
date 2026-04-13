@@ -4,9 +4,8 @@ import { PlayCircle, CheckCircle, Lock, ArrowLeft, Upload, Check, Video, Plus, X
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { storage, db } from '../lib/firebase';
-import { ref, deleteObject } from 'firebase/storage';
+import { ref, deleteObject, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { collection, getDocs, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, where, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
-import { uploadVideoToDrive } from '../lib/driveService';
 import { sendPushNotification } from '../lib/fcmService';
 import { InteractiveLesson } from '../components/InteractiveLesson';
 import { BoxingGlossary } from '../components/BoxingGlossary';
@@ -326,19 +325,20 @@ export function Saberes() {
           alert('El video no puede durar más de 5 minutos (300 segundos).');
         } else {
           setTutorialUploadProgress(0);
-          try {
-            const url = await uploadVideoToDrive(
-              file,
-              String(user?.id || 'admin'),
-              (progress) => setTutorialUploadProgress(progress),
-              { title: file.name, type: 'tutorial' }
-            );
-            setNewTutorial(prev => ({ ...prev, video_url: url }));
-          } catch (err: any) {
-            alert('Error al subir el video: ' + err.message);
-          } finally {
-            setTutorialUploadProgress(null);
-          }
+          const storageRef = ref(storage, `tutorials/${Date.now()}_${file.name}`);
+          const task = uploadBytesResumable(storageRef, file);
+          task.on('state_changed',
+            s => setTutorialUploadProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+            err => {
+              alert('Error al subir el video: ' + err.message);
+              setTutorialUploadProgress(null);
+            },
+            async () => {
+              const url = await getDownloadURL(task.snapshot.ref);
+              setNewTutorial(prev => ({ ...prev, video_url: url }));
+              setTutorialUploadProgress(null);
+            }
+          );
         }
       };
       video.src = URL.createObjectURL(file);
@@ -428,24 +428,30 @@ export function Saberes() {
     setUploadProgress(0);
     try {
       if (isAdmin && editingCombo) {
-        // Admin: sube el video de referencia a Drive
-        const url = await uploadVideoToDrive(
-          file,
-          String(user?.id || 'admin'),
-          (progress) => setUploadProgress(progress),
-          { title: editingCombo.name, type: 'como_referencia' }
-        );
+        // Admin: sube el video de referencia a Storage
+        const storageRef = ref(storage, `combos/reference/${editingCombo.id}_${Date.now()}.mp4`);
+        const task = uploadBytesResumable(storageRef, file);
+        const url = await new Promise<string>((resolve, reject) => {
+          task.on('state_changed',
+            s => setUploadProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+            reject,
+            async () => resolve(await getDownloadURL(task.snapshot.ref))
+          );
+        });
         await updateDoc(doc(db, 'combos', editingCombo.id), { video_url: url });
         setEditingCombo(null);
         alert('✅ Video de referencia subido correctamente.');
       } else if (videoPreview?.comboId && user) {
-        // Estudiante: sube a Drive → combo_progress
-        const videoUrl = await uploadVideoToDrive(
-          file,
-          String(user.id),
-          (progress) => setUploadProgress(progress),
-          { title: videoPreview.comboId, type: 'evaluacion_combo' }
-        );
+        // Estudiante: sube a Storage → combo_progress
+        const storageRef = ref(storage, `combos/evaluations/${user.id}_${videoPreview.comboId}_${Date.now()}.mp4`);
+        const task = uploadBytesResumable(storageRef, file);
+        const videoUrl = await new Promise<string>((resolve, reject) => {
+          task.on('state_changed',
+            s => setUploadProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+            reject,
+            async () => resolve(await getDownloadURL(task.snapshot.ref))
+          );
+        });
         
         await addDoc(collection(db, 'combo_progress'), {
           combo_id: videoPreview.comboId,

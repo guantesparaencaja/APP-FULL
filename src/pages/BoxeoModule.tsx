@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { db, storage } from '../lib/firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { uploadVideoToDrive } from '../lib/driveService';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -213,21 +213,24 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     if (!selectedFile) return;
     setUploading(true);
     setUploadPct(0);
-    try {
-      const url = await uploadVideoToDrive(
-        selectedFile,
-        String(user?.id || 'admin'),
-        (progress) => setUploadPct(progress),
-        { title: selectedFile.name, type: 'boxeo' }
-      );
-      setAddForm(f => ({ ...f, url_directa: url }));
-      setSelectedFile(null);
-    } catch (err: any) {
-      alert('Error: ' + err.message);
-    } finally {
-      setUploading(false);
-      if (videoFileRef.current) videoFileRef.current.value = '';
-    }
+    const storageRef = ref(storage, `boxeo/${Date.now()}_${selectedFile.name}`);
+    const task = uploadBytesResumable(storageRef, selectedFile);
+    task.on('state_changed',
+      s => setUploadPct(Math.round(s.bytesTransferred / s.totalBytes * 100)),
+      err => { alert('Error al subir video: ' + err.message); setUploading(false); },
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          setAddForm(f => ({ ...f, url_directa: url }));
+          setSelectedFile(null);
+        } catch (err: any) {
+          alert('Error al obtener URL: ' + err.message);
+        } finally {
+          setUploading(false);
+          if (videoFileRef.current) videoFileRef.current.value = '';
+        }
+      }
+    );
   };
 
   const handleCancelFile = () => {
@@ -427,8 +430,8 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
         </AnimatePresence>
 
         <header className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800 px-4 py-4 flex items-center gap-4">
-          <button onClick={() => setSelectedSub(null)} className="text-primary p-2 hover:bg-primary/10 rounded-full transition-colors">
-            <ArrowLeft className="w-6 h-6" />
+          <button onClick={() => setSelectedSub(null)} className="text-primary px-4 py-2 hover:bg-primary/10 flex items-center gap-2 rounded-xl border border-primary/20 transition-colors font-black uppercase text-xs">
+            <ArrowLeft className="w-5 h-5" /> Volver
           </button>
           <div className="flex-1">
             <h1 className="text-lg font-black uppercase tracking-tight text-white">{subConfig.icon} {subConfig.label}</h1>

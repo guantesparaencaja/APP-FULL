@@ -7,7 +7,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw,
-  ChevronRight, X, AlertCircle, CheckCircle, ChevronDown,
+  ChevronRight, X, AlertCircle, CheckCircle, ChevronDown, ArrowLeft
 } from 'lucide-react';
 
 export interface VideoPlayerModalProps {
@@ -122,9 +122,10 @@ export function VideoPlayerModal({
         <div className="flex items-center gap-3 px-4 py-3 bg-black/80 backdrop-blur-md flex-shrink-0">
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors text-white flex-shrink-0"
+            className="p-2 rounded-full hover:bg-white/10 transition-colors text-white flex-shrink-0 flex items-center gap-2"
           >
-            <X className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5" />
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Volver</span>
           </button>
           <div className="flex-1 min-w-0">
             <h2 className="text-white font-black text-sm uppercase tracking-tight truncate leading-tight">
