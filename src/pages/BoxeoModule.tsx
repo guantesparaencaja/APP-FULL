@@ -1,16 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import {
-  ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize2, RefreshCw,
-  Trash2, Plus, ChevronRight, ChevronLeft, RotateCcw, Eye, EyeOff,
-  Upload, X, Check, Loader2, Shield, Footprints, Zap, Target,
-  Dumbbell, Wind, Flame, Heart, AlertCircle, Star, Edit2, Lock
+  ArrowLeft, Play, Trash2, Plus, ChevronRight, EyeOff,
+  Upload, X, Check, Loader2, Edit2, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { db, storage } from '../lib/firebase';
 import {
   collection, getDocs, addDoc, deleteDoc, doc, updateDoc,
-  query, where, setDoc, onSnapshot, serverTimestamp, getDoc
+  setDoc, onSnapshot, serverTimestamp
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { motion, AnimatePresence } from 'motion/react';

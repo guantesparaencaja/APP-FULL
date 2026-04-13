@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ShoppingBag, ExternalLink, ChevronRight, Info, Package,
+  ShoppingBag, Info, Package,
   Clock, CheckCircle2, X, Plus, Minus, Trash2, Edit2,
-  AlertCircle, ShoppingCart, Upload, Loader2, Smartphone, Check,
+  AlertCircle, ShoppingCart, Upload, Loader2, Check,
 } from 'lucide-react';
 import {
   collection, onSnapshot, query, addDoc, serverTimestamp,

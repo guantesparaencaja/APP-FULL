@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Clock, Heart, X, CheckSquare, Settings, Trash2,
-  ChevronDown, ChevronUp, Maximize2, Volume2, VolumeX,
-  Info, Target, Dumbbell,
+  ChevronDown, ChevronUp, Maximize2, Info, Target, Dumbbell,
 } from 'lucide-react';
 import { WorkoutVideo, WorkoutCategory, getVideoStatus, MUSCLE_GROUP_LABELS } from '../../types/workout.types';
 import { getYouTubeEmbedUrl } from '../../services/geminiService';
 import { LazyVideoWrapper } from '../LazyVideoWrapper';
 
 interface WorkoutVideoRowProps {
+  key?: React.Key;
   video: WorkoutVideo;
   category?: WorkoutCategory;
   isAdmin?: boolean;

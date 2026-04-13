@@ -5,13 +5,11 @@ import {
   Heart,
   Flame,
   Trophy,
-  Play,
   Dumbbell,
   Calendar,
   Utensils,
   Quote,
   Smile,
-  Zap,
   Target,
   Activity,
   Star,
@@ -28,8 +26,6 @@ import {
   Clock,
   Plus,
   X,
-  Users,
-  Send,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { AssessmentModal } from '../components/AssessmentModal';
@@ -40,11 +36,9 @@ import {
   collection,
   onSnapshot,
   query,
-  where,
   orderBy,
   addDoc,
   deleteDoc,
-  getDocs,
   limit,
   serverTimestamp,
 } from 'firebase/firestore';

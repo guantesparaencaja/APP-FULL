@@ -17,30 +17,15 @@ export default [
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
-        ecmaFeatures: {
-          jsx: true,
-        },
+        ecmaFeatures: { jsx: true },
       },
       globals: {
-        window: "readonly",
-        document: "readonly",
-        console: "readonly",
-        setTimeout: "readonly",
-        setInterval: "readonly",
-        clearInterval: "readonly",
-        fetch: "readonly",
-        process: "readonly",
-        import: "readonly",
-        navigator: "readonly",
-        XMLHttpRequest: "readonly",
-        FormData: "readonly",
+        window: "readonly", document: "readonly", console: "readonly",
+        setTimeout: "readonly", setInterval: "readonly", clearInterval: "readonly",
+        fetch: "readonly", process: "readonly", navigator: "readonly",
       },
     },
-    settings: {
-      react: {
-        version: "detect",
-      },
-    },
+    settings: { react: { version: "detect" } },
     rules: {
       ...typescript.configs.recommended.rules,
       ...react.configs.recommended.rules,
