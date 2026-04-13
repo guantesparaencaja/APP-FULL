@@ -136,6 +136,9 @@ export function Home() {
     id: string;
     url?: string;
     text?: string;
+    text_bajar_peso?: string;
+    text_mantener?: string;
+    text_aumentar?: string;
     title?: string;
     categoria?: string;
     dificultad?: string;
@@ -157,6 +160,9 @@ export function Home() {
   const [challengeForm, setChallengeForm] = useState({
     title: '',
     text: '',
+    text_bajar_peso: '',
+    text_mantener: '',
+    text_aumentar: '',
     categoria: 'Boxeo',
     dificultad: 'intermedio',
     objetivo: 'general',
@@ -472,6 +478,9 @@ export function Home() {
       setChallengeForm({
         title: '',
         text: '',
+        text_bajar_peso: '',
+        text_mantener: '',
+        text_aumentar: '',
         categoria: 'Boxeo',
         dificultad: 'intermedio',
         objetivo: 'general',
@@ -642,7 +651,7 @@ export function Home() {
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  {(currentChallenge.title || currentChallenge.text) && (
+                  {(currentChallenge.title || currentChallenge.text || currentChallenge.text_bajar_peso || currentChallenge.text_mantener || currentChallenge.text_aumentar) && (
                     <div className="p-4 sm:p-6 bg-slate-900/40 rounded-2xl border border-slate-800">
                       {currentChallenge.title && (
                         <h4 className="text-base sm:text-lg font-bold text-white mb-2 flex items-center gap-2">
@@ -650,9 +659,12 @@ export function Home() {
                           {currentChallenge.title}
                         </h4>
                       )}
-                      {currentChallenge.text && (
+                      {(currentChallenge.text || currentChallenge.text_bajar_peso || currentChallenge.text_mantener || currentChallenge.text_aumentar) && (
                         <p className="text-slate-300 text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
-                          {currentChallenge.text}
+                          {user.fitnessGoal === 'bajar_peso' && currentChallenge.text_bajar_peso ? currentChallenge.text_bajar_peso
+                            : user.fitnessGoal === 'aumentar' && currentChallenge.text_aumentar ? currentChallenge.text_aumentar
+                            : user.fitnessGoal === 'mantener' && currentChallenge.text_mantener ? currentChallenge.text_mantener
+                            : currentChallenge.text}
                         </p>
                       )}
                     </div>
@@ -665,7 +677,10 @@ export function Home() {
                     {currentChallenge.title || 'Misión del Día'}
                   </h4>
                   <p className="text-slate-300 text-sm sm:text-lg leading-relaxed whitespace-pre-wrap">
-                    {currentChallenge.text}
+                    {user.fitnessGoal === 'bajar_peso' && currentChallenge.text_bajar_peso ? currentChallenge.text_bajar_peso
+                      : user.fitnessGoal === 'aumentar' && currentChallenge.text_aumentar ? currentChallenge.text_aumentar
+                      : user.fitnessGoal === 'mantener' && currentChallenge.text_mantener ? currentChallenge.text_mantener
+                      : currentChallenge.text}
                   </p>
                 </div>
               )}
@@ -1297,15 +1312,58 @@ export function Home() {
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                Descripción / Instrucciones
+                Descripción / Instrucciones Generales
               </label>
               <textarea
-                placeholder="Describe qué deben hacer los alumnos..."
+                placeholder="Describe qué deben hacer los alumnos en general..."
                 value={challengeForm.text}
                 onChange={(e) => setChallengeForm({ ...challengeForm, text: e.target.value })}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white outline-none focus:border-primary h-32 resize-none transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-slate-900 dark:text-white outline-none focus:border-primary h-24 resize-none transition-all"
               />
             </div>
+
+            {challengeForm.objetivo === 'general' && (
+              <div className="space-y-4 p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <p className="text-[11px] font-black text-primary uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5" /> Rutinas Específicas por Objetivo (Opcional)
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1">
+                      Rutina (Bajar Peso) 📉
+                    </label>
+                    <textarea
+                      placeholder="Ej: 🏃‍♂️ Correr 5km | 🥊 3x10 Sombra..."
+                      value={challengeForm.text_bajar_peso}
+                      onChange={(e) => setChallengeForm({ ...challengeForm, text_bajar_peso: e.target.value })}
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white outline-none focus:border-blue-500 h-20 resize-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-emerald-500 uppercase tracking-widest ml-1">
+                      Rutina (Mantener Peso) ⚖️
+                    </label>
+                    <textarea
+                      placeholder="Ej: 🏋️‍♂️ 4x10 Press | 🏃‍♂️ 2km trote..."
+                      value={challengeForm.text_mantener}
+                      onChange={(e) => setChallengeForm({ ...challengeForm, text_mantener: e.target.value })}
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white outline-none focus:border-emerald-500 h-20 resize-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest ml-1">
+                      Rutina (Aumentar Masa) 📈
+                    </label>
+                    <textarea
+                      placeholder="Ej: 🏋️‍♂️ Peso Muerto 5x5 | 💪 3x12 Dominadas..."
+                      value={challengeForm.text_aumentar}
+                      onChange={(e) => setChallengeForm({ ...challengeForm, text_aumentar: e.target.value })}
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-500 h-20 resize-none transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">

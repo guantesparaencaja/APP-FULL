@@ -115,7 +115,7 @@ function VideoFullscreenModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col"
+        className="fixed inset-0 z-200 bg-black/95 backdrop-blur-md flex flex-col"
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
         {/* Header bar */}
