@@ -431,12 +431,11 @@ export function Home() {
     setUploadProgress(0);
 
     try {
-      const downloadURL = await uploadVideoToDrive(
-        file,
-        String(user?.id || 'admin'),
-        (progress) => setUploadProgress(progress),
-        { title: 'Reto del Día', type: 'challenge' }
-      );
+      const downloadURL = await uploadVideoToDrive({
+        video: file,
+        name: `reto_${Date.now()}_${file.name}`,
+        onProgress: (progress) => setUploadProgress(progress)
+      });
 
       await addDoc(collection(db, 'challenges'), {
         url: downloadURL,

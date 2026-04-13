@@ -33,36 +33,69 @@ export async function uploadVideoToDrive({
 
   try {
     const token = await getGoogleDriveToken();
-    onProgress?.(15);
+    onProgress?.(10);
 
     const metadata = {
       name: `${Date.now()}_${name.replace(/[^a-zA-Z0-9.-]/g, '_')}`,
       mimeType: video.type || 'video/mp4'
     };
 
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', video);
-
-    onProgress?.(30);
-
-    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    // 1. Iniciar sesión de subida Resumable
+    const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-Upload-Content-Type': metadata.mimeType,
+        'X-Upload-Content-Length': video.size.toString()
       },
-      body: form
+      body: JSON.stringify(metadata)
     });
 
-    if (!uploadRes.ok) {
-      console.error(await uploadRes.text());
-      throw new Error('No se pudo subir a Drive directamente.');
+    if (!initRes.ok) {
+      console.error(await initRes.text());
+      throw new Error('No se pudo inicializar la subida en Drive. Verifica los permisos.');
     }
 
-    onProgress?.(80);
-    const result = await uploadRes.json();
-    const fileId = result.id;
+    const uploadUrl = initRes.headers.get('Location');
+    if (!uploadUrl) {
+      throw new Error('Drive no devolvió una URL de subida retornable.');
+    }
 
+    onProgress?.(15);
+
+    // 2. Subir binario con XHR para tener barra de progreso
+    const fileId = await new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl, true);
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          const percent = 15 + Math.round((event.loaded / event.total) * 75); // 15% -> 90%
+          onProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            resolve(data.id);
+          } catch (e) {
+            reject(new Error('Fallo al interpretar la respuesta exitosa de Drive'));
+          }
+        } else {
+          reject(new Error(`Drive rechazó el binario. Status: ${xhr.status} - ${xhr.responseText}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Drive error de red local.'));
+      xhr.send(video);
+    });
+
+    onProgress?.(95);
+
+    // 3. Hacer público el acceso para que todos en el app puedan verlo!
     await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
       method: 'POST',
       headers: {
@@ -76,7 +109,8 @@ export async function uploadVideoToDrive({
     return `https://drive.google.com/file/d/${fileId}/preview`;
   } catch (error: any) {
     onProgress?.(0);
-    throw new Error('Fallo crítico al subir video a Drive: ' + error.message);
+    console.error('Error Google Drive:', error);
+    throw new Error('Fallo crítico subiendo a Drive: ' + error.message);
   }
 }
 
