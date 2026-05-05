@@ -61,6 +61,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Horarios disponibles (Admin los crea/edita/borra, todos los leen)
+    match /availabilities/{id} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Excepciones de disponibilidad (Admin las gestiona)
+    match /availability_exceptions/{id} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
     // Pagos
     match /payments/{id} {
       allow read: if isOwner(resource.data.user_id) || isAdmin();
@@ -91,8 +103,8 @@ service cloud.firestore {
     // Default rules for other collections
     match /{path=**} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && !isAdmin() && request.method != 'delete';
       allow write: if isAdmin();
+      allow write: if isAuthenticated() && request.method != 'delete';
     }
   }
 }

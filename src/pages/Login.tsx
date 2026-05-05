@@ -6,28 +6,13 @@ import {
   Mail,
   Lock,
   ArrowLeft,
-  UserPlus,
-  AlertCircle,
-  Info,
   CheckCircle2,
 } from 'lucide-react';
-import { auth, db, googleProvider } from '../lib/firebase';
-import {
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  sendPasswordResetEmail,
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  GoogleAuthProvider,
-  signInWithCredential,
-} from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { useEffect } from 'react';
+import { signIn, signInWithGoogle, resetPassword } from '../lib/authService';
 import { Capacitor } from '@capacitor/core';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 import { Modal } from '../components/Modal';
+
 export function Login() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -40,179 +25,56 @@ export function Login() {
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotVerifyInput, setForgotVerifyInput] = useState('');
   const [forgotStep, setForgotStep] = useState<1 | 2>(1); // 1=email, 2=confirmación doble
-  const [showEmailPrompt, setShowEmailPrompt] = useState(false);
-  const [promptEmail, setPromptEmail] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const setUser = useStore((state) => state.setUser);
+  // setUser no es necesario aquí — App.tsx lo maneja via onAuthStateChange
 
-  useEffect(() => {
-    // Handle Email Link Sign-in
-    if (isSignInWithEmailLink(auth, window.location.href)) {
-      let emailForLink = window.localStorage.getItem('emailForSignIn');
-      if (!emailForLink) {
-        setShowEmailPrompt(true);
-        return;
-      }
-      handleEmailLinkSignIn(emailForLink);
-    }
-  }, [navigate, setUser]);
-
-  const handleEmailLinkSignIn = async (emailForLink: string) => {
-    try {
-      const result = await signInWithEmailLink(auth, emailForLink, window.location.href);
-      window.localStorage.removeItem('emailForSignIn');
-      const userRef = doc(db, 'users', result.user.uid);
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        setUser({ id: result.user.uid, ...userDoc.data() } as any);
-        navigate('/');
-      } else {
-        // Create basic profile
-        const userData = {
-          name: result.user.displayName || 'Usuario',
-          email: emailForLink,
-          role: 'student',
-          streak: 0,
-          lives: 3,
-          license_level: 1,
-          is_new_user: true,
-        };
-        await setDoc(userRef, userData);
-        setUser({ id: result.user.uid, ...userData } as any);
-        navigate('/');
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError('Error al iniciar sesión con el enlace: ' + err.message);
-    }
-  };
-
-  const handleSendSignInLink = async () => {
-    if (!email) {
-      setError('Ingresa tu correo primero');
-      return;
-    }
-
-    // URL de producción corregida para el link de login
-    const productionUrl =
-      'https://guantes-entrenamiento-de-boxeo-167463849607.us-west1.run.app/login';
-
-    const actionCodeSettings = {
-      url: productionUrl,
-      handleCodeInApp: true,
-    };
-
-    try {
-      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-      window.localStorage.setItem('emailForSignIn', email);
-      setInfo('¡Enlace enviado! Revisa tu correo para entrar sin contraseña.');
-      setError('');
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/unauthorized-continue-uri') {
-        setError(
-          'Error: El dominio de producción no está autorizado en Firebase. Por favor, contacta al administrador.'
-        );
-      } else {
-        setError('Error al enviar enlace: ' + err.message);
-      }
-    }
-  };
+  // ── Handlers migrados a Supabase ──────────────────────────────────────────
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loginType === 'Phone') {
+      setError('El inicio de sesión por teléfono no está disponible por ahora.');
+      return;
+    }
+    setLoading(true);
+    setError('');
     try {
-      if (loginType === 'Phone') {
-        setError('El inicio de sesión por teléfono no está disponible por ahora.');
-        return;
-      }
-
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userRef = doc(db, 'users', userCredential.user.uid);
-      const userDoc = await getDoc(userRef);
-
-      if (userDoc.exists()) {
-        setUser({ id: userCredential.user.uid, ...userDoc.data() } as any);
-        navigate('/');
-      } else {
-        // Create basic profile if it doesn't exist in Firestore
-        const userData = {
-          name: 'Usuario',
-          email: email,
-          role: 'student',
-          weight: 0,
-          height: 0,
-          dominant_hand: 'Derecha',
-          boxing_goal: 'Aprender a defenderme',
-          fitness_goal: 'Mantener peso',
-          goal: 'Mantener peso',
-          streak: 0,
-          lives: 3,
-          license_level: 1,
-          profile_pic: null,
-          is_new_user: true,
-          tutorial_completed: false,
-        };
-        await setDoc(userRef, userData);
-        setUser({ id: userCredential.user.uid, ...userData } as any);
-        navigate('/');
-      }
+      await signIn(email, password);
+      // App.tsx onAuthStateChange se dispara y carga el perfil → navega automáticamente
+      navigate('/');
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Error al iniciar sesión');
+      console.error('[Login] Error:', err);
+      const msg = err.message || '';
+      if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) {
+        setError('Correo o contraseña incorrectos.');
+      } else if (msg.includes('Email not confirmed')) {
+        setError('Debes confirmar tu correo antes de iniciar sesión.');
+      } else {
+        setError(msg || 'Error al iniciar sesión');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSocialLogin = async () => {
+    setError('');
+    setLoading(true);
     try {
-      let user;
-
       if (Capacitor.isNativePlatform()) {
-        const googleUser = await GoogleAuth.signIn();
-        const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
-        const result = await signInWithCredential(auth, credential);
-        user = result.user;
+        // En nativo: redirigir al OAuth de Supabase (deeplink)
+        await signInWithGoogle();
       } else {
-        const result = await signInWithPopup(auth, googleProvider);
-        user = result.user;
+        // En web: redirige al proveedor OAuth de Google → callback a Supabase
+        await signInWithGoogle();
       }
-
-      if (!user) return;
-
-      // Check if user exists in Firestore
-      const userRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userRef);
-
-      let userData;
-      if (!userDoc.exists()) {
-        // Create new user profile
-        userData = {
-          name: user.displayName || 'Usuario',
-          email: user.email,
-          role: 'student',
-          weight: 0,
-          height: 0,
-          dominant_hand: 'Derecha',
-          boxing_goal: 'Aprender a defenderme',
-          fitness_goal: 'Mantener peso',
-          goal: 'Mantener peso',
-          streak: 0,
-          lives: 3,
-          license_level: 1,
-          profile_pic: user.photoURL || null,
-          is_new_user: true,
-          tutorial_completed: false,
-        };
-        await setDoc(userRef, userData);
-      } else {
-        userData = userDoc.data();
-      }
-
-      setUser({ id: user.uid, ...userData } as any);
-      navigate('/');
+      // La sesión se establece vía onAuthStateChange en App.tsx al volver del redirect
     } catch (err: any) {
-      console.error(err);
-      setError('Error al conectar con Google: ' + err.message);
+      console.error('[Login] Google error:', err);
+      setError('Error al conectar con Google: ' + (err.message || ''));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -229,12 +91,12 @@ export function Login() {
         setForgotStep(2);
         return;
       }
-      // Paso 2: Usuario confirmó el correo — enviamos el reset
+      // Paso 2: Usuario confirmó el correo — enviamos el reset via Supabase
       if (forgotVerifyInput.toLowerCase().trim() !== forgotInput.toLowerCase().trim()) {
         setError('Los correos no coinciden. Vuelve a intentarlo.');
         return;
       }
-      await sendPasswordResetEmail(auth, forgotInput);
+      await resetPassword(forgotInput);
       setForgotSent(true);
       setError('');
     } catch (err: any) {
@@ -242,6 +104,8 @@ export function Login() {
       setError(err.message || 'Error al enviar el correo de recuperación');
     }
   };
+
+  // ── Forgot Password UI (sin cambios visuales) ─────────────────────────────
 
   if (showForgot) {
     return (
@@ -411,6 +275,8 @@ export function Login() {
     );
   }
 
+  // ── Login principal (UI idéntica al original) ─────────────────────────────
+
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased pb-12">
       <div className="flex items-center bg-transparent p-4 justify-between z-10">
@@ -537,10 +403,17 @@ export function Login() {
 
         <button
           type="submit"
-          className="mt-4 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow"
+          disabled={loading}
+          className="mt-4 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow disabled:opacity-60"
         >
-          <span>ENTRAR</span>
-          <LogIn className="w-5 h-5" />
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <>
+              <span>ENTRAR</span>
+              <LogIn className="w-5 h-5" />
+            </>
+          )}
         </button>
 
         <div className="relative my-4">
@@ -557,44 +430,13 @@ export function Login() {
         <button
           type="button"
           onClick={handleSocialLogin}
-          className="w-full bg-white text-slate-900 font-bold py-3 rounded-lg shadow-lg hover:bg-slate-100 transition-all flex items-center justify-center gap-3"
+          disabled={loading}
+          className="w-full bg-white text-slate-900 font-bold py-3 rounded-lg shadow-lg hover:bg-slate-100 transition-all flex items-center justify-center gap-3 disabled:opacity-60"
         >
           <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
           <span>ENTRAR CON GOOGLE</span>
         </button>
       </form>
-
-      {/* Email Prompt Modal for Link Sign-in */}
-      <Modal
-        isOpen={showEmailPrompt}
-        onClose={() => setShowEmailPrompt(false)}
-        title="Confirmar Email"
-      >
-        <div className="flex flex-col gap-4 p-4">
-          <p className="text-slate-300 text-sm">
-            Por favor, ingresa tu correo para confirmar el inicio de sesión:
-          </p>
-          <input
-            type="email"
-            value={promptEmail}
-            onChange={(e) => setPromptEmail(e.target.value)}
-            className="w-full bg-slate-800/30 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg py-3 px-4 text-slate-100"
-            placeholder="tu@email.com"
-            required
-          />
-          <button
-            onClick={() => {
-              if (promptEmail) {
-                setShowEmailPrompt(false);
-                handleEmailLinkSignIn(promptEmail);
-              }
-            }}
-            className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-primary/90 transition-colors"
-          >
-            Confirmar e Iniciar Sesión
-          </button>
-        </div>
-      </Modal>
     </div>
   );
 }

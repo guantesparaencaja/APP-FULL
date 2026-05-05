@@ -1,6 +1,9 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * App.tsx — Migrado a Supabase Auth.
+ * Firebase completamente eliminado de este archivo.
  */
 
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
@@ -20,28 +23,29 @@ import { Profile } from './pages/Profile';
 import { Store } from './pages/Store';
 import { FundamentosBoxeo } from './pages/fundamentos/FundamentosBoxeo';
 import { FundamentosVideoPlayer } from './pages/fundamentos/FundamentosVideoPlayer';
-
 import { Meals } from './pages/Meals';
 import { Plans } from './pages/Plans';
 import { Payments } from './pages/Payments';
 import { PaymentReview } from './pages/PaymentReview';
-
 import { Timer } from './pages/Timer';
-
 import { Chat } from './pages/Chat';
 import { Recipes } from './pages/Recipes';
 import { useClassReminders } from './hooks/useClassReminders';
 import { useAppNotifications } from './hooks/useAppNotifications';
-import { auth, db } from './lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { initializePushNotifications } from './lib/pushNotifications';
 import { VersionCheckModal } from './components/VersionCheckModal';
 import { Capacitor } from '@capacitor/core';
-import { initSyncQueue, syncQueue } from './utils/syncQueue';
+
+// ── Supabase Auth (reemplaza Firebase) ──────────────────────────────────────
+import { supabase } from './lib/supabase';
+import { getProfile } from './lib/db';
 
 const APP_VERSION = '1.0.1';
+
+const ADMIN_EMAILS = [
+  'hernandezkevin001998@gmail.com',
+  'guantesparaencajar@gmail.com',
+];
 
 function ProtectedRoute({
   children,
@@ -69,8 +73,6 @@ function ProtectedRoute({
     if (user.role === 'admin') return;
 
     // Navigation Guards for students
-    const isPublicPath = ['/profile', '/plans', '/payments', '/payment-review'].includes(pathname);
-
     if (!user.plan_id || user.plan_status === 'none' || !user.plan_status) {
       if (pathname !== '/plans' && pathname !== '/profile') {
         navigate('/plans');
@@ -83,8 +85,6 @@ function ProtectedRoute({
       if (pathname !== '/payment-review' && pathname !== '/profile') {
         navigate('/payment-review');
       }
-    } else if (user.plan_status === 'active') {
-      // Allowed to access everything
     }
   }, [user, navigate, pathname, allowedRoles]);
 
@@ -101,162 +101,133 @@ export default function App() {
   useClassReminders();
   useAppNotifications();
 
+  // ── Supabase Auth Listener (reemplaza onAuthStateChanged de Firebase) ──────
   useEffect(() => {
-    // 1. Version Check Listener
-    const unsubConfig = onSnapshot(doc(db, 'settings', 'app_config'), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        const serverVersion = data.version || '1.0.0';
-        const downloadUrl = data.url || '';
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session?.user) {
+          const supabaseUser = session.user;
+          const isAdmin = supabaseUser.email && ADMIN_EMAILS.includes(supabaseUser.email);
 
-        if (serverVersion !== APP_VERSION) {
-          setNewVersionInfo({ version: serverVersion, url: downloadUrl });
-          setShowVersionModal(true);
-        } else {
-          setShowVersionModal(false);
-        }
-      }
-    });
+          try {
+            // Obtener perfil desde Supabase
+            let profile = await getProfile(supabaseUser.id);
 
-    return () => unsubConfig();
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
-      root.classList.remove('light', 'dark');
-      root.classList.add(systemTheme);
-
-      const listener = (e: MediaQueryListEvent) => {
-        if (useStore.getState().theme === 'system') {
-          root.classList.remove('light', 'dark');
-          root.classList.add(e.matches ? 'dark' : 'light');
-        }
-      };
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
-      return () =>
-        window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
-    } else {
-      root.classList.remove('light', 'dark');
-      root.classList.add(theme);
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    let unsubUser: (() => void) | null = null;
-
-    // La lógica real de auth comienza aquí
-
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Clean up previous user snapshot listener if it exists
-      if (unsubUser) {
-        unsubUser();
-        unsubUser = null;
-      }
-
-      if (firebaseUser) {
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        unsubUser = onSnapshot(
-          userRef,
-          async (userDoc) => {
-            if (userDoc.exists()) {
-              const data = userDoc.data();
-              const adminEmails = ['hernandezkevin001998@gmail.com'];
-
-              // Handle role synchronization
-              const isAdminEmail = firebaseUser.email && adminEmails.includes(firebaseUser.email);
-              if (isAdminEmail && data.role !== 'admin') {
-                await updateDoc(userRef, { role: 'admin' });
-              } else if (
-                !isAdminEmail &&
-                data.role === 'admin' &&
-                firebaseUser.email !== 'hernandezkevin001998@gmail.com'
-              ) {
-                await updateDoc(userRef, { role: 'student' });
-              }
-
-              const userData = { id: firebaseUser.uid, ...data } as any;
-              const currentUser = useStore.getState().user;
-
-              // ✅ BLOQUE B FIX: Merge profundo para preservar campos del admin
-              // Si Firestore no tiene un campo (undefined) pero el estado local sí lo tiene,
-              // conservamos el valor local. Esto evita que height, weight, dominant_hand
-              // se pierdan en actualizaciones parciales de Firestore.
-              const mergedUser = currentUser
-                ? {
-                  ...currentUser,   // base: estado actual
-                  ...userData,      // Firestore sobreescribe (es la fuente de verdad)
-                  // Para campos críticos: solo sobreescribir si Firestore tiene un valor real
-                  height: userData.height ?? currentUser.height,
-                  weight: userData.weight ?? currentUser.weight,
-                  dominant_hand: userData.dominant_hand ?? currentUser.dominant_hand,
-                  age: userData.age ?? currentUser.age,
-                  gender: userData.gender ?? currentUser.gender,
-                  profile_pic: userData.profile_pic ?? currentUser.profile_pic,
-                }
-                : userData;
-
-              // Only update if data actually changed to avoid infinite re-renders
-              if (!currentUser || JSON.stringify(mergedUser) !== JSON.stringify(currentUser)) {
-                setUser(mergedUser);
-              }
-              initializePushNotifications(firebaseUser.uid);
-            } else {
-              const adminEmails = ['hernandezkevin001998@gmail.com'];
-              const userData = {
-                name: firebaseUser.displayName || 'Usuario',
-                email: firebaseUser.email,
-                role:
-                  firebaseUser.email && adminEmails.includes(firebaseUser.email)
-                    ? 'admin'
-                    : 'student',
-                is_new_user: true,
-              };
-              await setDoc(userRef, userData);
-              setUser({ id: firebaseUser.uid, ...userData } as any);
+            if (!profile) {
+              // Crear perfil si no existe
+              const { error } = await supabase.from('profiles').insert({
+                id: supabaseUser.id,
+                email: supabaseUser.email ?? '',
+                name: supabaseUser.user_metadata?.full_name || 'Usuario',
+                role: isAdmin ? 'admin' : 'student',
+                lives: 3, streak: 0, license_level: 1,
+                is_new_user: true, tutorial_completed: false,
+                plan_status: 'none', classes_remaining: 0, xp: 0,
+              });
+              if (!error) profile = await getProfile(supabaseUser.id);
+            } else if (isAdmin && profile.role !== 'admin') {
+              // Sincronizar rol admin
+              await supabase.from('profiles').update({ role: 'admin' }).eq('id', supabaseUser.id);
+              profile = { ...profile, role: 'admin' };
             }
-            setLoading(false);
-          },
-          (error) => {
-            console.error('Error syncing user data:', error);
-            setLoading(false);
+
+            const currentUser = useStore.getState().user;
+            const newUserData = {
+              id: supabaseUser.id,
+              email: supabaseUser.email ?? '',
+              name: profile?.name || 'Usuario',
+              role: profile?.role || (isAdmin ? 'admin' : 'student'),
+              lives: profile?.lives ?? 3,
+              streak: profile?.streak ?? 0,
+              license_level: profile?.license_level ?? 1,
+              weight: profile?.weight ?? 0,
+              dominant_hand: profile?.dominant_hand ?? 'Derecha',
+              goal: profile?.goal ?? '',
+              age: profile?.age,
+              height: profile?.height,
+              is_new_user: profile?.is_new_user ?? true,
+              tutorial_completed: profile?.tutorial_completed ?? false,
+              fitness_goal: profile?.fitness_goal as any,
+              profile_pic: profile?.profile_pic,
+              before_pic: profile?.before_pic,
+              after_pic: profile?.after_pic,
+              plan: profile?.plan,
+              plan_id: profile?.plan_id,
+              plan_name: profile?.plan_name,
+              plan_status: profile?.plan_status as any ?? 'none',
+              plan_start_date: profile?.plan_start_date,
+              classes_per_month: profile?.classes_per_month ?? 0,
+              classes_remaining: profile?.classes_remaining ?? 0,
+              gender: profile?.gender as any,
+              last_workout: profile?.last_workout,
+              xp: profile?.xp ?? 0,
+              created_at: profile?.created_at,
+            };
+
+            // Deep merge para no perder campos locales
+            const mergedUser = currentUser
+              ? {
+                ...currentUser,
+                ...newUserData,
+                height: newUserData.height ?? currentUser.height,
+                weight: newUserData.weight ?? currentUser.weight,
+                dominant_hand: newUserData.dominant_hand ?? currentUser.dominant_hand,
+                age: newUserData.age ?? currentUser.age,
+                gender: newUserData.gender ?? currentUser.gender,
+                profile_pic: newUserData.profile_pic ?? currentUser.profile_pic,
+              }
+              : newUserData;
+
+            if (!currentUser || JSON.stringify(mergedUser) !== JSON.stringify(currentUser)) {
+              setUser(mergedUser);
+            }
+          } catch (err) {
+            console.error('[App] Error cargando perfil:', err);
+            setUser(null);
           }
-        );
-      } else {
-        setUser(null);
+        } else {
+          setUser(null);
+        }
         setLoading(false);
       }
-    });
+    );
 
-    return () => {
-      unsubscribeAuth();
-      if (unsubUser) unsubUser();
-    };
+    return () => subscription.unsubscribe();
   }, [setUser]);
 
-  // ✅ Banner de permiso de notificaciones (una sola vez)
+  // ── Suscripción realtime al perfil del usuario actual ────────────────────
   useEffect(() => {
-    if (!useStore.getState().user) return;
-    const alreadyAsked = localStorage.getItem('gpte_notif_asked');
-    if (alreadyAsked) return;
-    // Mostrar banner si el permiso aún no fue otorgado
-    const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
-    if (permission === 'default' || Capacitor.isNativePlatform()) {
-      const timer = setTimeout(() => setShowNotifBanner(true), 2500);
-      return () => clearTimeout(timer);
-    }
-  }, []);
+    const currentUser = useStore.getState().user;
+    if (!currentUser?.id) return;
 
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${currentUser.id}` },
+        (payload) => {
+          const updated = payload.new as any;
+          const current = useStore.getState().user;
+          if (current) {
+            setUser({
+              ...current,
+              ...updated,
+              id: current.id,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [useStore.getState().user?.id, setUser]);
+
+  // ── Theme ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const root = window.document.documentElement;
-
     const applyTheme = (currentTheme: string) => {
       root.classList.remove('light', 'dark');
       if (currentTheme === 'system') {
-        // Automatic feature: Check if it's night time (>19:00 or <06:00)
         const hour = new Date().getHours();
         const isNight = hour >= 19 || hour < 6;
         const systemTheme =
@@ -269,7 +240,6 @@ export default function App() {
 
     applyTheme(theme);
 
-    // Listen for OS-level theme changes (only relevant when theme === 'system')
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleSystemThemeChange = () => {
       if (theme === 'system') applyTheme('system');
@@ -278,43 +248,29 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
   }, [theme]);
 
+  // ── Offline ──────────────────────────────────────────────────────────────
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-
-  // ✅ Capacitor: sync on resume — los onSnapshot se reconectan automáticamente
-  // SyncQueue también intenta enviar acciones pendientes cuando la app vuelve al frente
-  useEffect(() => {
-    // Inicializar motor offline en web (listeners onLine/offLine)
-    initSyncQueue();
-
-    if (!Capacitor.isNativePlatform()) return;
-    let listenerHandle: any = null;
-    const setupListener = async () => {
-      const { App: CapApp } = await import('@capacitor/app');
-      listenerHandle = await CapApp.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) {
-          // Los listeners de Firestore (onSnapshot) se reconectan solos.
-          console.log('[GPTE] App activa — reconectando Firestore + vaciando cola offline...');
-          syncQueue.attemptSync();
-        }
-      });
-    };
-    setupListener().catch(console.error);
-    return () => {
-      if (listenerHandle) listenerHandle.remove().catch(console.error);
-    };
-  }, []);
-
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, []);
+
+  // ── Notification banner ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!useStore.getState().user) return;
+    const alreadyAsked = localStorage.getItem('gpte_notif_asked');
+    if (alreadyAsked) return;
+    const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+    if (permission === 'default' || Capacitor.isNativePlatform()) {
+      const timer = setTimeout(() => setShowNotifBanner(true), 2500);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   if (loading) {
@@ -347,144 +303,23 @@ export default function App() {
             <Route path="/register" element={<Register />} />
 
             <Route element={<Layout />}>
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Home />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/saberes"
-                element={
-                  <ProtectedRoute>
-                    <Saberes />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/saberes/fundamentos"
-                element={
-                  <ProtectedRoute>
-                    <FundamentosBoxeo />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/saberes/fundamentos/:videoId"
-                element={
-                  <ProtectedRoute>
-                    <FundamentosVideoPlayer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/workouts"
-                element={
-                  <ProtectedRoute>
-                    <Workouts />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/calentamiento"
-                element={
-                  <ProtectedRoute>
-                    <Calentamiento />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/calendar"
-                element={
-                  <ProtectedRoute>
-                    <Calendar />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/meals"
-                element={
-                  <ProtectedRoute>
-                    <Meals />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/plans"
-                element={
-                  <ProtectedRoute>
-                    <Plans />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/payments"
-                element={
-                  <ProtectedRoute>
-                    <Payments />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/payment-review"
-                element={
-                  <ProtectedRoute>
-                    <PaymentReview />
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/timer"
-                element={
-                  <ProtectedRoute>
-                    <Timer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/aprobacion"
-                element={
-                  <ProtectedRoute>
-                    <Saberes />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/chat"
-                element={
-                  <ProtectedRoute>
-                    <Chat />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/recipes"
-                element={
-                  <ProtectedRoute>
-                    <Recipes />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/store"
-                element={
-                  <ProtectedRoute>
-                    <Store />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/saberes" element={<ProtectedRoute><Saberes /></ProtectedRoute>} />
+              <Route path="/saberes/fundamentos" element={<ProtectedRoute><FundamentosBoxeo /></ProtectedRoute>} />
+              <Route path="/saberes/fundamentos/:videoId" element={<ProtectedRoute><FundamentosVideoPlayer /></ProtectedRoute>} />
+              <Route path="/workouts" element={<ProtectedRoute><Workouts /></ProtectedRoute>} />
+              <Route path="/calentamiento" element={<ProtectedRoute><Calentamiento /></ProtectedRoute>} />
+              <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/meals" element={<ProtectedRoute><Meals /></ProtectedRoute>} />
+              <Route path="/plans" element={<ProtectedRoute><Plans /></ProtectedRoute>} />
+              <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+              <Route path="/payment-review" element={<ProtectedRoute><PaymentReview /></ProtectedRoute>} />
+              <Route path="/timer" element={<ProtectedRoute><Timer /></ProtectedRoute>} />
+              <Route path="/aprobacion" element={<ProtectedRoute><Saberes /></ProtectedRoute>} />
+              <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+              <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
+              <Route path="/store" element={<ProtectedRoute><Store /></ProtectedRoute>} />
             </Route>
           </Routes>
         </BrowserRouter>

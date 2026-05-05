@@ -15,9 +15,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { auth, db } from '../lib/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { signUp } from '../lib/authService';
 import { sendEmail } from '../lib/email';
 
 export function Register() {
@@ -63,39 +61,30 @@ export function Register() {
         throw new Error('Las contraseñas no coinciden.');
       }
 
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
+      // Registro vía Supabase (authService automáticamente crea el perfil)
+      const authUser = await signUp(
         formData.email,
-        formData.password
+        formData.password,
+        formData.name
       );
-      const user = userCredential.user;
 
-      const userData = {
-        name: formData.name,
-        email: formData.email,
+      // Actualizar el perfil con los datos físicos adicionales
+      const { supabase } = await import('../lib/supabase');
+      await supabase.from('profiles').update({
         weight: parseFloat(formData.weight),
         height: parseFloat(formData.height),
         age: parseInt(formData.age),
         dominant_hand: formData.dominant_hand,
-        boxing_goal: formData.boxing_goal,
-        fitness_goal: formData.fitness_goal,
         goal: formData.fitness_goal,
-        role: 'student',
-        streak: 0,
-        lives: 3,
-        license_level: 1,
-        profile_pic: null,
+        fitness_goal: formData.fitness_goal,
         is_new_user: false,
-        tutorial_completed: false,
-      };
+      }).eq('id', authUser.id);
 
-      await setDoc(doc(db, 'users', user.uid), userData);
-
-      // ✅ Correo de bienvenida via colección 'mail' (Firebase Trigger Email)
+      // ✅ Correo de bienvenida via Resend (ya implementado en lib/email)
       try {
         await sendEmail(
           formData.email,
-          '\u00a1Bienvenido a Guantes Para Encajar! \U0001f94a',
+          '¡Bienvenido a Guantes Para Encajar! 🥊',
           `
           <!DOCTYPE html>
           <html>
@@ -117,16 +106,16 @@ export function Register() {
           <body>
           <div class="container">
             <div class="header">
-              <h1>\U0001f94a Guantes Para Encajar</h1>
+              <h1>🥊 Guantes Para Encajar</h1>
               <p>Tu academia de boxeo personalizada</p>
             </div>
             <div class="body">
-              <h2>\u00a1Hola, ${formData.name}!</h2>
+              <h2>¡Hola, ${formData.name}!</h2>
               <p>Tu cuenta ha sido creada exitosamente. Estamos emocionados de tenerte en la familia GPTE.</p>
               
               <div class="step">
                 <div class="step-num">1</div>
-                <div class="step-text"><b>Elige tu plan</b> — Selecciona el plan que mejor se adapte a tus objetivos en la secci\u00f3n Planes.</div>
+                <div class="step-text"><b>Elige tu plan</b> — Selecciona el plan que mejor se adapte a tus objetivos en la sección Planes.</div>
               </div>
               <div class="step">
                 <div class="step-num">2</div>
@@ -137,32 +126,29 @@ export function Register() {
                 <div class="step-text"><b>Reserva tu clase</b> — Ve al Calendario y reserva tu primera clase con el instructor.</div>
               </div>
               
-              <p style="margin-top:20px;">Si tienes alguna duda, esc\u00edbenos por WhatsApp: <br><b style="color:#25D366;">+57 302 202 8477</b></p>
+              <p style="margin-top:20px;">Si tienes alguna duda, escríbenos por WhatsApp: <br><b style="color:#25D366;">+57 302 202 8477</b></p>
             </div>
             <div class="footer">
               Guantes Para Encajar | <a href="mailto:guantesparaencajar@gmail.com">guantesparaencajar@gmail.com</a>
-              <br>Medell\u00edn, Colombia
+              <br>Medellín, Colombia
             </div>
           </div>
           </body></html>
           `
         );
       } catch (emailErr) {
-        console.warn('Correo de bienvenida no enviado (no cr\u00edtico):', emailErr);
+        console.warn('Correo de bienvenida no enviado (no crítico):', emailErr);
       }
 
-      setUser({ id: user.uid, ...userData } as any);
+      // El store se actualizará automáticamente por el listener de App.tsx
       navigate('/');
     } catch (err: any) {
       console.error(err);
       let errorMsg = 'Error al registrar usuario. Intenta de nuevo.';
       if (err.message === 'Las contraseñas no coinciden.') errorMsg = err.message;
-      else if (err.code === 'auth/email-already-in-use') errorMsg = 'El correo ya está registrado.';
-      else if (err.code === 'auth/weak-password')
-        errorMsg = 'La contraseña es muy corta (mínimo 6 caracteres).';
-      else if (err.code === 'auth/invalid-email') errorMsg = 'El formato del correo es inválido.';
-      else if (err.code === 'auth/network-request-failed')
-        errorMsg = 'Error de conexión. Revisa tu internet.';
+      else if (err.message.includes('User already registered')) errorMsg = 'El correo ya está registrado.';
+      else if (err.message.includes('Password should be at least')) errorMsg = 'La contraseña es muy corta.';
+      else if (err.message.includes('Invalid email format')) errorMsg = 'El formato del correo es inválido.';
       setError(errorMsg);
     }
   };
