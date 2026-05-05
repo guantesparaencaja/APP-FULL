@@ -5,11 +5,7 @@ import {
   Clock, CheckCircle2, X, Plus, Minus, Trash2, Edit2,
   AlertCircle, ShoppingCart, Upload, Loader2, Check,
 } from 'lucide-react';
-import {
-  collection, onSnapshot, query, addDoc, serverTimestamp,
-  deleteDoc, doc, updateDoc,
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,13 +54,16 @@ export function Store() {
 
   // ── Load products ─────────────────────────────────────────────────────────
   useEffect(() => {
-    const q = query(collection(db, 'products'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
-      setProducts(prods);
+    supabase.from('products').select('*').then(({ data }) => {
+      if (data) setProducts(data as Product[]);
       setLoading(false);
     });
-    return () => unsub();
+    const channel = supabase.channel('store-products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+        const { data } = await supabase.from('products').select('*');
+        if (data) setProducts(data as Product[]);
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   // ── Cart helpers ──────────────────────────────────────────────────────────
@@ -115,23 +114,16 @@ export function Store() {
         reader.readAsDataURL(paymentFile);
       });
 
-      // Save order to Firestore
-      await addDoc(collection(db, 'orders'), {
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email,
-        items: cart.map(i => ({
-          productId: i.product.id,
-          productName: i.product.name,
-          price: i.product.price,
-          quantity: i.quantity,
-          subtotal: i.product.price * i.quantity,
-        })),
+      await supabase.from('orders').insert({
+        user_id: user.id,
+        user_name: user.name,
+        user_email: user.email,
+        items: cart.map(i => ({ productId: i.product.id, productName: i.product.name, price: i.product.price, quantity: i.quantity, subtotal: i.product.price * i.quantity })),
         total: cartTotal,
         status: 'pending',
         receipt_url: receiptBase64,
         receipt_filename: paymentFile.name,
-        created_at: serverTimestamp(),
+        created_at: new Date().toISOString(),
       });
 
       setCheckoutStep('success');
@@ -154,13 +146,9 @@ export function Store() {
     setIsSaving(true);
     try {
       if (editingProduct) {
-        await updateDoc(doc(db, 'products', editingProduct.id), {
-          ...newProduct, updated_at: serverTimestamp()
-        });
+        await supabase.from('products').update({ ...newProduct, updated_at: new Date().toISOString() }).eq('id', editingProduct.id);
       } else {
-        await addDoc(collection(db, 'products'), {
-          ...newProduct, created_at: serverTimestamp()
-        });
+        await supabase.from('products').insert({ ...newProduct, created_at: new Date().toISOString() });
       }
       setNewProduct({ name: '', price: 0, delivery_time: '', image_url: '', description: '', care_instructions: '' });
       setEditingProduct(null);
@@ -360,7 +348,7 @@ export function Store() {
                       </button>
                       <button onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm('¿Eliminar este producto?')) deleteDoc(doc(db, 'products', product.id));
+                        if (confirm('¿Eliminar este producto?')) supabase.from('products').delete().eq('id', product.id);
                       }} className="p-3 bg-red-500 text-white rounded-2xl shadow-xl">
                         <Trash2 className="w-4 h-4" />
                       </button>

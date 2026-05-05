@@ -29,20 +29,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { AssessmentModal } from '../components/AssessmentModal';
-import {
-  doc,
-  updateDoc,
-  setDoc,
-  collection,
-  onSnapshot,
-  query,
-  orderBy,
-  addDoc,
-  deleteDoc,
-  limit,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { LazyVideoWrapper } from '../components/LazyVideoWrapper';
 import { generateLocalWorkout } from '../services/geminiService';
@@ -209,81 +196,46 @@ export function Home() {
   };
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
+    if (!user) { navigate('/login'); return; }
 
     // Actualizar presencia
-    const updatePresence = async () => {
-      try {
-        await updateDoc(doc(db, 'users', String(user.id)), {
-          last_seen: new Date().toISOString(),
-        });
-      } catch (err) {
-        console.warn('Error presence update:', err);
-      }
+    const updatePresence = () => {
+      supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id).then(() => {});
     };
     updatePresence();
-    const presenceInterval = setInterval(updatePresence, 120000); // Cada 2 min
+    const presenceInterval = setInterval(updatePresence, 120000);
 
     // Fetch global settings
-    const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
-      if (doc.exists()) {
-        setAppSettings(doc.data() as any);
-      }
+    supabase.from('settings').select('*').eq('id', 'global').single().then(({ data }) => {
+      if (data) setAppSettings(data as any);
     });
+    const settingsChannel = supabase.channel('home-settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.global' }, async () => {
+        const { data } = await supabase.from('settings').select('*').eq('id', 'global').single();
+        if (data) setAppSettings(data as any);
+      }).subscribe();
 
-    // Check if assessment is needed (every 3 months)
-    const checkAssessment = () => {
-      // Admin nunca necesita completar el assessment
-      if (user.role === 'admin') return;
-      if (!user.assessment_completed) {
-        setShowAssessment(true);
-        return;
+    // Assessment check
+    if (user.role !== 'admin') {
+      if (!user.assessment_completed) { setShowAssessment(true); }
+      else if (user.assessment_updated_at) {
+        const last = new Date(user.assessment_updated_at);
+        const threeAgo = new Date(); threeAgo.setMonth(threeAgo.getMonth() - 3);
+        if (last < threeAgo) setShowAssessment(true);
       }
-
-      if (user.assessment_updated_at) {
-        const lastUpdate = new Date(user.assessment_updated_at);
-        const threeMonthsAgo = new Date();
-        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-
-        if (lastUpdate < threeMonthsAgo) {
-          setShowAssessment(true);
-        }
-      }
-    };
-
-    checkAssessment();
-
-    // Admin counts & social listeners
-    let unsubUsers: (() => void) | undefined;
-    if (user?.role === 'admin' || user?.email === 'hernandezkevin001998@gmail.com') {
-      const qUsers = query(collection(db, 'users'));
-      unsubUsers = onSnapshot(qUsers, (snapshot) => {
-        const activeCount = snapshot.docs.filter((d) => d.data().isActive !== false).length;
-        setAllUsersCount(activeCount);
-      });
     }
 
-    const qTop = query(collection(db, 'users'), orderBy('xp', 'desc'), limit(5));
-    const unsubscribeTop = onSnapshot(qTop, (snap) => {
-      setTopUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    // Admin count
+    if (user.role === 'admin' || user.email === 'hernandezkevin001998@gmail.com') {
+      supabase.from('profiles').select('id', { count: 'exact' }).then(({ count }) => setAllUsersCount(count || 0));
+    }
 
-    const qAct = query(collection(db, 'activity_feed'), orderBy('createdAt', 'desc'), limit(10));
-    const unsubscribeAct = onSnapshot(qAct, (snap) => {
-      setActivities(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    // Top users & activity feed
+    supabase.from('profiles').select('id,name,xp,email').order('xp', { ascending: false }).limit(5).then(({ data }) => { if (data) setTopUsers(data); });
+    supabase.from('activity_feed').select('*').order('created_at', { ascending: false }).limit(10).then(({ data }) => { if (data) setActivities(data); });
 
-    return () => {
-      clearInterval(presenceInterval);
-      unsubscribeSettings();
-      unsubscribeTop();
-      unsubscribeAct();
-      if (unsubUsers) unsubUsers();
-    };
-  }, [user, navigate]);
+    return () => { clearInterval(presenceInterval); supabase.removeChannel(settingsChannel); };
+  }, [user?.id, navigate]);
 
   const refreshJokesAndQuotes = () => {
     const randomDayIndex = Math.floor(Math.random() * 10000);
@@ -341,41 +293,18 @@ export function Home() {
 
   useEffect(() => {
     if (!user) return;
-
-    // 1. Fetch the latest challenge for the user's goal
-    const qChallenge = query(collection(db, 'challenges'), orderBy('createdAt', 'desc'));
-
-    const unsubscribeChallenges = onSnapshot(qChallenge, async (snapshot) => {
-      const allChallenges = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as any);
-
-      // Filter logic: match user.fitnessGoal or 'general'
+    supabase.from('challenges').select('*').order('created_at', { ascending: false }).then(async ({ data: allChallenges }) => {
+      if (!allChallenges) return;
       const userGoal = user.fitnessGoal || 'general';
-      const filtered = allChallenges.filter(
-        (c) => c.objetivo === userGoal || c.objetivo === 'general' || !c.objetivo
-      );
-
+      const filtered = allChallenges.filter((c: any) => c.objetivo === userGoal || c.objetivo === 'general' || !c.objetivo);
       if (filtered.length > 0) {
-        const challenge = filtered[0];
-        setCurrentChallenge(challenge);
-        setCheckedTasks(new Set()); // reset task checks when challenge changes
-
-        // Check if completed today using the subcollection
+        setCurrentChallenge(filtered[0]);
+        setCheckedTasks(new Set());
         const todayStr = new Date().toISOString().split('T')[0];
-        const recordRef = doc(db, 'challenge_completions', user.id, 'records', todayStr);
-        onSnapshot(recordRef, (snap) => {
-          setIsChallengeCompleted(snap.exists());
-          // restore checked tasks from firestore
-          const data = snap.data();
-          if (data?.checkedTasks) {
-            setCheckedTasks(new Set(data.checkedTasks as number[]));
-          }
-        });
-      } else {
-        setCurrentChallenge(null);
-      }
+        const { data: rec } = await supabase.from('challenge_completions').select('*').eq('user_id', user.id).eq('date', todayStr).single();
+        if (rec) { setIsChallengeCompleted(true); if (rec.checkedTasks) setCheckedTasks(new Set(rec.checkedTasks)); }
+      } else { setCurrentChallenge(null); }
     });
-
-    return () => unsubscribeChallenges();
   }, [user?.fitnessGoal, user?.id]);
 
   if (!user) return null;
@@ -384,19 +313,12 @@ export function Home() {
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
     const currentCount = user.water_intake?.date === today ? user.water_intake.count : 0;
-
-    // If clicking the same glass that is the current max, decrease by 1 (unfill)
-    // Otherwise, fill up to the clicked glass
     const newCount = index + 1 === currentCount ? index : index + 1;
-
     try {
-      const userRef = doc(db, 'users', String(user.id));
       const waterData = { date: today, count: newCount };
-      await updateDoc(userRef, { water_intake: waterData });
+      await supabase.from('profiles').update({ water_intake: waterData }).eq('id', user.id);
       setUser({ ...user, water_intake: waterData });
-    } catch (error) {
-      console.error('Error updating water intake:', error);
-    }
+    } catch (error) { console.error('Error updating water intake:', error); }
   };
 
   const waterCount =
@@ -421,94 +343,38 @@ export function Home() {
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 200 * 1024 * 1024) {
-      showAlert('Error', 'El video es demasiado grande. Máximo 200MB.', 'error');
-      e.target.value = '';
-      return;
-    }
-
+    if (file.size > 200 * 1024 * 1024) { showAlert('Error', 'El video es demasiado grande. Máximo 200MB.', 'error'); e.target.value = ''; return; }
     setUploadProgress(0);
-
     try {
-      const downloadURL = await uploadVideoToDrive({
-        video: file,
-        name: `reto_${Date.now()}_${file.name}`,
-        onProgress: (progress) => setUploadProgress(progress)
-      });
-
-      await addDoc(collection(db, 'challenges'), {
-        url: downloadURL,
-        title: 'Nuevo Reto de Video',
-        objetivo: 'general',
-        categoria: 'Boxeo',
-        dificultad: 'intermedio',
-        createdAt: new Date().toISOString(),
-        createdBy: user.id,
-      });
-
+      const downloadURL = await uploadVideoToDrive({ video: file, name: `reto_${Date.now()}_${file.name}`, onProgress: (p) => setUploadProgress(p) });
+      await supabase.from('challenges').insert({ url: downloadURL, title: 'Nuevo Reto de Video', objetivo: 'general', categoria: 'Boxeo', dificultad: 'intermedio', created_at: new Date().toISOString(), created_by: user.id });
       showAlert('Éxito', 'Video subido correctamente.', 'success');
     } catch (error: any) {
-      console.error('Error uploading video:', error);
-      showAlert(
-        'Error',
-        'Error al subir el video: ' + (error.message || 'Error desconocido'),
-        'error'
-      );
-    } finally {
-      setUploadProgress(null);
-      if (e.target) e.target.value = '';
-    }
+      showAlert('Error', 'Error al subir el video: ' + (error.message || 'Error desconocido'), 'error');
+    } finally { setUploadProgress(null); if (e.target) e.target.value = ''; }
   };
 
   const handleChallengeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!challengeForm.title) {
-      showAlert('Error', 'El título es obligatorio.', 'error');
-      return;
-    }
+    if (!challengeForm.title) { showAlert('Error', 'El título es obligatorio.', 'error'); return; }
     try {
-      await addDoc(collection(db, 'challenges'), {
-        ...challengeForm,
-        createdAt: new Date().toISOString(),
-        createdBy: user.id,
-      });
+      await supabase.from('challenges').insert({ ...challengeForm, created_at: new Date().toISOString(), created_by: user.id });
       setShowChallengeModal(false);
-      setChallengeForm({
-        title: '',
-        text: '',
-        text_bajar_peso: '',
-        text_mantener: '',
-        text_aumentar: '',
-        categoria: 'Boxeo',
-        dificultad: 'intermedio',
-        objetivo: 'general',
-        tasks: [],
-        period: 'dia',
-      });
+      setChallengeForm({ title: '', text: '', text_bajar_peso: '', text_mantener: '', text_aumentar: '', categoria: 'Boxeo', dificultad: 'intermedio', objetivo: 'general', tasks: [], period: 'dia' });
       setNewTaskInput('');
       showAlert('Éxito', 'Reto publicado correctamente.', 'success');
-    } catch (error) {
-      console.error('Error saving challenge:', error);
-      showAlert('Error', 'No se pudo guardar el reto.', 'error');
-    }
+    } catch (error) { showAlert('Error', 'No se pudo guardar el reto.', 'error'); }
   };
 
   const handleDeleteChallenge = async () => {
     if (!currentChallenge) return;
-    setConfirmModal({
-      isOpen: true,
-      title: '¿Eliminar Reto?',
-      message: '¿Estás seguro de que quieres eliminar el reto del día?',
+    setConfirmModal({ isOpen: true, title: '¿Eliminar Reto?', message: '¿Estás seguro de que quieres eliminar el reto del día?',
       onConfirm: async () => {
         try {
-          await deleteDoc(doc(db, 'challenges', currentChallenge.id));
+          await supabase.from('challenges').delete().eq('id', currentChallenge.id);
           setCurrentChallenge(null);
           setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        } catch (error) {
-          console.error('Error deleting challenge:', error);
-          showAlert('Error', 'No se pudo eliminar el reto.', 'error');
-        }
+        } catch (error) { showAlert('Error', 'No se pudo eliminar el reto.', 'error'); }
       },
     });
   };

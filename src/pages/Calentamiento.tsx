@@ -13,8 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { db } from '../lib/firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { uploadVideoToDrive } from '../lib/driveService';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -47,100 +46,47 @@ export const Calentamiento: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'configuracion', 'calentamiento'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as any;
-        setVideoConfig(data);
-        setEditForm({
-          titulo: data.titulo || '',
-          descripcion: data.descripcion || '',
-          duracion: data.duracion || '',
-          videoUrl: data.videoUrl || '',
-        });
+    const load = async () => {
+      const { data } = await supabase.from('configuracion').select('*').eq('id', 'calentamiento').single();
+      if (data) {
+        setVideoConfig(data as any);
+        setEditForm({ titulo: data.titulo || '', descripcion: data.descripcion || '', duracion: data.duracion || '', videoUrl: data.videoUrl || '' });
       } else {
-        const defaultConfig: any = {
-          tipo: 'storage',
-          videoUrl: '',
-          titulo: 'Calentamiento Pro Boxeo',
-          descripcion: 'Rutina obligatoria de movilidad articular y activación neuromuscular.',
-          duracion: '10-12 minutos',
-        };
-        setVideoConfig(defaultConfig);
-        setEditForm(defaultConfig);
+        const def: any = { tipo: 'storage', videoUrl: '', titulo: 'Calentamiento Pro Boxeo', descripcion: 'Rutina obligatoria de movilidad articular y activación neuromuscular.', duracion: '10-12 minutos' };
+        setVideoConfig(def); setEditForm(def);
       }
       setLoadingVideo(false);
-    });
-    return () => unsub();
+    };
+    load();
   }, []);
 
   const handleSaveVideo = async () => {
     if (!user) return;
-    setSaving(true);
-    setSaveError(null);
-
+    setSaving(true); setSaveError(null);
     try {
       let finalUrl = editForm.videoUrl;
-
       if (videoFile) {
         setUploading(true);
-        finalUrl = await uploadVideoToDrive(
-          videoFile,
-          user.id,
-          (progress) => setUploadProgress(progress),
-          { type: 'calentamiento', title: editForm.titulo }
-        );
+        finalUrl = await uploadVideoToDrive(videoFile, user.id, (p) => setUploadProgress(p), { type: 'calentamiento', title: editForm.titulo });
       }
-
-      if (!finalUrl && !videoFile) {
-        throw new Error('Debes subir un video para guardar la configuración.');
-      }
-
-      await setDoc(doc(db, 'configuracion', 'calentamiento'), {
-        tipo: 'storage',
-        videoUrl: finalUrl,
-        titulo: editForm.titulo,
-        descripcion: editForm.descripcion,
-        duracion: editForm.duracion,
-        actualizadoEn: new Date().toISOString(),
-        actualizadoPor: user.email,
-      });
-
-      setVideoFile(null);
-      setUploadProgress(0);
-      setUploading(false);
-      setSaveSuccess(true);
+      if (!finalUrl && !videoFile) throw new Error('Debes subir un video para guardar la configuración.');
+      await supabase.from('configuracion').upsert({ id: 'calentamiento', tipo: 'storage', videoUrl: finalUrl, titulo: editForm.titulo, descripcion: editForm.descripcion, duracion: editForm.duracion, updated_at: new Date().toISOString(), updated_by: user.email });
+      setVideoFile(null); setUploadProgress(0); setUploading(false); setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
-      console.error('Error saving video:', err);
       setSaveError('Error: ' + (err.message || 'Error al procesar el video'));
-    } finally {
-      setSaving(false);
-      setUploading(false);
-    }
+    } finally { setSaving(false); setUploading(false); }
   };
 
   const handleDeleteVideo = async () => {
     if (!window.confirm('¿Deseas eliminar el video actual de calentamiento?')) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'configuracion', 'calentamiento'), {
-        tipo: 'storage',
-        videoUrl: '',
-        titulo: editForm.titulo,
-        descripcion: editForm.descripcion,
-        duracion: editForm.duracion,
-        actualizadoEn: new Date().toISOString(),
-        actualizadoPor: user?.email,
-      });
+      await supabase.from('configuracion').upsert({ id: 'calentamiento', tipo: 'storage', videoUrl: '', titulo: editForm.titulo, descripcion: editForm.descripcion, duracion: editForm.duracion, updated_at: new Date().toISOString() });
       setVideoConfig((prev) => (prev ? { ...prev, videoUrl: '' } : null));
       setEditForm((prev) => ({ ...prev, videoUrl: '' }));
       alert('Video eliminado con éxito');
-    } catch (err: any) {
-      console.error('Error deleting video:', err);
-      setSaveError('Error al eliminar el video');
-    } finally {
-      setSaving(false);
-    }
+    } catch (err: any) { setSaveError('Error al eliminar el video'); } finally { setSaving(false); }
   };
 
   return (

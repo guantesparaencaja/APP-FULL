@@ -1,17 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore, User } from '../store/useStore';
-import { db } from '../lib/firebase';
-import {
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
-  where,
-  Timestamp,
-} from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import {
   ArrowLeft,
   Send,
@@ -85,12 +75,9 @@ export function Chat() {
   // ── Load students list (admin only) ─────────────────────────────────────
   useEffect(() => {
     if (!isAdmin) return;
-    const q = query(collection(db, 'users'), where('role', '!=', 'admin'));
-    const unsub = onSnapshot(q, (snap) => {
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }) as User);
-      setStudents(all);
+    supabase.from('profiles').select('id,name,email,role').neq('role','admin').then(({ data }) => {
+      if (data) setStudents(data as any);
     });
-    return () => unsub();
   }, [isAdmin]);
 
   // ── Messages subscription — solo últimos 7 días ──────────────────────────
@@ -99,57 +86,54 @@ export function Chat() {
     const chatId = isAdmin ? (selectedStudentId || 'admin_support') : String(user.id);
     if (!chatId) return;
 
-    // Filtrar mensajes de los últimos 7 días
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoTimestamp = Timestamp.fromDate(sevenDaysAgo);
 
-    const q = query(
-      collection(db, 'chats', chatId, 'messages'),
-      where('createdAt', '>=', sevenDaysAgoTimestamp),
-      orderBy('createdAt', 'asc')
-    );
+    const channel = supabase
+      .channel(`chat-${chatId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats', filter: `chat_id=eq.${chatId}` }, (payload) => {
+        setMessages(prev => [...prev, payload.new]);
+        setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      })
+      .subscribe();
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setMessages(msgs);
-      setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    });
+    // Initial load
+    supabase.from('chats').select('*')
+      .eq('chat_id', chatId)
+      .gte('created_at', sevenDaysAgo.toISOString())
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (data) { setMessages(data); setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); }
+      });
 
-    return () => unsubscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [user, selectedStudentId, isAdmin]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !newMessage.trim()) return;
-
     setIsSending(true);
     try {
       const chatId = isAdmin ? (selectedStudentId || 'admin_support') : String(user.id);
-      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+      await supabase.from('chats').insert({
+        chat_id: chatId,
         text: newMessage.trim(),
         sender_id: user.id,
         sender_name: user.name,
         role: user.role,
-        createdAt: serverTimestamp(),
+        created_at: new Date().toISOString(),
       });
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
-    } finally {
-      setIsSending(false);
-    }
+    } finally { setIsSending(false); }
   };
 
-  // ── Group messages by day label ──────────────────────────────────────────
   const grouped: { label: string; msgs: any[] }[] = [];
   let lastLabel = '';
   messages.forEach((msg) => {
-    const label = getDateLabel(msg.createdAt);
-    if (label !== lastLabel) {
-      grouped.push({ label, msgs: [] });
-      lastLabel = label;
-    }
+    const label = getDateLabel(msg.created_at || msg.createdAt);
+    if (label !== lastLabel) { grouped.push({ label, msgs: [] }); lastLabel = label; }
     grouped[grouped.length - 1]?.msgs.push(msg);
   });
 

@@ -24,9 +24,7 @@ import {
   Edit2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { db, storage } from '../lib/firebase';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { supabase } from '../lib/supabase';
 import { generateLocalMeals } from '../services/geminiService';
 import { AssessmentModal } from '../components/AssessmentModal';
 import { HEALTHY_RECIPES, HealthyRecipe } from '../data/healthyRecipes';
@@ -92,39 +90,16 @@ export function Meals() {
   };
 
   const handleGenerateMealPlan = async () => {
-    if (!user?.assessment_completed) {
-      setShowAssessment(true);
-      return;
-    }
-
+    if (!user?.assessment_completed) { setShowAssessment(true); return; }
     setIsGenerating(true);
     try {
-      const plan = generateLocalMeals(
-        user?.goal || 'mantener',
-        user?.weight || 70,
-        user?.activity_level || 'moderado',
-        user?.dietary_restrictions || 'ninguna',
-        meals
-      );
-
+      const plan = generateLocalMeals(user?.goal || 'mantener', user?.weight || 70, user?.activity_level || 'moderado', user?.dietary_restrictions || 'ninguna', meals);
       if (user?.id) {
-        const userRef = doc(db, 'users', String(user.id));
-        await updateDoc(userRef, {
-          weekly_meal_plan: plan,
-        });
-
-        useStore.getState().setUser({
-          ...user,
-          weekly_meal_plan: plan,
-        });
+        await supabase.from('profiles').update({ weekly_meal_plan: plan }).eq('id', user.id);
+        useStore.getState().setUser({ ...user, weekly_meal_plan: plan });
       }
       setShowMealPlanner(false);
-    } catch (err) {
-      console.error(err);
-      alert('Error al generar el plan de comidas. Inténtalo de nuevo.');
-    } finally {
-      setIsGenerating(false);
-    }
+    } catch (err) { console.error(err); alert('Error al generar el plan.'); } finally { setIsGenerating(false); }
   };
 
   const weight = user?.weight || 70;
@@ -169,95 +144,43 @@ export function Meals() {
     return matchesSearch && matchesCategory;
   });
 
-  // ✅ onSnapshot — tiempo real para la colección meals
   useEffect(() => {
-    const unsubMeals = onSnapshot(
-      collection(db, 'meals'),
-      (snapshot) => {
-        const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Meal);
-        setMeals(data);
-      },
-      (error) => {
-        console.error('Error en listener de meals:', error);
-      }
-    );
-    return () => unsubMeals();
+    supabase.from('meals').select('*').then(({ data }) => { if (data) setMeals(data as Meal[]); });
+    const channel = supabase.channel('meals-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meals' }, async () => {
+        const { data } = await supabase.from('meals').select('*');
+        if (data) setMeals(data as Meal[]);
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const handleAddMeal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (editingMealId) {
-        await updateDoc(doc(db, 'meals', editingMealId), newMeal);
+        await supabase.from('meals').update(newMeal).eq('id', editingMealId);
         setEditingMealId(null);
       } else {
-        await addDoc(collection(db, 'meals'), { ...newMeal, created_by: String(user?.id) });
+        await supabase.from('meals').insert({ ...newMeal, created_by: String(user?.id) });
       }
-      
-      // ✅ Sincronizar vista con el cambio realizado
-      setActiveCategory(newMeal.category);
-      setSearchQuery('');
-      
+      setActiveCategory(newMeal.category); setSearchQuery('');
       setShowAddForm(false);
-      setNewMeal({
-        name: '',
-        category: 'desayuno',
-        ingredients: '',
-        instructions: '',
-        video_url: '',
-        image_url: '',
-      });
-    } catch (error) {
-      console.error('Error saving meal:', error);
-    }
+      setNewMeal({ name: '', category: 'desayuno', ingredients: '', instructions: '', video_url: '', image_url: '' });
+    } catch (error) { console.error('Error saving meal:', error); }
   };
 
   const handleDeleteMeal = async (meal: Meal) => {
     if (!window.confirm('¿Deseas eliminar esta receta definitivamente?')) return;
-    try {
-      const mealRef = doc(db, 'meals', meal.id);
-      await deleteDoc(mealRef);
-      
-      if (meal.image_url && meal.image_url.includes('firebasestorage')) {
-        try {
-          const decodedUrl = decodeURIComponent(meal.image_url);
-          const filePath = decodedUrl.split('/o/')[1].split('?')[0];
-          const imageRef = ref(storage, filePath);
-          await deleteObject(imageRef);
-        } catch (e) {
-          console.warn('Could not delete image from storage:', e);
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting meal:', error);
-    }
+    try { await supabase.from('meals').delete().eq('id', meal.id); } catch (error) { console.error('Error deleting meal:', error); }
   };
 
   const handleDeleteImage = async () => {
-    if (!newMeal.image_url) return;
-    if (
-      !window.confirm('¿Deseas quitar la imagen actual? Se borrará permanentemente del servidor.')
-    )
-      return;
-
+    if (!newMeal.image_url || !window.confirm('¿Deseas quitar la imagen actual?')) return;
     try {
-      // Extraemos la ruta del archivo desde la URL de Firebase Storage
-      const decodedUrl = decodeURIComponent(newMeal.image_url);
-      const filePath = decodedUrl.split('/o/')[1].split('?')[0];
-      const imageRef = ref(storage, filePath);
-      
-      await deleteObject(imageRef);
       setNewMeal({ ...newMeal, image_url: '' });
-
-      if (editingMealId) {
-        await updateDoc(doc(db, 'meals', editingMealId), { image_url: '' });
-      }
+      if (editingMealId) { await supabase.from('meals').update({ image_url: '' }).eq('id', editingMealId); }
       showAlert('Éxito', 'Imagen eliminada correctamente', 'success');
-    } catch (error) {
-      console.error('Error deleting image:', error);
-      // Si falla, al menos limpiamos el estado local para que el usuario pueda subir otra
-      setNewMeal({ ...newMeal, image_url: '' });
-    }
+    } catch (error) { console.error('Error deleting image:', error); setNewMeal({ ...newMeal, image_url: '' }); }
   };
 
   const handleEditMealClick = (meal: Meal) => {
@@ -269,48 +192,24 @@ export function Meals() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploadingImage(true);
     try {
-      const storageRef = ref(storage, `meals/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      uploadTask.on(
-        'state_changed',
-        null,
-        (error) => {
-          console.error('Error uploading image:', error);
-          setUploadingImage(false);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          setNewMeal({ ...newMeal, image_url: downloadURL });
-          setUploadingImage(false);
-        }
-      );
-    } catch (error) {
-      console.error('Error in image upload:', error);
-      setUploadingImage(false);
-    }
+      const ext = file.name.split('.').pop();
+      const path = `meals/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('gpte-videos').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
+      setNewMeal({ ...newMeal, image_url: urlData.publicUrl });
+    } catch (error) { console.error('Error in image upload:', error); } finally { setUploadingImage(false); }
   };
 
   const handleAddNutrition = async (e: React.FormEvent, mealId: string) => {
     e.preventDefault();
-    const updatedMeal = {
-      calories: parseInt(nutrition.calories),
-      carbs: parseInt(nutrition.carbs),
-      protein: parseInt(nutrition.protein),
-      fats: parseInt(nutrition.fats),
-    };
-
+    const updatedMeal = { calories: parseInt(nutrition.calories), carbs: parseInt(nutrition.carbs), protein: parseInt(nutrition.protein), fats: parseInt(nutrition.fats) };
     try {
-      await updateDoc(doc(db, 'meals', mealId), updatedMeal);
-      // onSnapshot actualiza automáticamente
-      setEditingNutritionId(null);
-      setNutrition({ calories: '', carbs: '', protein: '', fats: '' });
-    } catch (error) {
-      console.error('Error updating nutrition:', error);
-    }
+      await supabase.from('meals').update(updatedMeal).eq('id', mealId);
+      setEditingNutritionId(null); setNutrition({ calories: '', carbs: '', protein: '', fats: '' });
+    } catch (error) { console.error('Error updating nutrition:', error); }
   };
 
   return (

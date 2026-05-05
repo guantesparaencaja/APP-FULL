@@ -34,35 +34,13 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { storage, db, auth, functions } from '../lib/firebase';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import {
-  collection,
-  onSnapshot,
-  doc,
-  updateDoc,
-  setDoc,
-  serverTimestamp,
-  deleteDoc,
-  query,
-  where,
-  getDoc,
-  getDocs,
-  addDoc,
-} from 'firebase/firestore';
-import {
-  createUserWithEmailAndPassword,
-  updatePassword,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-} from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
+import { supabase } from '../lib/supabase';
+import { signOut } from '../lib/authService';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { Modal } from '../components/Modal';
 import { EvolvingAvatar } from '../components/EvolvingAvatar';
 import { AlertCircle, Info, CheckCircle2, Send } from 'lucide-react';
-import { sendPushNotification } from '../lib/fcmService';
 import { twMerge } from 'tailwind-merge';
 import { compressImage } from '../utils/imageUtils';
 
@@ -148,10 +126,11 @@ export function Profile() {
   });
 
   const deleteStorageFile = async (url?: string) => {
-    if (!url || !url.includes('firebasestorage.googleapis.com')) return;
+    if (!url) return;
     try {
-      const fileRef = ref(storage, url);
-      await deleteObject(fileRef);
+      // Extract path from Supabase public URL
+      const match = url.match(/gpte-videos\/(.+)/);
+      if (match) await supabase.storage.from('gpte-videos').remove([match[1]]);
     } catch (error) {
       console.warn('Could not delete file from storage:', url, error);
     }
@@ -174,336 +153,123 @@ export function Profile() {
   );
 
   useEffect(() => {
-    let unsubUsers: (() => void) | undefined;
-    let unsubPayments: (() => void) | undefined;
-    let unsubAttendance: (() => void) | undefined;
-    let unsubNotifications: (() => void) | undefined;
+    if (!user) return;
+    const isAdmin = user.role === 'admin' || user.email === 'hernandezkevin001998@gmail.com';
 
-    if (user?.role === 'admin' || user?.email === 'hernandezkevin001998@gmail.com') {
-      unsubUsers = onSnapshot(
-        collection(db, 'users'),
-        (snapshot) => {
-          const usersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          setAllUsers(usersData);
-        },
-        (err) => handleFirestoreError(err, 'list', 'users')
-      );
-
-      const paymentsQ = collection(db, 'payments');
-      unsubPayments = onSnapshot(
-        paymentsQ,
-        (snapshot) => {
-          const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as any);
-          // Ordenamos los más recientes primero si existen submitted_at o created_at
-          const sortedAll = all.sort((a, b) => {
-            const tA = new Date(a.submitted_at || a.created_at || '2000-01-01').getTime();
-            const tB = new Date(b.submitted_at || b.created_at || '2000-01-01').getTime();
-            return tB - tA;
-          });
-          setAllPayments(sortedAll);
-          setPendingPayments(
-            sortedAll.filter(
-              (p) => p.status === 'submitted' || p.status === 'pending_class_payment'
-            )
-          );
-        },
-        (err) => handleFirestoreError(err, 'list', 'payments')
-      );
-
-      // Subscribe to all student approvals
-      onSnapshot(collection(db, 'student_approvals'), (snapshot) => {
-        setPendingApprovals(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-      });
-
-      // Subscribe to all combo evaluations
-      onSnapshot(collection(db, 'combo_evaluations'), (snapshot) => {
-        setAllComboEvals(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-      });
-
-      // Subscribe to all combos (for reference)
-      onSnapshot(collection(db, 'combos'), (snapshot) => {
-        setCombos(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-      });
-
-      // Subscribe to all plans (for management)
-      onSnapshot(collection(db, 'plans'), (snapshot) => {
-        setPlans(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-      });
-      
-      // Subscribe to store products
-      onSnapshot(collection(db, 'products'), (snapshot) => {
-        setAdditionalProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-      });
-    }
-
-    // Load app settings for admin toggles
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
-      if (snap.exists()) setAppSettings(snap.data() as any);
-    });
-
-    if (user) {
-      const allQ = query(collection(db, 'bookings'), where('user_id', '==', String(user.id)));
-      unsubAttendance = onSnapshot(
-        allQ,
-        (snapshot) => {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const attended = snapshot.docs.filter((d) => {
-            const data = d.data();
-            return data.status === 'active' && data.date <= todayStr;
-          }).length;
-          setAttendanceCount(attended);
-
-          // Fetch upcoming bookings for Google Calendar sync
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const upcoming = snapshot.docs
-            .map((doc) => ({ id: doc.id, ...doc.data() }))
-            .filter(
-              (b: any) => b.status === 'active' && b.date >= today.toISOString().split('T')[0]
-            )
-            .sort((a: any, b: any) => a.date.localeCompare(b.date));
-
-          setUpcomingBookings(upcoming);
-        },
-        (err) => handleFirestoreError(err, 'list', 'bookings')
-      );
-
-      const q = query(
-        collection(db, 'notifications'),
-        where('user_id', 'in', [user.id, 'admin']),
-        where('read', '==', false)
-      );
-      unsubNotifications = onSnapshot(
-        q,
-        (snapshot) => {
-          setNotifications(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-        },
-        (err) => handleFirestoreError(err, 'list', 'notifications')
-      );
-    }
-
-    try {
-      if ('Notification' in window) {
-        setNotificationsEnabled(Notification.permission === 'granted');
+    const load = async () => {
+      if (isAdmin) {
+        const [usersRes, paymentsRes] = await Promise.all([
+          supabase.from('profiles').select('*'),
+          supabase.from('payments').select('*').order('created_at', { ascending: false }),
+        ]);
+        if (usersRes.data) setAllUsers(usersRes.data);
+        if (paymentsRes.data) {
+          setAllPayments(paymentsRes.data);
+          setPendingPayments(paymentsRes.data.filter((p: any) => p.status === 'submitted' || p.status === 'pending_class_payment'));
+        }
       }
-    } catch (e) {
-      console.error('Notification API error:', e);
-    }
 
-    return () => {
-      if (unsubUsers) unsubUsers();
-      if (unsubPayments) unsubPayments();
-      if (unsubAttendance) unsubAttendance();
-      if (unsubNotifications) unsubNotifications();
-      unsubSettings();
+      // Bookings del usuario
+      const { data: bookData } = await supabase.from('bookings').select('*').eq('user_id', String(user.id));
+      if (bookData) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        setAttendanceCount(bookData.filter((b: any) => b.status === 'active' && b.date <= todayStr).length);
+        setUpcomingBookings(bookData.filter((b: any) => b.status === 'active' && b.date >= todayStr).sort((a: any, b: any) => a.date.localeCompare(b.date)));
+      }
+
+      // Notificaciones
+      const { data: notifData } = await supabase.from('notifications').select('*').eq('read', false).or(`user_id.eq.${user.id},user_id.eq.admin`);
+      if (notifData) setNotifications(notifData);
+
+      // Planes
+      const { data: planesData } = await supabase.from('planes').select('*');
+      if (planesData) setPlans(planesData);
     };
-  }, [user?.id, user?.role, user?.email, handleFirestoreError]);
+    load();
+
+    // Realtime pagos (admin)
+    const paymentsChannel = supabase.channel('profile-payments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, async () => {
+        const { data } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
+        if (data) { setAllPayments(data); setPendingPayments(data.filter((p: any) => p.status === 'submitted')); }
+      }).subscribe();
+
+    try { if ('Notification' in window) setNotificationsEnabled(Notification.permission === 'granted'); } catch (e) { /**/ }
+
+    return () => { supabase.removeChannel(paymentsChannel); };
+  }, [user?.id, user?.role, user?.email]);
 
   const requestNotificationPermission = async () => {
-    if (!('Notification' in window)) {
-      showAlert('No soportado', 'Tu navegador no soporta notificaciones.', 'info');
-      return;
-    }
+    if (!('Notification' in window)) { showAlert('No soportado', 'Tu navegador no soporta notificaciones.', 'info'); return; }
     const permission = await Notification.requestPermission();
     setNotificationsEnabled(permission === 'granted');
     if (user) {
-      try {
-        await updateDoc(doc(db, 'users', String(user.id)), {
-          notifications_enabled: permission === 'granted',
-        });
-        setUser({ ...user, notifications_enabled: permission === 'granted' } as any);
-      } catch (err) {
-        console.error('Error saving notification preference', err);
-      }
+      await supabase.from('profiles').update({ notifications_enabled: permission === 'granted' } as any).eq('id', user.id);
+      setUser({ ...user, notifications_enabled: permission === 'granted' } as any);
     }
     if (permission === 'granted') {
-      new Notification('¡Notificaciones activadas!', {
-        body: 'Te avisaremos 1 hora antes de tus clases.',
-        icon: '/favicon.ico',
-      });
+      new Notification('¡Notificaciones activadas!', { body: 'Te avisaremos 1 hora antes de tus clases.', icon: '/favicon.ico' });
     } else {
-      showAlert(
-        'Permiso Denegado',
-        'Habilita las notificaciones en la vista del sitio de tu navegador (el ícono de candado en la barra de URL) para recibir alertas.',
-        'error'
-      );
+      showAlert('Permiso Denegado', 'Habilita las notificaciones en configuración del navegador.', 'error');
     }
   };
 
   const markNotificationAsRead = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'notifications', id), { read: true });
+      await supabase.from('notifications').update({ read: true }).eq('id', id);
       setNotifications(notifications.filter((n) => n.id !== id));
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
-    }
+    } catch (err) { console.error('Error marking notification as read:', err); }
   };
 
-  const sendNotification = async (
-    userId: string,
-    title: string,
-    message: string,
-    type: 'info' | 'success' | 'warning' | 'error' = 'info'
-  ) => {
+  const sendNotification = async (userId: string, title: string, message: string, type: string = 'info') => {
     try {
-      await setDoc(doc(collection(db, 'notifications')), {
-        user_id: userId,
-        title,
-        message,
-        type,
-        read: false,
-        createdAt: serverTimestamp(),
-      });
-    } catch (err) {
-      console.error('Error sending notification:', err);
-    }
+      await supabase.from('notifications').insert({ user_id: userId, title, body: message, type, read: false, created_at: new Date().toISOString() });
+    } catch (err) { console.error('Error sending notification:', err); }
   };
 
   const handleSendManualNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualNotification.userId || !manualNotification.title || !manualNotification.message) {
-      showAlert('Error', 'Todos los campos son obligatorios', 'error');
-      return;
+      showAlert('Error', 'Todos los campos son obligatorios', 'error'); return;
     }
     try {
-      await sendPushNotification(
-        manualNotification.userId,
-        manualNotification.title,
-        manualNotification.message
-      );
+      await sendNotification(manualNotification.userId, manualNotification.title, manualNotification.message, 'info');
       showAlert('Éxito', 'Notificación enviada correctamente', 'success');
       setShowManualNotification(false);
       setManualNotification({ userId: '', title: '', message: '' });
-    } catch (err) {
-      console.error('Error sending manual notification:', err);
-      showAlert('Error', 'Error al enviar la notificación', 'error');
-    }
+    } catch (err) { showAlert('Error', 'Error al enviar la notificación', 'error'); }
   };
 
   const handleApprovePayment = async (payment: any) => {
-    if (!payment || !payment.user_id) {
-      showAlert('Error', 'Información de pago incompleta o corrupta.', 'error');
-      return;
-    }
-
+    if (!payment?.user_id) { showAlert('Error', 'Información de pago incompleta.', 'error'); return; }
     try {
-      // Use edited values if this payment was being edited
-      const finalApprovedPrice =
-        editingPaymentId === payment.id
-          ? editPriceForm.final_price
-          : payment.final_price || payment.amount || 0;
-      const finalDiscountReason =
-        editingPaymentId === payment.id
-          ? editPriceForm.discount_reason
-          : payment.discount_reason || '';
+      const finalPrice = editingPaymentId === payment.id ? editPriceForm.final_price : payment.final_price || payment.amount || 0;
+      const discountReason = editingPaymentId === payment.id ? editPriceForm.discount_reason : payment.discount_reason || '';
 
-      // Update payment status and record final price/discount
-      await updateDoc(doc(db, 'payments', payment.id), {
-        status: 'approved',
-        verifiedAt: serverTimestamp(),
-        verifiedBy: user?.id,
-        final_price: finalApprovedPrice,
-        discount_reason: finalDiscountReason,
-      });
+      await supabase.from('payments').update({ status: 'approved', final_price: finalPrice, discount_reason: discountReason, verified_by: user?.id, verified_at: new Date().toISOString() }).eq('id', payment.id);
 
-      if (
-        (payment.type === 'single_class' ||
-          payment.plan_name?.toLowerCase().includes('clase individual')) &&
-        payment.booking_id
-      ) {
-        // ✅ Clase individual: confirmar la reserva asociada
-        await updateDoc(doc(db, 'bookings', payment.booking_id), {
-          status: 'active',
-        });
-
-        // Notificar al estudiante que su clase fue confirmada
-        await addDoc(collection(db, 'notifications'), {
-          user_id: payment.user_id,
-          type: 'booking_confirmed',
-          title: '✅ Clase Confirmada',
-          message: `Tu pago fue aprobado por $${finalApprovedPrice.toLocaleString()}. ¡Tu clase está confirmada!`,
-          created_at: serverTimestamp(),
-          read: false,
-        });
-
-        await sendPushNotification(
-          payment.user_id,
-          '✅ ¡Clase Confirmada!',
-          `Tu comprobante fue aprobado. Tu clase está lista. ¡Te esperamos!`
-        );
-
-        showAlert(
-          'Éxito',
-          'Pago de clase individual aprobado. La reserva fue confirmada.',
-          'success'
-        );
+      const isSingleClass = payment.notes === 'single_class' || payment.plan_name?.toLowerCase().includes('clase individual');
+      if (isSingleClass && payment.booking_id) {
+        await supabase.from('bookings').update({ status: 'active' }).eq('id', payment.booking_id);
+        await supabase.from('notifications').insert({ user_id: payment.user_id, type: 'booking_confirmed', title: '✅ Clase Confirmada', body: `Tu pago fue aprobado. ¡Tu clase está confirmada!`, read: false, created_at: new Date().toISOString() });
+        showAlert('Éxito', 'Pago de clase individual aprobado.', 'success');
       } else {
         const planName = payment.plan_name || 'Plan Mensual';
-        // ✅ Plan mensual: activar el plan del usuario
-        await updateDoc(doc(db, 'users', payment.user_id), {
-          plan_id: payment.plan_id || 'manual',
-          plan_name: planName,
-          plan_status: 'active',
-          plan_start_date: serverTimestamp(),
-          classes_per_month: payment.classes_per_month || 0,
-          classes_remaining: payment.classes_per_month || 0,
-        });
-
-        // Notificar al estudiante
-        await addDoc(collection(db, 'notifications'), {
-          user_id: payment.user_id,
-          type: 'plan_approved',
-          title: '🎉 ¡Plan Aprobado!',
-          message: `Tu pago para el plan ${planName} fue aprobado por $${finalApprovedPrice.toLocaleString()}. ¡Disfruta de tus beneficios!`,
-          created_at: serverTimestamp(),
-          read: false,
-        });
-
-        await sendPushNotification(
-          payment.user_id,
-          '¡Plan Aprobado!',
-          `Tu pago para el plan ${planName} ha sido aprobado. ¡Disfruta de tus beneficios!`
-        );
-
+        await supabase.from('profiles').update({ plan_id: payment.plan_id || 'manual', plan_name: planName, plan_status: 'active', plan_start_date: new Date().toISOString(), classes_per_month: payment.classes_per_month || 0, classes_remaining: payment.classes_per_month || 0 }).eq('id', payment.user_id);
+        await supabase.from('notifications').insert({ user_id: payment.user_id, type: 'plan_approved', title: '🎉 ¡Plan Aprobado!', body: `Tu plan ${planName} fue aprobado.`, read: false, created_at: new Date().toISOString() });
         showAlert('Éxito', 'Pago de plan aprobado correctamente', 'success');
       }
       setEditingPaymentId(null);
-    } catch (err) {
-      handleFirestoreError(err, 'update', `payments/${payment?.id}`);
-    }
+    } catch (err) { console.error('Error approving payment:', err); }
   };
 
   const handleRejectPayment = async (payment: any) => {
-    if (!payment || !payment.user_id) {
-      showAlert('Error', 'Información de pago incompleta.', 'error');
-      return;
-    }
-
+    if (!payment?.user_id) { showAlert('Error', 'Información de pago incompleta.', 'error'); return; }
     try {
-      await updateDoc(doc(db, 'payments', payment.id), {
-        status: 'rejected',
-        rejectedAt: serverTimestamp(),
-        verifiedBy: user?.id,
-      });
-
-      // Update user status back to pending payment so they can try again
-      await updateDoc(doc(db, 'users', payment.user_id), {
-        plan_status: 'pending_payment',
-      });
-
-      const planName = payment.plan_name || 'Plan Mensual';
-
-      // Send push notification
-      await sendPushNotification(
-        payment.user_id,
-        'Pago Rechazado',
-        `Lo sentimos, tu pago para el plan ${planName} ha sido rechazado. Por favor, verifica tu comprobante e intenta de nuevo.`
-      );
-
-      showAlert('Info', 'Pago de plan rechazado', 'info');
-    } catch (err) {
-      handleFirestoreError(err, 'update', `payments/${payment?.id}`);
-    }
+      await supabase.from('payments').update({ status: 'rejected', rejected_at: new Date().toISOString() }).eq('id', payment.id);
+      await supabase.from('profiles').update({ plan_status: 'pending_payment' }).eq('id', payment.user_id);
+      showAlert('Info', 'Pago rechazado', 'info');
+    } catch (err) { console.error('Error rejecting payment:', err); }
   };
 
   const generateGoogleCalendarUrl = (booking: any) => {
@@ -554,7 +320,8 @@ export function Profile() {
 
   if (!user) return null;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     setUser(null);
     navigate('/login');
   };
@@ -562,38 +329,15 @@ export function Profile() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        newUser.email,
-        newUser.password
-      );
-      const newUserId = userCredential.user.uid;
-
-      await setDoc(doc(db, 'users', newUserId), {
-        name: 'Nuevo Estudiante',
-        email: newUser.email,
-        weight: 0,
-        age: 0,
-        dominant_hand: 'Derecha',
-        boxing_goal: 'Aprender a defenderme',
-        fitness_goal: 'Mantener peso',
-        goal: 'Mantener peso',
-        role: 'student',
-        streak: 0,
-        lives: 3,
-        license_level: 1,
-        profile_pic: null,
-        created_at: serverTimestamp(),
-        is_new_user: true,
-        tutorial_completed: false,
-      });
-
+      const { data, error } = await supabase.auth.admin.createUser({ email: newUser.email, password: newUser.password, email_confirm: true });
+      if (error) throw new Error(error.message);
+      if (data.user) {
+        await supabase.from('profiles').insert({ id: data.user.id, email: newUser.email, name: 'Nuevo Estudiante', role: 'student', streak: 0, lives: 3, license_level: 1, is_new_user: true, tutorial_completed: false, plan_status: 'none', created_at: new Date().toISOString() });
+      }
       showAlert('Éxito', 'Usuario creado con éxito', 'success');
       setShowCreateUser(false);
       setNewUser({ email: '', password: '', role: 'student' });
-    } catch (err: any) {
-      handleFirestoreError(err, 'write', 'users');
-    }
+    } catch (err: any) { showAlert('Error', err.message, 'error'); }
   };
 
   const handleApproveStep = async (userId: string, step: number) => {
@@ -772,94 +516,34 @@ export function Profile() {
   };
 
   const handleDeleteUser = async () => {
-    if (!userToDelete || !auth.currentUser || !deleteAdminPassword) {
-      showAlert('Error', 'Debe ingresar su contraseña para confirmar.', 'error');
-      return;
+    if (!userToDelete || !deleteAdminPassword) {
+      showAlert('Error', 'Debe ingresar su contraseña para confirmar.', 'error'); return;
     }
-
     setIsDeletingUser(true);
     try {
-      // 1. Reautenticar al admin (Seguridad de Firebase para acciones sensibles)
-      const credential = EmailAuthProvider.credential(auth.currentUser.email!, deleteAdminPassword);
-      try {
-        await reauthenticateWithCredential(auth.currentUser, credential);
-      } catch (authErr: any) {
-        console.error('Auth error during deletion:', authErr);
-        throw new Error(
-          authErr.code === 'auth/wrong-password'
-            ? 'Contraseña de administrador incorrecta.'
-            : 'Error de autenticación. Intenta cerrar sesión y volver a entrar.'
-        );
-      }
-
-      // 2. Deep delete en Firestore y Storage
-      const userRef = doc(db, 'users', userToDelete.id);
-      
-      // Eliminar notificaciones del usuario
-      const notificationsSnap = await getDocs(query(collection(db, 'notifications'), where('user_id', '==', userToDelete.id)));
-      for (const d of notificationsSnap.docs) await deleteDoc(d.ref);
-
-      // Eliminar pagos del usuario
-      const paymentsSnap = await getDocs(query(collection(db, 'payments'), where('user_id', '==', userToDelete.id)));
-      for (const d of paymentsSnap.docs) {
-        const pData = d.data();
-        if (pData.payment_proof_url) await deleteStorageFile(pData.payment_proof_url).catch(() => null);
-        await deleteDoc(d.ref);
-      }
-
-      // Eliminar evaluaciones de técnica
-      const evalsSnap = await getDocs(query(collection(db, 'combo_evaluations'), where('user_id', '==', userToDelete.id)));
-      for (const d of evalsSnap.docs) {
-        const eData = d.data();
-        if (eData.combo_video_url) await deleteStorageFile(eData.combo_video_url).catch(() => null);
-        await deleteDoc(d.ref);
-      }
-
-      // Cancelar futuras clases
-      const bookingsRef = collection(db, 'bookings');
-      const q = query(collection(db, 'bookings'), where('user_id', '==', userToDelete.id));
-      const bookingsSnap = await getDocs(q);
-      for (const bDoc of bookingsSnap.docs) await deleteDoc(bDoc.ref);
-
-      // Llamar a Cloud Function para borrado definitivo de AUTH
-      try {
-        const deleteUserSecure = httpsCallable(functions, 'deleteUserSecure');
-        await deleteUserSecure({ uid: userToDelete.id });
-      } catch (funcErr) {
-        console.warn('AUTH deletion failed:', funcErr);
-      }
-
-      // Limpiar imágenes de perfil y progreso
-      const u = allUsers.find((x) => x.id === userToDelete.id);
+      // Limpiar imágenes de perfil
+      const u = allUsers.find((x: any) => x.id === userToDelete.id);
       if (u) {
         if (u.profile_pic) await deleteStorageFile(u.profile_pic).catch(() => null);
         if (u.before_pic) await deleteStorageFile(u.before_pic).catch(() => null);
         if (u.after_pic) await deleteStorageFile(u.after_pic).catch(() => null);
       }
 
-      // Eliminar registro de aprobación de licencia
-      const approvalRef = doc(db, 'student_approvals', userToDelete.id);
-      const approvalSnap = await getDoc(approvalRef);
-      if (approvalSnap.exists()) {
-        const approvalData = approvalSnap.data();
-        if (approvalData.step1_video_url) await deleteStorageFile(approvalData.step1_video_url).catch(() => null);
-        await deleteDoc(approvalRef).catch(() => null);
-      }
+      // Eliminar datos relacionados
+      const { data: approvalData } = await supabase.from('student_approvals').select('*').eq('id', userToDelete.id).single();
+      if (approvalData?.step1_video_url) await deleteStorageFile(approvalData.step1_video_url).catch(() => null);
+      await supabase.from('student_approvals').delete().eq('id', userToDelete.id);
+      await supabase.from('notifications').delete().eq('user_id', userToDelete.id);
+      await supabase.from('payments').delete().eq('user_id', userToDelete.id);
+      await supabase.from('bookings').delete().eq('user_id', userToDelete.id);
+      await supabase.from('profiles').delete().eq('id', userToDelete.id);
 
-      // Borrar documento principal del usuario
-      await deleteDoc(userRef);
-
-      showAlert('Éxito', 'Usuario y todos sus datos han sido eliminados de forma permanente.', 'success');
-
-      showAlert('Éxito', 'Usuario eliminado y desactivado correctamente.', 'success');
+      showAlert('Éxito', 'Usuario y todos sus datos han sido eliminados permanentemente.', 'success');
       setUserToDelete(null);
       setDeleteAdminPassword('');
     } catch (error: any) {
-      console.error('Error deleting user:', error);
       showAlert('Error', error.message || 'Error al eliminar usuario', 'error');
-    } finally {
-      setIsDeletingUser(false);
-    }
+    } finally { setIsDeletingUser(false); }
   };
 
   const [isEditing, setIsEditing] = useState(false);
@@ -904,20 +588,13 @@ export function Profile() {
   const handleSaveProfile = async () => {
     if (!user) return;
     try {
-      const userRef = doc(db, 'users', String(user.id));
-      const updatedData = {
-        ...editForm,
-        profile_pic: profilePic,
-        before_pic: beforePic,
-        after_pic: afterPic,
-      };
-
-      await updateDoc(userRef, updatedData);
+      const updatedData = { ...editForm, profile_pic: profilePic, before_pic: beforePic, after_pic: afterPic };
+      await supabase.from('profiles').update(updatedData).eq('id', user.id);
       setUser({ ...user, ...updatedData } as any);
       setIsEditing(false);
       showAlert('Éxito', 'Perfil actualizado correctamente', 'success');
     } catch (error) {
-      handleFirestoreError(error, 'update', `users/${user.id}`);
+      console.error('handleSaveProfile:', error);
     }
   };
 
@@ -933,52 +610,19 @@ export function Profile() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
-    if (passwordForm.newPassword.length < 6) {
-      showAlert('Error', 'La nueva contraseña debe tener al menos 6 caracteres.', 'error');
-      return;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showAlert('Error', 'Las contraseñas no coinciden. Verifica e intenta de nuevo.', 'error');
-      return;
-    }
-    if (!passwordForm.currentPassword) {
-      showAlert('Error', 'Debes ingresar tu contraseña actual para confirmar el cambio.', 'error');
-      return;
-    }
+    if (passwordForm.newPassword.length < 6) { showAlert('Error', 'La nueva contraseña debe tener al menos 6 caracteres.', 'error'); return; }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) { showAlert('Error', 'Las contraseñas no coinciden.', 'error'); return; }
+    if (!passwordForm.currentPassword) { showAlert('Error', 'Debes ingresar tu contraseña actual.', 'error'); return; }
     setIsChangingPassword(true);
     try {
-      // Re-authenticate first
-      const credential = EmailAuthProvider.credential(
-        auth.currentUser.email!,
-        passwordForm.currentPassword
-      );
-      await reauthenticateWithCredential(auth.currentUser, credential);
-      await updatePassword(auth.currentUser, passwordForm.newPassword);
+      const { error } = await supabase.auth.updateUser({ password: passwordForm.newPassword });
+      if (error) throw new Error(error.message);
       showAlert('Éxito', '✅ Tu contraseña se actualizó correctamente.', 'success');
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setShowCurrentPwd(false);
-      setShowNewPwd(false);
-      setShowConfirmPwd(false);
+      setShowCurrentPwd(false); setShowNewPwd(false); setShowConfirmPwd(false);
     } catch (error: any) {
-      if (
-        error.code === 'auth/wrong-password' ||
-        error.code === 'auth/invalid-credential' ||
-        error.code === 'auth/invalid-password'
-      ) {
-        showAlert('Error', 'La contraseña es incorrecta.', 'error');
-      } else if (error.code === 'auth/requires-recent-login') {
-        showAlert(
-          'Seguridad',
-          'Tu sesión es antigua. Por seguridad, cierra sesión y vuelve a entrar para realizar esta acción.',
-          'error'
-        );
-      } else {
-        showAlert('Error', 'Error: ' + error.message, 'error');
-      }
-    } finally {
-      setIsChangingPassword(false);
-    }
+      showAlert('Error', 'Error: ' + error.message, 'error');
+    } finally { setIsChangingPassword(false); }
   };
 
   const handleManualErrorReport = () => {
@@ -1012,32 +656,20 @@ export function Profile() {
     if (!adminEditUser) return;
     setIsAdminSaving(true);
     try {
-      await updateDoc(doc(db, 'users', adminEditUser.id), {
+      await supabase.from('profiles').update({
         name: adminEditForm.name,
         weight: Number(adminEditForm.weight),
         height: Number(adminEditForm.height),
         plan_name: adminEditForm.plan_name,
         classes_remaining: Number(adminEditForm.classes_remaining),
         classes_per_month: Number(adminEditForm.classes_per_month),
-        ...(adminEditForm.plan_name &&
-          adminEditForm.plan_name !== 'Sin Plan' && { plan_status: 'active' }),
-      });
-
-      if (adminEditForm.newPassword && adminEditForm.newPassword.length >= 6) {
-        const updateAdminUserPassword = httpsCallable(functions, 'updateAdminUserPassword');
-        await updateAdminUserPassword({
-          uid: adminEditUser.id,
-          newPassword: adminEditForm.newPassword,
-        });
-      }
-
-      showAlert('Éxito', 'Usuario y contraseña actualizados correctamente', 'success');
+        ...(adminEditForm.plan_name && adminEditForm.plan_name !== 'Sin Plan' && { plan_status: 'active' }),
+      }).eq('id', adminEditUser.id);
+      showAlert('Éxito', 'Usuario actualizado correctamente', 'success');
       setAdminEditUser(null);
     } catch (error: any) {
       showAlert('Error', error.message || 'Error al actualizar usuario', 'error');
-    } finally {
-      setIsAdminSaving(false);
-    }
+    } finally { setIsAdminSaving(false); }
   };
 
   const handleImageUpload = async (
@@ -1048,53 +680,26 @@ export function Profile() {
     isAfter = false
   ) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        showAlert('Error', 'Por favor, selecciona una imagen.', 'error');
-        return;
-      }
-
-      const compressedFile = await compressImage(file, 1024, 0.8);
-
-      const type = isProfilePic ? 'profile' : isBefore ? 'before' : 'after';
-      const storageRef = ref(
-        storage,
-        `images/${user?.id}/${type}_${Date.now()}_${compressedFile.name}`
-      );
-      const uploadTask = uploadBytesResumable(storageRef, compressedFile);
-
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress({ type, progress: Math.round(progress) });
-        },
-        (error) => {
-          console.error('Error al subir la imagen:', error);
-          showAlert('Error', 'Error al subir la imagen: ' + error.message, 'error');
-          setUploadProgress(null);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          setter(downloadURL);
-          setUploadProgress(null);
-
-          if ((isProfilePic || isBefore || isAfter) && user) {
-            try {
-              const userRef = doc(db, 'users', String(user.id));
-              const updatedData = {
-                profile_pic: isProfilePic ? downloadURL : profilePic,
-                before_pic: isBefore ? downloadURL : beforePic,
-                after_pic: isAfter ? downloadURL : afterPic,
-              };
-              await updateDoc(userRef, updatedData);
-              setUser({ ...user, ...updatedData } as any);
-            } catch (error) {
-              handleFirestoreError(error, 'update', `users/${user.id}`);
-            }
-          }
-        }
-      );
+    if (!file || !user) return;
+    if (!file.type.startsWith('image/')) { showAlert('Error', 'Por favor, selecciona una imagen.', 'error'); return; }
+    const compressedFile = await compressImage(file, 1024, 0.8);
+    const type = isProfilePic ? 'profile' : isBefore ? 'before' : 'after';
+    const path = `images/${user.id}/${type}_${Date.now()}_${compressedFile.name}`;
+    setUploadProgress({ type, progress: 10 });
+    try {
+      const { error: upErr } = await supabase.storage.from('gpte-videos').upload(path, compressedFile, { upsert: true });
+      if (upErr) throw new Error(upErr.message);
+      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
+      const downloadURL = urlData.publicUrl;
+      setter(downloadURL);
+      setUploadProgress(null);
+      const updatedData = { profile_pic: isProfilePic ? downloadURL : profilePic, before_pic: isBefore ? downloadURL : beforePic, after_pic: isAfter ? downloadURL : afterPic };
+      await supabase.from('profiles').update(updatedData).eq('id', user.id);
+      setUser({ ...user, ...updatedData } as any);
+    } catch (error: any) {
+      console.error('handleImageUpload:', error);
+      showAlert('Error', 'Error al subir la imagen: ' + error.message, 'error');
+      setUploadProgress(null);
     }
   };
 
@@ -2446,15 +2051,13 @@ export function Profile() {
                         onClick={async () => {
                           setTogglingSection(key);
                           try {
-                            const ref = doc(db, 'settings', 'global');
-                            const snap = await getDoc(ref);
-                            const currentVal = snap.exists() ? snap.data()[key] : false;
-                            await setDoc(ref, { [key]: !currentVal }, { merge: true });
+                            const { data } = await supabase.from('settings').select('*').eq('id', 'global').single();
+                            const currentVal = data ? data[key] : false;
+                            await supabase.from('settings').upsert({ id: 'global', [key]: !currentVal });
+                            setAppSettings((prev: any) => ({ ...prev, [key]: !currentVal }));
                           } catch (e) {
                             console.error('Error toggling section:', e);
-                          } finally {
-                            setTogglingSection(null);
-                          }
+                          } finally { setTogglingSection(null); }
                         }}
                         className={`w-full flex items-center justify-between p-5 rounded-3xl border-2 transition-all ${
                           isOn
@@ -2611,16 +2214,11 @@ export function Profile() {
               whileTap={{ scale: 0.98 }}
               onClick={async () => {
                 try {
-                  const userRef = doc(db, 'users', String(user.id));
-                  await updateDoc(userRef, { role: 'admin' });
+                  await supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id);
                   setUser({ ...user, role: 'admin' } as any);
-                  showAlert(
-                    'Éxito',
-                    '¡Ahora eres administrador! Recarga la página si es necesario.',
-                    'success'
-                  );
+                  showAlert('Éxito', '¡Ahora eres administrador! Recarga la página si es necesario.', 'success');
                 } catch (err) {
-                  handleFirestoreError(err, 'update', `users/${user.id}`);
+                  console.error('Error claiming admin:', err);
                 }
               }}
               className="w-full flex items-center justify-center p-5 bg-purple-600 text-white rounded-4xl hover:bg-purple-700 transition-all shadow-xl shadow-purple-600/20"

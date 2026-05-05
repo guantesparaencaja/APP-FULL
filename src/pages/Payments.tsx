@@ -12,18 +12,7 @@ import {
   QrCode,
   Copy,
 } from 'lucide-react';
-import { db, storage } from '../lib/firebase';
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  collection,
-  addDoc,
-  query,
-  where,
-  onSnapshot,
-} from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { supabase } from '../lib/supabase';
 
 export function Payments() {
   const location = useLocation();
@@ -45,51 +34,21 @@ export function Payments() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let unsubBooking: (() => void) | undefined;
-    let unsubPending: (() => void) | undefined;
-
     if (bookingId) {
-      const docRef = doc(db, 'bookings', bookingId);
-      unsubBooking = onSnapshot(
-        docRef,
-        (docSnap) => {
-          if (docSnap.exists()) {
-            setBooking({ id: docSnap.id, ...docSnap.data() });
+      supabase.from('bookings').select('*').eq('id', bookingId).single()
+        .then(({ data }) => { if (data) setBooking(data); });
+    } else if (!planId && user?.id) {
+      supabase.from('bookings')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'pending_payment')
+        .then(({ data }) => {
+          if (data) {
+            setPendingBookings(data);
+            if (data.length === 1) setBookingId(data[0].id);
           }
-        },
-        (err) => {
-          console.error('Error syncing booking:', err);
-        }
-      );
-    } else if (planId) {
-      // Viene desde Plans con planId — no necesita buscar bookings
-      // El formulario de pago se muestra directamente con el plan seleccionado
-    } else if (user?.id) {
-      // Fetch pending bookings for the user
-      const q = query(
-        collection(db, 'bookings'),
-        where('user_id', '==', user.id),
-        where('status', '==', 'pending_payment')
-      );
-      unsubPending = onSnapshot(
-        q,
-        (snapshot) => {
-          const pending = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          setPendingBookings(pending);
-          if (pending.length === 1) {
-            setBookingId(pending[0].id);
-          }
-        },
-        (err) => {
-          console.error('Error syncing pending bookings:', err);
-        }
-      );
+        });
     }
-
-    return () => {
-      if (unsubBooking) unsubBooking();
-      if (unsubPending) unsubPending();
-    };
   }, [bookingId, planId, user?.id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,90 +95,62 @@ export function Payments() {
 
   const handleUpload = async () => {
     if (!file || (!bookingId && !planId) || !user) return;
-
     setUploading(true);
     setError(null);
-
     try {
       const extension = file.name.split('.').pop() || 'jpg';
-      const storageRef = ref(storage, `pagos/${user.id}/comprobante_${Date.now()}.${extension}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const path = `pagos/${user.id}/comprobante_${Date.now()}.${extension}`;
 
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const p = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setProgress(p);
-        },
-        (err: any) => {
-          console.error(err);
-          setError(
-            `Error al subir: ${err.code || err.message}. Verifica tu conexión e inténtalo de nuevo.`
-          );
-          setUploading(false);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+      const { error: upErr } = await supabase.storage.from('gpte-videos').upload(path, file, { upsert: true });
+      if (upErr) throw new Error(upErr.message);
+      setProgress(100);
 
-          if (planId) {
-            // Create a plan payment request
-            await addDoc(collection(db, 'payments'), {
-              user_id: user.id,
-              user_name: user.name,
-              plan_id: planId,
-              plan_name: planName,
-              classes_per_month: classesPerMonth || user.classes_per_month || 0,
-              amount: 0, // Should probably get this from plan data
-              payment_proof_url: downloadURL,
-              status: 'submitted',
-              created_at: new Date().toISOString(),
-            });
+      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
+      const downloadURL = urlData.publicUrl;
 
-            // Update user status
-            await updateDoc(doc(db, 'users', user.id), {
-              plan_status: 'pending_verification',
-            });
-          } else if (bookingId) {
-            // Update booking with payment info
-            await updateDoc(doc(db, 'bookings', bookingId), {
-              payment_proof_url: downloadURL,
-              payment_status: 'submitted',
-              payment_submitted_at: new Date().toISOString(),
-            });
-            // ✅ Crear ticket de pago unificado para clase individual
-            await addDoc(collection(db, 'payments'), {
-              user_id: user.id,
-              user_name: user.name,
-              booking_id: bookingId,
-              plan_name: `Clase Individual del ${booking?.date || 'día'}`,
-              plan_id: 'single_class',
-              classes_per_month: 1,
-              payment_proof_url: downloadURL,
-              status: 'submitted',
-              created_at: new Date().toISOString(),
-              type: 'single_class',
-            });
-          }
+      if (planId) {
+        await supabase.from('payments').insert({
+          user_id: user.id,
+          plan_id: planId,
+          plan_name: planName,
+          classes_per_month: classesPerMonth || user.classes_per_month || 0,
+          amount: 0,
+          receipt_url: downloadURL,
+          status: 'submitted',
+          created_at: new Date().toISOString(),
+        });
+        await supabase.from('profiles').update({ plan_status: 'pending_verification' }).eq('id', user.id);
+      } else if (bookingId) {
+        await supabase.from('bookings').update({
+          payment_proof_url: downloadURL,
+          payment_status: 'submitted',
+          payment_submitted_at: new Date().toISOString(),
+        }).eq('id', bookingId);
+        await supabase.from('payments').insert({
+          user_id: user.id,
+          booking_id: bookingId,
+          plan_name: `Clase Individual del ${booking?.date || 'día'}`,
+          plan_id: 'single_class',
+          classes_per_month: 1,
+          receipt_url: downloadURL,
+          status: 'submitted',
+          created_at: new Date().toISOString(),
+          notes: 'single_class',
+        });
+      }
 
-          // Create a notification for admin
-          await addDoc(collection(db, 'notifications'), {
-            user_id: 'admin',
-            type: 'payment_submitted',
-            message: `Nuevo comprobante de pago de ${user.name} para ${planId ? 'el plan ' + planName : 'la clase del ' + booking?.date}`,
-            booking_id: bookingId || null,
-            plan_id: planId || null,
-            created_at: new Date().toISOString(),
-            read: false,
-          });
+      await supabase.from('notifications').insert({
+        user_id: 'admin',
+        title: 'Nuevo Comprobante de Pago',
+        body: `Nuevo comprobante de ${user.name} para ${planId ? 'el plan ' + planName : 'la clase del ' + booking?.date}`,
+        type: 'payment_submitted',
+        read: false,
+        created_at: new Date().toISOString(),
+      });
 
-          setSuccess(true);
-          setUploading(false);
-
-          setTimeout(() => {
-            navigate(planId ? '/payment-review' : '/calendar');
-          }, 3000);
-        }
-      );
+      setSuccess(true);
+      setUploading(false);
+      setTimeout(() => navigate(planId ? '/payment-review' : '/calendar'), 3000);
     } catch (err: any) {
       console.error(err);
       setError(err.message);

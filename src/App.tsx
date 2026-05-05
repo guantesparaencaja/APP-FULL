@@ -103,96 +103,111 @@ export default function App() {
 
   // ── Supabase Auth Listener (reemplaza onAuthStateChanged de Firebase) ──────
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (session?.user) {
-          const supabaseUser = session.user;
-          const isAdmin = supabaseUser.email && ADMIN_EMAILS.includes(supabaseUser.email);
+    let mounted = true;
 
-          try {
-            // Obtener perfil desde Supabase
-            let profile = await getProfile(supabaseUser.id);
+    const handleSession = async (session: any) => {
+      if (session?.user) {
+        const supabaseUser = session.user;
+        const isAdmin = supabaseUser.email && ADMIN_EMAILS.includes(supabaseUser.email);
 
-            if (!profile) {
-              // Crear perfil si no existe
-              const { error } = await supabase.from('profiles').insert({
-                id: supabaseUser.id,
-                email: supabaseUser.email ?? '',
-                name: supabaseUser.user_metadata?.full_name || 'Usuario',
-                role: isAdmin ? 'admin' : 'student',
-                lives: 3, streak: 0, license_level: 1,
-                is_new_user: true, tutorial_completed: false,
-                plan_status: 'none', classes_remaining: 0, xp: 0,
-              });
-              if (!error) profile = await getProfile(supabaseUser.id);
-            } else if (isAdmin && profile.role !== 'admin') {
-              // Sincronizar rol admin
-              await supabase.from('profiles').update({ role: 'admin' }).eq('id', supabaseUser.id);
-              profile = { ...profile, role: 'admin' };
-            }
+        try {
+          // Obtener perfil desde Supabase
+          let profile = await getProfile(supabaseUser.id);
 
-            const currentUser = useStore.getState().user;
-            const newUserData = {
+          if (!profile) {
+            // Crear perfil si no existe
+            const { error } = await supabase.from('profiles').insert({
               id: supabaseUser.id,
               email: supabaseUser.email ?? '',
-              name: profile?.name || 'Usuario',
-              role: profile?.role || (isAdmin ? 'admin' : 'student'),
-              lives: profile?.lives ?? 3,
-              streak: profile?.streak ?? 0,
-              license_level: profile?.license_level ?? 1,
-              weight: profile?.weight ?? 0,
-              dominant_hand: profile?.dominant_hand ?? 'Derecha',
-              goal: profile?.goal ?? '',
-              age: profile?.age,
-              height: profile?.height,
-              is_new_user: profile?.is_new_user ?? true,
-              tutorial_completed: profile?.tutorial_completed ?? false,
-              fitness_goal: profile?.fitness_goal as any,
-              profile_pic: profile?.profile_pic,
-              before_pic: profile?.before_pic,
-              after_pic: profile?.after_pic,
-              plan: profile?.plan,
-              plan_id: profile?.plan_id,
-              plan_name: profile?.plan_name,
-              plan_status: profile?.plan_status as any ?? 'none',
-              plan_start_date: profile?.plan_start_date,
-              classes_per_month: profile?.classes_per_month ?? 0,
-              classes_remaining: profile?.classes_remaining ?? 0,
-              gender: profile?.gender as any,
-              last_workout: profile?.last_workout,
-              xp: profile?.xp ?? 0,
-              created_at: profile?.created_at,
-            };
-
-            // Deep merge para no perder campos locales
-            const mergedUser = currentUser
-              ? {
-                ...currentUser,
-                ...newUserData,
-                height: newUserData.height ?? currentUser.height,
-                weight: newUserData.weight ?? currentUser.weight,
-                dominant_hand: newUserData.dominant_hand ?? currentUser.dominant_hand,
-                age: newUserData.age ?? currentUser.age,
-                gender: newUserData.gender ?? currentUser.gender,
-                profile_pic: newUserData.profile_pic ?? currentUser.profile_pic,
-              }
-              : newUserData;
-
-            if (!currentUser || JSON.stringify(mergedUser) !== JSON.stringify(currentUser)) {
-              setUser(mergedUser);
-            }
-          } catch (err) {
-            console.error('[App] Error cargando perfil:', err);
-            setUser(null);
+              name: supabaseUser.user_metadata?.full_name || 'Usuario',
+              role: isAdmin ? 'admin' : 'student',
+              lives: 3, streak: 0, license_level: 1,
+              is_new_user: true, tutorial_completed: false,
+              plan_status: 'none', classes_remaining: 0, xp: 0,
+            });
+            if (!error) profile = await getProfile(supabaseUser.id);
+          } else if (isAdmin && profile.role !== 'admin') {
+            // Sincronizar rol admin
+            await supabase.from('profiles').update({ role: 'admin' }).eq('id', supabaseUser.id);
+            profile = { ...profile, role: 'admin' };
           }
-        } else {
+
+          const currentUser = useStore.getState().user;
+          const newUserData = {
+            id: supabaseUser.id,
+            email: supabaseUser.email ?? '',
+            name: profile?.name || 'Usuario',
+            role: profile?.role || (isAdmin ? 'admin' : 'student'),
+            lives: profile?.lives ?? 3,
+            streak: profile?.streak ?? 0,
+            license_level: profile?.license_level ?? 1,
+            weight: profile?.weight ?? 0,
+            dominant_hand: profile?.dominant_hand ?? 'Derecha',
+            goal: profile?.goal ?? '',
+            age: profile?.age,
+            height: profile?.height,
+            is_new_user: profile?.is_new_user ?? true,
+            tutorial_completed: profile?.tutorial_completed ?? false,
+            fitness_goal: profile?.fitness_goal as any,
+            profile_pic: profile?.profile_pic,
+            before_pic: profile?.before_pic,
+            after_pic: profile?.after_pic,
+            plan: profile?.plan,
+            plan_id: profile?.plan_id,
+            plan_name: profile?.plan_name,
+            plan_status: profile?.plan_status as any ?? 'none',
+            plan_start_date: profile?.plan_start_date,
+            classes_per_month: profile?.classes_per_month ?? 0,
+            classes_remaining: profile?.classes_remaining ?? 0,
+            gender: profile?.gender as any,
+            last_workout: profile?.last_workout,
+            xp: profile?.xp ?? 0,
+            created_at: profile?.created_at,
+          };
+
+          const mergedUser = currentUser
+            ? {
+              ...currentUser,
+              ...newUserData,
+              height: newUserData.height ?? currentUser.height,
+              weight: newUserData.weight ?? currentUser.weight,
+              dominant_hand: newUserData.dominant_hand ?? currentUser.dominant_hand,
+              age: newUserData.age ?? currentUser.age,
+              gender: newUserData.gender ?? currentUser.gender,
+              profile_pic: newUserData.profile_pic ?? currentUser.profile_pic,
+            }
+            : newUserData;
+
+          if (!currentUser || JSON.stringify(mergedUser) !== JSON.stringify(currentUser)) {
+            setUser(mergedUser);
+          }
+        } catch (err) {
+          console.error('[App] Error cargando perfil:', err);
           setUser(null);
         }
-        setLoading(false);
+      } else {
+        setUser(null);
+      }
+      
+      if (mounted) setLoading(false);
+    };
+
+    // 1. Obtener la sesión inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session);
+    });
+
+    // 2. Escuchar cambios futuros
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        handleSession(session);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [setUser]);
 
   // ── Suscripción realtime al perfil del usuario actual ────────────────────

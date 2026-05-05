@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { db } from '../lib/firebase';
-import {
-  doc,
-  updateDoc,
-  setDoc,
-  getDoc,
-  serverTimestamp,
-  collection,
-  addDoc,
-} from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import {
   ArrowLeft,
   CreditCard,
@@ -183,70 +174,45 @@ export function Plans() {
 
   const handlePaymentSubmit = async () => {
     if (!user || !selectedPlan || !paymentFile || selectedClasses.length === 0) return;
-
     setIsUploading(true);
     try {
-      // 1. Convertir imagen a base64 para evitar errores de Firebase Storage
-      const receiptBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(paymentFile);
-      });
+      const ext = paymentFile.name.split('.').pop() || 'jpg';
+      const path = `pagos/${user.id}/plan_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('gpte-videos').upload(path, paymentFile, { upsert: true });
+      if (upErr) throw new Error(upErr.message);
+      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
+      const receiptUrl = urlData.publicUrl;
 
-      // 2. Actualizar plan del usuario con la imagen en base64
-      const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, {
-        plan_id: selectedPlan.id,
-        plan_name: selectedPlan.name,
-        plan_status: 'pending_approval',
-        classes_per_month: allowedClasses,
-        classes_remaining: allowedClasses,
-        receipt_url: receiptBase64,
-        receipt_filename: paymentFile.name,
-        receipt_uploaded_at: serverTimestamp(),
-      });
+      await supabase.from('profiles').update({
+        plan_id: selectedPlan.id, plan_name: selectedPlan.name, plan_status: 'pending_approval',
+        classes_per_month: allowedClasses, classes_remaining: allowedClasses,
+        receipt_url: receiptUrl,
+      }).eq('id', user.id);
 
-      // 3. Crear Reservas (estado pending)
       for (const cls of selectedClasses) {
-        await addDoc(collection(db, 'bookings'), {
-          user_id: user.id,
-          user_name: user.name,
-          user_email: user.email || '',
-          class_id: cls.avail.id,
-          date: format(cls.date, 'yyyy-MM-dd'),
+        await supabase.from('bookings').insert({
+          user_id: user.id, user_name: user.name, user_email: user.email || '',
+          class_id: cls.avail.id, date: format(cls.date, 'yyyy-MM-dd'),
           time: `${cls.avail.start_time} - ${cls.avail.end_time}`,
-          status: 'pending',
-          created_at: serverTimestamp(),
-          receipt_filename: paymentFile.name,
+          status: 'pending', created_at: new Date().toISOString(),
         });
       }
 
-      // 4. Registrar descuento si aplica
       if (qualifiesForDiscount) {
-        await addDoc(collection(db, 'payments'), {
-          user_id: user.id,
-          user_name: user.name,
-          user_email: user.email || '',
-          plan_id: selectedPlan.id,
-          plan_name: selectedPlan.name,
-          original_price: currentPrice,
-          discount_percent: discountPercent,
-          discount_amount: discountAmount,
-          final_price: finalPrice,
-          discount_reason: 'Descuento nuevo estudiante 10% — plan 12+ clases primeros 3 meses',
-          classes_per_month: allowedClasses,
-          status: 'submitted',
-          submitted_at: serverTimestamp(),
-          payment_mode: selectedDateMode,
+        await supabase.from('payments').insert({
+          user_id: user.id, plan_id: selectedPlan.id, plan_name: selectedPlan.name,
+          original_price: currentPrice, discount_percent: discountPercent,
+          discount_amount: discountAmount, final_price: finalPrice,
+          discount_reason: 'Descuento nuevo estudiante 10%',
+          classes_per_month: allowedClasses, status: 'submitted',
+          created_at: new Date().toISOString(),
         });
       }
 
       setCurrentStep(4);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error: any) {
-      console.error('Error submitting payment:', error);
-      alert('Hubo un error al enviar el comprobante: ' + error.message);
+      alert('Error al enviar el comprobante: ' + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -256,36 +222,24 @@ export function Plans() {
     if (!user || !selectedPlan || selectedClasses.length === 0) return;
     setIsUploading(true);
     try {
-      const userRef = doc(db, 'users', String(user.id));
-      await updateDoc(userRef, {
-        plan_id: selectedPlan.id,
-        plan_name: selectedPlan.name,
-        plan_status: 'pending_approval',
-        classes_per_month: allowedClasses,
-        classes_remaining: allowedClasses,
+      await supabase.from('profiles').update({
+        plan_id: selectedPlan.id, plan_name: selectedPlan.name, plan_status: 'pending_approval',
+        classes_per_month: allowedClasses, classes_remaining: allowedClasses,
         receipt_url: 'whatsapp_pending',
-      });
+      }).eq('id', user.id);
 
       for (const cls of selectedClasses) {
-        await addDoc(collection(db, 'bookings'), {
-          user_id: user.id,
-          user_name: user.name,
-          class_id: cls.avail.id,
-          date: format(cls.date, 'yyyy-MM-dd'),
-          time: cls.avail.start_time,
-          status: 'pending',
-          created_at: serverTimestamp(),
-          receipt_url: 'whatsapp_pending',
+        await supabase.from('bookings').insert({
+          user_id: user.id, user_name: user.name, class_id: cls.avail.id,
+          date: format(cls.date, 'yyyy-MM-dd'), time: cls.avail.start_time,
+          status: 'pending', created_at: new Date().toISOString(), receipt_url: 'whatsapp_pending',
         });
       }
-
-      const message = `Hola, mi nombre es ${user.name}. Acabo de solicitar el plan ${selectedPlan.name} en la app y por aquí adjuntaré mi comprobante de pago.`;
-      window.open(`https://wa.me/573022028477?text=${encodeURIComponent(message)}`, '_blank');
-
+      const msg = `Hola, mi nombre es ${user.name}. Acabo de solicitar el plan ${selectedPlan.name} en la app y por aquí adjuntaré mi comprobante de pago.`;
+      window.open(`https://wa.me/573022028477?text=${encodeURIComponent(msg)}`, '_blank');
       setCurrentStep(4);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error: any) {
-      console.error('Error in WhatsApp bypass:', error);
       alert('Error en el sistema de reservas: ' + error.message);
     } finally {
       setIsUploading(false);
@@ -295,16 +249,9 @@ export function Plans() {
   const simulateAdminApproval = async () => {
     if (!user || !selectedPlan) return;
     try {
-      const userRef = doc(db, 'users', String(user.id));
-      await updateDoc(userRef, {
-        plan_status: 'active',
-      });
-      // Also update pending bookings
-      // Done in a real backend, but for simulation we just change UI state
+      await supabase.from('profiles').update({ plan_status: 'active' }).eq('id', user.id);
       setCurrentStep(5);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   // Calendar Helpers for Step 2

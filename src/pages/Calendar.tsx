@@ -40,21 +40,7 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '../lib/firebase';
-import {
-  collection,
-  addDoc,
-  deleteDoc,
-  doc,
-  query,
-  where,
-  setDoc,
-  onSnapshot,
-  updateDoc,
-  getDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { sendPushNotification } from '../lib/fcmService';
+import { supabase } from '../lib/supabase';
 import { Modal } from '../components/Modal';
 import { sendEmail } from '../lib/email';
 
@@ -146,9 +132,7 @@ export function Calendar() {
   const handleSaveField = async () => {
     if (!selectedTime || !editingField) return;
     try {
-      await updateDoc(doc(db, 'availabilities', selectedTime.id), {
-        [editingField]: editingFieldValue,
-      });
+      await supabase.from('availabilities').update({ [editingField]: editingFieldValue }).eq('id', selectedTime.id);
       setEditingField(null);
     } catch (err) {
       console.error('Error saving field:', err);
@@ -172,12 +156,11 @@ export function Calendar() {
     if (!selectedStudentForSchedule) return;
     setIsUpdatingPlan(true);
     try {
-      const userRef = doc(db, 'users', selectedStudentForSchedule.id);
-      await updateDoc(userRef, {
+      await supabase.from('profiles').update({
         classes_per_month: totalPlanCount,
         classes_remaining: newPlanCount,
         plan_status: newPlanCount > 0 ? 'active' : 'inactive',
-      });
+      }).eq('id', selectedStudentForSchedule.id);
       setSelectedStudentForSchedule({
         ...selectedStudentForSchedule,
         classes_per_month: totalPlanCount,
@@ -185,11 +168,7 @@ export function Calendar() {
         plan_status: newPlanCount > 0 ? 'active' : 'inactive',
       });
       setIsEditingPlan(false);
-      setAlertModal({
-        show: true,
-        message: '✅ Plan y clases restantes actualizados.',
-        type: 'success',
-      });
+      setAlertModal({ show: true, message: '✅ Plan y clases restantes actualizados.', type: 'success' });
     } catch (err) {
       console.error('Error updating plan:', err);
       setAlertModal({ show: true, message: 'Error al actualizar el plan.', type: 'info' });
@@ -198,22 +177,11 @@ export function Calendar() {
     }
   };
 
-  const fetchBookings = () => {
-    if (!user) return () => {};
-    const q = query(collection(db, 'bookings'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Booking);
-      setAllBookings(allData);
-    });
-    return () => unsubscribe();
-  };
-
   useEffect(() => {
     let targetId = String(user?.id);
     if (isAdmin && selectedStudentForSchedule) {
       targetId = String(selectedStudentForSchedule.id);
     }
-
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const filtered = allBookings.filter(
       (b) => b.user_id === targetId && b.date >= todayStr && b.status !== 'cancelled'
@@ -221,36 +189,53 @@ export function Calendar() {
     setBookings(filtered);
   }, [allBookings, user?.id, selectedStudentForSchedule, isAdmin]);
 
-  const fetchAvailabilities = () => {
-    if (!user) return () => {};
-    const unsubscribe = onSnapshot(collection(db, 'availabilities'), (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Availability);
-      setAvailabilities(data);
-    });
-    return () => unsubscribe();
-  };
-
   useEffect(() => {
     if (!user) return;
-    const unsubAvail = fetchAvailabilities();
-    const unsubBookings = fetchBookings();
-    const unsubExceptions = onSnapshot(collection(db, 'availability_exceptions'), (snap) => {
-      setExceptions(snap.docs.map((d) => d.data() as { slot_id: string; date: string }));
-    });
-    let unsubUsers: (() => void) | undefined;
-    if (isAdmin) {
-      unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-        const students = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }) as User)
-          .filter((u) => u.role !== 'admin' && u.email && u.name);
-        setAllRegisteredUsers(students);
-      });
-    }
+
+    // Cargar datos iniciales
+    const loadAll = async () => {
+      const [availRes, bookRes, excRes] = await Promise.all([
+        supabase.from('availabilities').select('*'),
+        supabase.from('bookings').select('*'),
+        supabase.from('availability_exceptions').select('slot_id, date'),
+      ]);
+      if (availRes.data) setAvailabilities(availRes.data as Availability[]);
+      if (bookRes.data) setAllBookings(bookRes.data as Booking[]);
+      if (excRes.data) setExceptions(excRes.data as { slot_id: string; date: string }[]);
+
+      if (isAdmin) {
+        const { data: students } = await supabase
+          .from('profiles')
+          .select('*')
+          .neq('role', 'admin');
+        if (students) setAllRegisteredUsers(students as User[]);
+      }
+    };
+    loadAll();
+
+    // Suscripciones realtime
+    const availChannel = supabase.channel('avail-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'availabilities' }, async () => {
+        const { data } = await supabase.from('availabilities').select('*');
+        if (data) setAvailabilities(data as Availability[]);
+      }).subscribe();
+
+    const bookChannel = supabase.channel('book-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, async () => {
+        const { data } = await supabase.from('bookings').select('*');
+        if (data) setAllBookings(data as Booking[]);
+      }).subscribe();
+
+    const excChannel = supabase.channel('exc-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_exceptions' }, async () => {
+        const { data } = await supabase.from('availability_exceptions').select('slot_id, date');
+        if (data) setExceptions(data as { slot_id: string; date: string }[]);
+      }).subscribe();
+
     return () => {
-      unsubAvail();
-      unsubBookings();
-      unsubExceptions();
-      if (unsubUsers) unsubUsers();
+      supabase.removeChannel(availChannel);
+      supabase.removeChannel(bookChannel);
+      supabase.removeChannel(excChannel);
     };
   }, [user, isAdmin]);
 
@@ -282,47 +267,27 @@ export function Calendar() {
       const timeStr = `${selectedTime.start_time} - ${selectedTime.end_time}`;
       const status = isManualPayment ? 'pending_payment' : 'active';
 
-      await addDoc(collection(db, 'bookings'), {
+      await supabase.from('bookings').insert({
         user_id: String(targetUser.id),
         user_name: targetUser.name,
         user_email: targetUser.email || '',
         class_id: selectedTime.id,
         date: dateStr,
         time: timeStr,
-        status: status,
+        status,
         created_at: new Date().toISOString(),
       });
 
       if (status === 'active') {
         const newRemaining = Math.max(0, (targetUser.classes_remaining || 0) - 1);
-        await updateDoc(doc(db, 'users', targetUser.id), { classes_remaining: newRemaining });
+        await supabase.from('profiles').update({ classes_remaining: newRemaining }).eq('id', targetUser.id);
         if (targetUser.id === user?.id) setUser({ ...user!, classes_remaining: newRemaining });
 
         try {
-          const emailHtml = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f1f5f9; padding: 32px; border-radius: 16px;">
-              <div style="text-align: center; margin-bottom: 24px;">
-                <h1 style="color: #3f83f8; font-size: 28px; font-weight: 900; text-transform: uppercase;">🥊 GUANTES</h1>
-                <p style="color: #64748b; font-size: 12px; letter-spacing: 3px;">PARA ENCAJARTE</p>
-              </div>
-              <div style="background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-                <h2 style="color: #22c55e;">✅ ¡Clase Confirmada!</h2>
-                <p>Hola <strong>${targetUser.name}</strong>, tu reserva para el <strong>${format(selectedDate, "d 'de' MMMM", { locale: es })}</strong> a las <strong>${timeStr}</strong> ha sido exitosa.</p>
-              </div>
-            </div>
-          `;
-          await sendEmail(
-            targetUser.email || '',
-            '📅 Clase Confirmada — Guantes Para Encajarte',
-            emailHtml
-          );
-          await sendPushNotification(
-            targetUser.id,
-            '✅ Clase Confirmada',
-            `Tu reserva para el ${format(selectedDate, "d 'de' MMMM", { locale: es })} a las ${timeStr} ha sido exitosa.`
-          );
+          const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px;"><h2 style="color:#22c55e;">✅ ¡Clase Confirmada!</h2><p>Hola <strong>${targetUser.name}</strong>, tu reserva para el <strong>${format(selectedDate, "d 'de' MMMM", { locale: es })}</strong> a las <strong>${timeStr}</strong> ha sido exitosa.</p></div>`;
+          await sendEmail(targetUser.email || '', '📅 Clase Confirmada — Guantes Para Encajarte', emailHtml);
         } catch (e) {
-          console.warn('Booking notification error:', e);
+          console.warn('Booking email error:', e);
         }
       }
 
@@ -340,55 +305,23 @@ export function Calendar() {
   const handleCancelBooking = async (bookingId: string) => {
     if (!window.confirm('¿Deseas cancelar esta reserva?')) return;
     try {
-      const bookingRef = doc(db, 'bookings', bookingId);
-      const bookingSnap = await getDoc(bookingRef);
-      if (bookingSnap.exists()) {
-        const bookingData = bookingSnap.data();
-        await updateDoc(bookingRef, { status: 'cancelled' });
+      const { data: bookingData } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+      if (bookingData) {
+        await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
         if (bookingData.status === 'active') {
-          const userRef = doc(db, 'users', bookingData.user_id);
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            const newRemaining = (userSnap.data().classes_remaining || 0) + 1;
-            await updateDoc(userRef, { classes_remaining: newRemaining });
-            if (bookingData.user_id === user?.id)
-              setUser({ ...user!, classes_remaining: newRemaining });
+          const { data: profileData } = await supabase.from('profiles').select('classes_remaining').eq('id', bookingData.user_id).single();
+          if (profileData) {
+            const newRemaining = (profileData.classes_remaining || 0) + 1;
+            await supabase.from('profiles').update({ classes_remaining: newRemaining }).eq('id', bookingData.user_id);
+            if (bookingData.user_id === user?.id) setUser({ ...user!, classes_remaining: newRemaining });
           }
         }
+        try {
+          const cancelHtml = `<div style="font-family:Arial,sans-serif;padding:32px;background:#0f172a;color:#f1f5f9;border-radius:16px;"><h2 style="color:#ef4444;">❌ Clase Cancelada</h2><p>Tu reserva para el <strong>${bookingData.date}</strong> a las <strong>${bookingData.time}</strong> ha sido cancelada. La clase fue devuelta a tu plan.</p></div>`;
+          await sendEmail(bookingData.user_email || '', '❌ Clase Cancelada — Guantes Para Encajarte', cancelHtml);
+        } catch (e) { console.warn('Cancel email error:', e); }
       }
       setAlertModal({ show: true, message: 'Reserva cancelada.', type: 'info' });
-
-      // Notificaciones de cancelación
-      try {
-        const bookingData = (await getDoc(doc(db, 'bookings', bookingId))).data();
-        if (bookingData) {
-          const cancelEmailHtml = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f1f5f9; padding: 32px; border-radius: 16px;">
-              <div style="text-align: center; margin-bottom: 24px;">
-                <h1 style="color: #ef4444; font-size: 28px; font-weight: 900; text-transform: uppercase;">🥊 GUANTES</h1>
-                <p style="color: #64748b; font-size: 12px; letter-spacing: 3px;">PARA ENCAJARTE</p>
-              </div>
-              <div style="background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-                <h2 style="color: #ef4444;">❌ Clase Cancelada</h2>
-                <p>Tu reserva para el <strong>${bookingData.date}</strong> a las <strong>${bookingData.time}</strong> ha sido cancelada.</p>
-                <p style="font-size: 12px; color: #64748b; margin-top: 16px;">Se ha devuelto la clase a tu plan si era una reserva activa.</p>
-              </div>
-            </div>
-          `;
-          await sendEmail(
-            bookingData.user_email || '',
-            '❌ Clase Cancelada — Guantes Para Encajarte',
-            cancelEmailHtml
-          );
-          await sendPushNotification(
-            bookingData.user_id,
-            '❌ Clase Cancelada',
-            `Tu reserva para el ${bookingData.date} ha sido cancelada.`
-          );
-        }
-      } catch (e) {
-        console.warn('Cancellation notification error:', e);
-      }
     } catch (err) {
       console.error(err);
     }
@@ -399,20 +332,13 @@ export function Calendar() {
     if (!slot) return;
     try {
       const sameSlots = availabilities.filter(
-        (a) =>
-          a.day_of_week === slot.day_of_week &&
-          a.start_time === slot.start_time &&
-          a.end_time === slot.end_time
+        (a) => a.day_of_week === slot.day_of_week && a.start_time === slot.start_time && a.end_time === slot.end_time
       );
       for (const s of sameSlots) {
-        await deleteDoc(doc(db, 'availabilities', s.id));
+        await supabase.from('availabilities').delete().eq('id', s.id);
       }
       setDeleteSlotConfirm({ show: false, slot: null, mode: 'permanent' });
-      setAlertModal({
-        show: true,
-        message: `✅ Horario eliminado correctamente.`,
-        type: 'success',
-      });
+      setAlertModal({ show: true, message: '✅ Horario eliminado correctamente.', type: 'success' });
     } catch (err) {
       console.error('Error deleting slot:', err);
     }
@@ -423,17 +349,9 @@ export function Calendar() {
     if (!slot) return;
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      await addDoc(collection(db, 'availability_exceptions'), {
-        slot_id: slot.id,
-        date: dateStr,
-        created_at: serverTimestamp(),
-      });
+      await supabase.from('availability_exceptions').insert({ slot_id: slot.id, date: dateStr });
       setDeleteSlotConfirm({ show: false, slot: null, mode: 'today_only' });
-      setAlertModal({
-        show: true,
-        message: `✅ Horario ocultado solo para el ${dateStr}.`,
-        type: 'success',
-      });
+      setAlertModal({ show: true, message: `✅ Horario ocultado solo para el ${dateStr}.`, type: 'success' });
     } catch (err) {
       console.error('Error creating exception:', err);
     }
@@ -1143,15 +1061,11 @@ export function Calendar() {
             e.preventDefault();
             try {
               if (editingAvailabilityId) {
-                await updateDoc(doc(db, 'availabilities', editingAvailabilityId), newAvailability);
+                await supabase.from('availabilities').update(newAvailability).eq('id', editingAvailabilityId);
               } else {
-                await addDoc(collection(db, 'availabilities'), newAvailability);
+                await supabase.from('availabilities').insert(newAvailability);
               }
-              setAlertModal({
-                show: true,
-                message: '✅ Horario actualizado con éxito.',
-                type: 'success',
-              });
+              setAlertModal({ show: true, message: '✅ Horario actualizado con éxito.', type: 'success' });
               setShowAddAvailability(false);
               setEditingAvailabilityId(null);
             } catch (err: any) {

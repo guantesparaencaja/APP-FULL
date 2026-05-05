@@ -9,14 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadVideoToDrive, hardDeleteVideo, approveVideoWithAudit } from '../lib/driveService';
-import { db, storage } from '../lib/firebase';
-import {
-  collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc,
-  query, where, getDocs,
-} from 'firebase/firestore';
-import {
-  ref, uploadBytesResumable, uploadBytes, getDownloadURL, deleteObject,
-} from 'firebase/storage';
+import { supabase } from '../lib/supabase';
 import { getYouTubeEmbedUrl } from '../services/geminiService';
 import { Modal } from '../components/Modal';
 import { LazyVideoWrapper } from '../components/LazyVideoWrapper';
@@ -34,13 +27,7 @@ import {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const deleteStorageFile = async (url?: string) => {
-  if (!url || !url.includes('firebasestorage.googleapis.com')) return;
-  try {
-    const fileRef = ref(storage, url);
-    await deleteObject(fileRef);
-  } catch (error) {
-    console.warn('[Workouts] Could not delete file from storage:', url, error);
-  }
+  if (!url || url.includes('firebasestorage.googleapis.com')) return; // Firebase URLs ignored, Supabase handled via bucket
 };
 
 const EMPTY_FILTERS: WorkoutFilters = {
@@ -101,32 +88,23 @@ export function Workouts() {
 
   // ─── Firebase Listeners ──────────────────────────────────────────────────
   useEffect(() => {
-    const unsubCategories = onSnapshot(
-      collection(db, 'workout_categories'),
-      (snap) => setCategories(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as WorkoutCategory)),
-      (err) => console.error('[Workouts] Categories error:', err)
-    );
-
-    const unsubVideos = onSnapshot(
-      collection(db, 'workout_videos'),
-      (snap) => {
-        setVideos(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as WorkoutVideo));
-        setIsLoading(false);
-      },
-      (err) => { console.error('[Workouts] Videos error:', err); setIsLoading(false); }
-    );
-
-    let unsubRoutines: (() => void) | undefined;
-    if (user) {
-      const q = query(collection(db, 'custom_routines'), where('user_id', '==', String(user.id)));
-      unsubRoutines = onSnapshot(q,
-        (snap) => setUserRoutines(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CustomRoutine)),
-        (err) => console.error('[Workouts] Routines error:', err)
-      );
-    }
-
-    return () => { unsubCategories(); unsubVideos(); if (unsubRoutines) unsubRoutines(); };
-  }, [user]);
+    const load = async () => {
+      const { data: cats } = await supabase.from('workout_categories').select('*');
+      if (cats) setCategories(cats as WorkoutCategory[]);
+      const { data: vids } = await supabase.from('workout_videos').select('*');
+      if (vids) { setVideos(vids as WorkoutVideo[]); setIsLoading(false); }
+      if (user) {
+        const { data: routines } = await supabase.from('custom_routines').select('*').eq('user_id', String(user.id));
+        if (routines) setUserRoutines(routines as CustomRoutine[]);
+      }
+    };
+    load();
+    const ch = supabase.channel('workouts-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workout_categories' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workout_videos' }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id]);
 
   // ─── Filtered videos ─────────────────────────────────────────────────────
   const filteredVideos = videos
@@ -212,21 +190,12 @@ export function Workouts() {
   };
 
   const handleDeleteVideo = async (id: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar Video',
-      message: '¿Deseas eliminar este video permanentemente de todas las plataformas?',
+    setConfirmDialog({ isOpen: true, title: 'Eliminar Video', message: '¿Deseas eliminar este video permanentemente?',
       onConfirm: async () => {
         try {
           const vid = videos.find((v) => v.id === id);
-          if (vid) {
-            await hardDeleteVideo(id, {
-              video_url: vid.video_url, cover_url: vid.cover_url,
-              title: vid.title, adminId: user?.id,
-            });
-          } else {
-            await deleteDoc(doc(db, 'workout_videos', id));
-          }
+          if (vid) { await hardDeleteVideo(id, { video_url: vid.video_url, cover_url: vid.cover_url, title: vid.title, adminId: user?.id }); }
+          else { await supabase.from('workout_videos').delete().eq('id', id); }
           setVideos((vids) => vids.filter((v) => v.id !== id));
           setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
         } catch (err) { console.error('[Workouts] Error deleting:', err); }
@@ -259,27 +228,19 @@ export function Workouts() {
     e.preventDefault();
     if (!newCategoryName.trim()) return;
     try {
-      const ref_ = await addDoc(collection(db, 'workout_categories'), { name: newCategoryName });
-      setCategories([...categories, { id: ref_.id, name: newCategoryName }]);
-      setNewCategoryName('');
-      setShowAddCategory(false);
+      const { data } = await supabase.from('workout_categories').insert({ name: newCategoryName }).select().single();
+      if (data) setCategories([...categories, data as WorkoutCategory]);
+      setNewCategoryName(''); setShowAddCategory(false);
     } catch (err) { console.error('[Workouts] Error adding category:', err); }
   };
 
   const handleDeleteCategory = async (id: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar Categoría',
-      message: '¿Eliminar esta categoría y todos sus videos asociados?',
+    setConfirmDialog({ isOpen: true, title: 'Eliminar Categoría', message: '¿Eliminar esta categoría y todos sus videos asociados?',
       onConfirm: async () => {
         try {
-          await deleteDoc(doc(db, 'workout_categories', id));
+          await supabase.from('workout_categories').delete().eq('id', id);
           const toDelete = videos.filter((v) => v.category_id === id);
-          for (const vid of toDelete) {
-            await deleteStorageFile(vid.video_url);
-            await deleteStorageFile(vid.cover_url);
-            await deleteDoc(doc(db, 'workout_videos', vid.id));
-          }
+          for (const vid of toDelete) { await hardDeleteVideo(vid.id, { video_url: vid.video_url, cover_url: vid.cover_url, title: vid.title, adminId: user?.id }); }
           setCategories(categories.filter((c) => c.id !== id));
           setVideos(videos.filter((v) => v.category_id !== id));
           setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
@@ -319,10 +280,12 @@ export function Workouts() {
   };
 
   const handleFileUpload = async (file: File, path: string): Promise<string> => {
-    const safeName = file.name.replace(/\s+/g, '_');
-    const storageRef = ref(storage, `${path}/${Date.now()}_${safeName}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    return getDownloadURL(snapshot.ref);
+    const ext = file.name.split('.').pop();
+    const storagePath = `${path}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('gpte-videos').upload(storagePath, file, { upsert: true });
+    if (error) throw error;
+    const { data } = supabase.storage.from('gpte-videos').getPublicUrl(storagePath);
+    return data.publicUrl;
   };
 
   const handleSubmitVideo = async (e: React.FormEvent) => {
@@ -354,14 +317,11 @@ export function Workouts() {
       }
 
       let finalCategoryId = uploadForm.categoryId;
-      const existingCat = categories.find(
-        (c) => c.id === finalCategoryId || c.name.toLowerCase() === finalCategoryId.toLowerCase()
-      );
-      if (existingCat) {
-        finalCategoryId = existingCat.id;
-      } else {
-        const docRef = await addDoc(collection(db, 'workout_categories'), { name: finalCategoryId });
-        finalCategoryId = docRef.id;
+      const existingCat = categories.find((c) => c.id === finalCategoryId || c.name.toLowerCase() === finalCategoryId.toLowerCase());
+      if (existingCat) { finalCategoryId = existingCat.id; }
+      else {
+        const { data: newCat } = await supabase.from('workout_categories').insert({ name: finalCategoryId }).select().single();
+        if (newCat) finalCategoryId = (newCat as any).id;
       }
 
       const videoData = {
@@ -389,9 +349,9 @@ export function Workouts() {
       });
 
       if (editingVideo) {
-        await updateDoc(doc(db, 'workout_videos', editingVideo.id), videoData);
+        await supabase.from('workout_videos').update(videoData).eq('id', editingVideo.id);
       } else {
-        await addDoc(collection(db, 'workout_videos'), videoData);
+        await supabase.from('workout_videos').insert(videoData);
       }
 
       handleCloseUploadModal();
@@ -408,14 +368,13 @@ export function Workouts() {
   const cleanupDuplicateVideos = async () => {
     if (!window.confirm('¿Buscar y eliminar videos duplicados por URL?')) return;
     try {
-      const snap = await getDocs(collection(db, 'workout_videos'));
-      const seen = new Set<string>();
-      let removed = 0;
-      for (const d of snap.docs) {
-        const url = d.data().video_url;
-        if (!url) continue;
-        if (seen.has(url)) { await deleteDoc(d.ref); removed++; }
-        else seen.add(url);
+      const { data } = await supabase.from('workout_videos').select('id,video_url');
+      if (!data) return;
+      const seen = new Set<string>(); let removed = 0;
+      for (const d of data) {
+        if (!d.video_url) continue;
+        if (seen.has(d.video_url)) { await supabase.from('workout_videos').delete().eq('id', d.id); removed++; }
+        else seen.add(d.video_url);
       }
       alert(`Limpieza: ${removed} duplicados eliminados.`);
     } catch (err) { console.error(err); }

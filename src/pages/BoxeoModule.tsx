@@ -5,8 +5,7 @@ import {
   Upload, X, Check, Loader2, Edit2, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { db, storage } from '../lib/firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadVideoToDrive } from '../lib/driveService';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
@@ -118,22 +117,25 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'boxeo_videos'), snap => {
-      setVideos(snap.docs.map(d => ({ id: d.id, ...d.data() } as BoxeoVideo)));
+    const load = async () => {
+      const { data, error } = await supabase.from('boxeo_videos').select('*').order('orden');
+      if (!error && data) setVideos(data as BoxeoVideo[]);
       setLoading(false);
-    }, err => { console.error('boxeo_videos:', err); setLoading(false); });
-    return () => unsub();
+    };
+    load();
+    const channel = supabase.channel('boxeo-videos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'boxeo_videos' }, async () => {
+        const { data } = await supabase.from('boxeo_videos').select('*').order('orden');
+        if (data) setVideos(data as BoxeoVideo[]);
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   useEffect(() => {
     if (!user) return;
-    const load = async () => {
-      try {
-        const snap = await getDocs(collection(db, `users/${user.id}/boxeo_ocultos`));
-        setHiddenIds(new Set(snap.docs.map(d => d.id)));
-      } catch (_) {}
-    };
-    load();
+    supabase.from('boxeo_ocultos').select('video_id').eq('user_id', user.id).then(({ data }) => {
+      if (data) setHiddenIds(new Set(data.map((r: any) => r.video_id)));
+    });
   }, [user?.id]);
 
   // ── Auto-Seed silencioso con Lyfta URLs ───────────────────────────────────
@@ -143,19 +145,13 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     setSeeding(true);
     try {
       if (videos.length === 0) {
-        // Crear videos base desde SEED_VIDEOS
         for (const v of SEED_VIDEOS) {
-          await addDoc(collection(db, 'boxeo_videos'), { ...v, creado_en: serverTimestamp(), activo: true });
+          await supabase.from('boxeo_videos').insert({ ...v, activo: true });
         }
       }
-      // Actualizar URLs de Lyfta (silencioso)
       const { seedBoxeoVideos } = await import('../scripts/seedVideos');
       await seedBoxeoVideos();
-    } catch (e: any) {
-      console.error('[BoxeoModule] seed error:', e.message);
-    } finally {
-      setSeeding(false);
-    }
+    } catch (e: any) { console.error('[BoxeoModule] seed error:', e.message); } finally { setSeeding(false); }
   };
 
   // Auto-seed silencioso al cargar si no hay videos
@@ -173,9 +169,8 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const handleHide = async (video: BoxeoVideo) => {
     if (!user) return;
     setHiddenIds(prev => new Set([...prev, video.id]));
-    setUndoVideo(video);
-    setSelectedVideo(null);
-    try { await setDoc(doc(db, `users/${user.id}/boxeo_ocultos`, video.id), { hidden_at: serverTimestamp() }); } catch (_) {}
+    setUndoVideo(video); setSelectedVideo(null);
+    try { await supabase.from('boxeo_ocultos').upsert({ user_id: user.id, video_id: video.id }); } catch (_) {}
     if (undoTimer.current) clearTimeout(undoTimer.current);
     undoTimer.current = setTimeout(() => setUndoVideo(null), 5000);
   };
@@ -183,7 +178,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const handleUndo = async () => {
     if (!user || !undoVideo) return;
     setHiddenIds(prev => { const n = new Set(prev); n.delete(undoVideo.id); return n; });
-    try { await deleteDoc(doc(db, `users/${user.id}/boxeo_ocultos`, undoVideo.id)); } catch (_) {}
+    try { await supabase.from('boxeo_ocultos').delete().eq('user_id', user.id).eq('video_id', undoVideo.id); } catch (_) {}
     setUndoVideo(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);
   };
@@ -244,26 +239,15 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
         ...addForm,
         puntos_clave: typeof addForm.puntos_clave === 'string' ? addForm.puntos_clave.split('\n').map(s => s.trim()).filter(Boolean) : addForm.puntos_clave,
         errores_comunes: typeof addForm.errores_comunes === 'string' ? addForm.errores_comunes.split('\n').map(s => s.trim()).filter(Boolean) : addForm.errores_comunes,
-        actualizado_en: serverTimestamp(),
+        updated_at: new Date().toISOString(),
       };
-
       if (editingVideoId) {
-        await updateDoc(doc(db, 'boxeo_videos', editingVideoId), data);
+        await supabase.from('boxeo_videos').update(data).eq('id', editingVideoId);
       } else {
-        await addDoc(collection(db, 'boxeo_videos'), {
-          ...data,
-          activo: true,
-          orden: 999,
-          creado_en: serverTimestamp(),
-        });
+        await supabase.from('boxeo_videos').insert({ ...data, activo: true, orden: 999, created_at: new Date().toISOString() });
       }
-      setShowAddModal(false);
-      setEditingVideoId(null);
-      setAddForm(defaultForm);
-      setSelectedFile(null);
-    } catch (err: any) {
-      alert('Error: ' + err.message);
-    }
+      setShowAddModal(false); setEditingVideoId(null); setAddForm(defaultForm); setSelectedFile(null);
+    } catch (err: any) { alert('Error: ' + err.message); }
   };
 
   const openEditModal = (v: BoxeoVideo) => {
@@ -284,13 +268,12 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
 
   // ── Admin: Toggle active ───────────────────────────────────────────────────
   const handleToggleActive = async (v: BoxeoVideo) => {
-    await updateDoc(doc(db, 'boxeo_videos', v.id), { activo: !v.activo });
+    await supabase.from('boxeo_videos').update({ activo: !v.activo }).eq('id', v.id);
   };
 
-  // ── Admin: Delete ──────────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este video permanentemente?')) return;
-    await deleteDoc(doc(db, 'boxeo_videos', id));
+    await supabase.from('boxeo_videos').delete().eq('id', id);
   };
 
   // ── Derived data ───────────────────────────────────────────────────────────

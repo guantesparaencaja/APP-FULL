@@ -240,7 +240,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('[Supabase] VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY no configurados.');
 }
 
-export const supabase = createClient<Database>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const supabase = createClient<any>(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder',
   {

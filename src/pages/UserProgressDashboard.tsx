@@ -12,17 +12,8 @@ import {
   Target,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { db, auth } from '../lib/firebase';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  onSnapshot,
-  orderBy,
-  limit,
-  updateDoc,
-} from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
+import { useStore } from '../store/useStore';
 import { calculateStreak, StreakInfo } from '../utils/streakCalculator';
 import { ACHIEVEMENTS, Achievement } from '../utils/achievements';
 import { TrainingCalendar } from '../components/TrainingCalendar';
@@ -47,74 +38,33 @@ export const UserProgressDashboard: React.FC = () => {
   const [punchesToday, setPunchesToday] = useState<number | null>(null);
   const [punchInput, setPunchInput] = useState('');
   const [weeklyPlan, setWeeklyPlan] = useState<any[]>([]);
-  const user = auth.currentUser;
+  const user = useStore((s) => s.user);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
-    const userId = auth.currentUser.uid;
-
-    // ✅ onSnapshot para workout_history en tiempo real
-    const q = query(
-      collection(db, 'workout_history'),
-      where('userId', '==', userId),
-      orderBy('timestamp', 'desc')
-    );
-    const unsubWorkouts = onSnapshot(
-      q,
-      (querySnapshot) => {
-        const workoutData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as WorkoutRecord[];
-        setWorkouts(workoutData);
-        const dates = workoutData.filter((w) => w.timestamp).map((w) => w.timestamp.toDate());
+    if (!user) return;
+    const userId = String(user.id);
+    const load = async () => {
+      const { data: wh } = await supabase.from('workout_history').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
+      if (wh) {
+        setWorkouts(wh as WorkoutRecord[]);
+        const dates = wh.filter((w: any) => w.timestamp).map((w: any) => new Date(w.timestamp));
         setStreak(calculateStreak(dates));
-      },
-      (err) => {
-        console.error('Error en listener workout_history:', err);
       }
-    );
-
-    // ✅ onSnapshot para achievements en tiempo real
-    const aq = query(collection(db, 'user_achievements'), where('userId', '==', userId));
-    const unsubAchievements = onSnapshot(
-      aq,
-      (snap) => {
-        setUnlockedAchievements(snap.docs.map((doc) => doc.data().achievementId));
-      },
-      (err) => {
-        console.error('Error en listener achievements:', err);
-      }
-    );
-
-    // getDocs para datos de inicialización (plan semanal y punches_today)
-    const initData = async () => {
-      try {
-        const pq = query(collection(db, 'weekly_plans'), where('userId', '==', userId), limit(1));
-        const planSnapshot = await getDocs(pq);
-        setWeeklyPlan(planSnapshot.docs.map((doc) => doc.data().combos || []).flat());
-
-        if (auth.currentUser?.email) {
-          const uSnap = await getDocs(
-            query(collection(db, 'users'), where('email', '==', auth.currentUser.email))
-          );
-          if (!uSnap.empty) {
-            setPunchesToday(uSnap.docs[0].data().punches_today || 0);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching init data:', error);
-      } finally {
-        setLoading(false);
-      }
+      const { data: ach } = await supabase.from('user_achievements').select('achievement_id').eq('user_id', userId);
+      if (ach) setUnlockedAchievements(ach.map((a: any) => a.achievement_id));
+      const { data: plan } = await supabase.from('weekly_plans').select('combos').eq('user_id', userId).limit(1);
+      if (plan?.[0]) setWeeklyPlan(plan[0].combos || []);
+      const { data: profile } = await supabase.from('profiles').select('punches_today').eq('id', userId).single();
+      if (profile) setPunchesToday(profile.punches_today || 0);
+      setLoading(false);
     };
-    initData();
-
-    return () => {
-      unsubWorkouts();
-      unsubAchievements();
-    };
-  }, []);
+    load();
+    const ch = supabase.channel('progress-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workout_history', filter: `user_id=eq.${userId}` }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_achievements', filter: `user_id=eq.${userId}` }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id]);
 
   const totalMinutes = Math.floor(workouts.reduce((acc, w) => acc + w.durationSeconds, 0) / 60);
   const totalWorkouts = workouts.length;
@@ -123,18 +73,11 @@ export const UserProgressDashboard: React.FC = () => {
   const handleRegisterPunches = async () => {
     if (!user || !punchInput) return;
     try {
-      // Very basic implementation: just store it in the user doc
-      const uSnap = await getDocs(query(collection(db, 'users'), where('email', '==', user.email)));
-      if (!uSnap.empty) {
-        const uDoc = uSnap.docs[0];
-        const current = uDoc.data().punches_today || 0;
-        await updateDoc(uDoc.ref, { punches_today: current + parseInt(punchInput) });
-        setPunchesToday(current + parseInt(punchInput));
-        setPunchInput('');
-      }
-    } catch (e) {
-      console.error(e);
-    }
+      const current = punchesToday || 0;
+      const newCount = current + parseInt(punchInput);
+      await supabase.from('profiles').update({ punches_today: newCount }).eq('id', user.id);
+      setPunchesToday(newCount); setPunchInput('');
+    } catch (e) { console.error(e); }
   };
 
   if (loading) {

@@ -4,9 +4,7 @@ import { PlayCircle, CheckCircle, Lock, ArrowLeft, Upload, Check, Video, Plus, X
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { uploadVideoToDrive } from '../lib/driveService';
-import { storage, db } from '../lib/firebase';
-import { ref, deleteObject } from 'firebase/storage';
-import { collection, getDocs, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, where, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { sendPushNotification } from '../lib/fcmService';
 import { InteractiveLesson } from '../components/InteractiveLesson';
 import { BoxingGlossary } from '../components/BoxingGlossary';
@@ -191,21 +189,10 @@ export function Saberes() {
 
     try {
       for (const c of initialCombos) {
-        await addDoc(collection(db, 'combos'), {
-          name: c.name,
-          level: c.level,
-          video_approved: false,
-          manillas_approved: false,
-          contacto_approved: false,
-          desarrollo_approved: false
-        });
+        await supabase.from('combos').insert({ name: c.name, level: c.level, video_approved: false, manillas_approved: false, contacto_approved: false, desarrollo_approved: false });
       }
       alert('✅ 30 Combos técnicos cargados.');
-    } catch (err) {
-      console.error('Error seeding combos:', err);
-    } finally {
-      setSeeding(false);
-    }
+    } catch (err) { console.error('Error seeding combos:', err); } finally { setSeeding(false); }
   };
 
   const seedInitialTutorials = async () => {
@@ -239,74 +226,36 @@ export function Saberes() {
     ];
 
     try {
-      for (const t of initialTutorials) {
-        await addDoc(collection(db, 'tutorials'), t);
-      }
+      for (const t of initialTutorials) { await supabase.from('tutorials').insert(t); }
       alert('✅ Tutoriales iniciales cargados.');
-    } catch (err) {
-      console.error('Error seeding tutorials:', err);
-    } finally {
-      setSeeding(false);
-    }
+    } catch (err) { console.error('Error seeding tutorials:', err); } finally { setSeeding(false); }
   };
 
 
   useEffect(() => {
-    let unsubCombos = () => {};
-    let unsubUserEval = () => {};
-    let unsubAllEvals = () => {};
-    let unsubProgress = () => {};
-    let unsubTutorials = () => {};
-
-    if (user) {
-      // Combos
-      unsubCombos = onSnapshot(collection(db, 'combos'), (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Combo));
-        setCombos(data);
-      }, (err) => console.error(err));
-
-      // User Evaluations logic removed
-      
-      // All Evaluations (Admin) logic removed
-
-      // Combo Progress
-      let progressQuery: any = collection(db, 'combo_progress');
-      if (user.role !== 'admin' && user.role !== 'teacher') {
-        progressQuery = query(collection(db, 'combo_progress'), where('user_id', '==', String(user.id)));
-      }
-      unsubProgress = onSnapshot(progressQuery, (snapshot: any) => {
-        const data = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as ComboProgress));
-        setComboProgress(data);
-      }, (err: any) => console.error(err));
-
-      // Tutorials
-      unsubTutorials = onSnapshot(collection(db, 'tutorials'), (snapshot) => {
-        let maxLevel = (user?.license_level || 1) + 1;
-        if (user.role === 'admin' || user.role === 'teacher') maxLevel = 999;
-        
-        const data = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Tutorial))
-          .filter(t => t.level <= maxLevel)
-          .sort((a, b) => a.level - b.level);
-        setTutorials(data);
-      }, (err) => console.error(err));
-    }
-
-    return () => {
-      unsubCombos();
-      unsubProgress();
-      unsubTutorials();
+    if (!user) return;
+    const loadAll = async () => {
+      const { data: combosData } = await supabase.from('combos').select('*').order('level');
+      if (combosData) setCombos(combosData as Combo[]);
+      const maxLevel = (user.role === 'admin' || user.role === 'teacher') ? 999 : (user.license_level || 1) + 1;
+      const { data: tutData } = await supabase.from('tutorials').select('*').lte('level', maxLevel).order('level');
+      if (tutData) setTutorials(tutData as Tutorial[]);
+      const progressQ = supabase.from('combo_progress').select('*');
+      if (user.role !== 'admin' && user.role !== 'teacher') progressQ.eq('user_id', String(user.id));
+      const { data: progData } = await progressQ;
+      if (progData) setComboProgress(progData as ComboProgress[]);
     };
-  }, [user]);
+    loadAll();
+    const ch = supabase.channel('saberes-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'combos' }, loadAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'combo_progress' }, loadAll)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id]);
 
   const fetchTutorials = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, 'tutorials'));
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tutorial));
-      setTutorials(data);
-    } catch (err) {
-      console.error(err);
-    }
+    const { data } = await supabase.from('tutorials').select('*').order('level');
+    if (data) setTutorials(data as Tutorial[]);
   };
 
   const handleTutorialVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -348,31 +297,17 @@ export function Saberes() {
   const handleAddTutorial = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'tutorials'), newTutorial);
+      await supabase.from('tutorials').insert(newTutorial);
       setShowAddTutorial(false);
       setNewTutorial({ title: '', description: '', duration: 60, level: 1, category: 'técnica', video_url: '' });
       fetchTutorials();
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleDeleteTutorial = (id: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar Tutorial',
-      message: '¿Estás seguro de que deseas eliminar este tutorial de forma definitiva?',
+    setConfirmDialog({ isOpen: true, title: 'Eliminar Tutorial', message: '¿Estás seguro?',
       onConfirm: async () => {
-        try {
-          const itemToDelete = tutorials.find(t => t.id === id);
-          if (itemToDelete?.videoUrl) {
-            await deleteStorageFile(storage, itemToDelete.videoUrl);
-          }
-          await deleteDoc(doc(db, 'tutorials', id));
-          fetchTutorials();
-        } catch (err) {
-          console.error(err);
-        }
+        try { await supabase.from('tutorials').delete().eq('id', id); fetchTutorials(); } catch (err) { console.error(err); }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -423,41 +358,21 @@ export function Saberes() {
     if (adminVideoInputRef.current) adminVideoInputRef.current.value = '';
   };
 
-  // ✅ Confirmar subida: Firebase Storage directo → combo_progress
   const handleConfirmVideoUpload = async (file: File, isAdmin = false) => {
     setUploadProgress(0);
     try {
       if (isAdmin && editingCombo) {
-        const url = await uploadVideoToDrive({
-          video: file,
-          name: `ref_${editingCombo.id}_${Date.now()}.mp4`,
-          onProgress: (pct) => setUploadProgress(pct)
-        });
-        await updateDoc(doc(db, 'combos', editingCombo.id), { video_url: url });
+        const url = await uploadVideoToDrive({ video: file, name: `ref_${editingCombo.id}_${Date.now()}.mp4`, onProgress: (pct) => setUploadProgress(pct) });
+        await supabase.from('combos').update({ video_url: url }).eq('id', editingCombo.id);
         setEditingCombo(null);
-        alert('✅ Video de referencia subido a Drive correctamente.');
+        alert('✅ Video de referencia subido correctamente.');
       } else if (videoPreview?.comboId && user) {
-        const videoUrl = await uploadVideoToDrive({
-          video: file,
-          name: `eval_${user.id}_${videoPreview.comboId}_${Date.now()}.mp4`,
-          onProgress: (pct) => setUploadProgress(pct)
-        });
-        
-        await addDoc(collection(db, 'combo_progress'), {
-          combo_id: videoPreview.comboId,
-          user_id: String(user.id),
-          user_name: user.name,
-          video_url: videoUrl,
-          status: 'pending',
-          created_at: serverTimestamp(),
-        });
-        alert('✅ Video enviado para revisión. El profesor lo revisará pronto.');
+        const videoUrl = await uploadVideoToDrive({ video: file, name: `eval_${user.id}_${videoPreview.comboId}_${Date.now()}.mp4`, onProgress: (pct) => setUploadProgress(pct) });
+        await supabase.from('combo_progress').insert({ combo_id: videoPreview.comboId, user_id: String(user.id), user_name: user.name, video_url: videoUrl, status: 'pending', created_at: new Date().toISOString() });
+        alert('✅ Video enviado para revisión.');
       }
-    } catch (err: any) {
-      alert('Error al subir el video: ' + (err?.message || 'Intenta de nuevo'));
-    } finally {
-      setUploadProgress(null);
-      setUploadingComboId(null);
+    } catch (err: any) { alert('Error al subir: ' + (err?.message || 'Intenta de nuevo')); } finally {
+      setUploadProgress(null); setUploadingComboId(null);
       if (videoPreview?.previewUrl) URL.revokeObjectURL(videoPreview.previewUrl);
       setVideoPreview(null);
     }
@@ -473,33 +388,14 @@ export function Saberes() {
   const handleAddCombo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComboName.trim()) return;
-    
     try {
-      await addDoc(collection(db, 'combos'), { 
-        name: newComboName, 
-        level: newComboLevel,
-        video_approved: false,
-        manillas_approved: false,
-        contacto_approved: false,
-        desarrollo_approved: false
-      });
-      // fetchCombos(); removed, onSnapshot handles it
-      setNewComboName('');
-      setNewComboLevel(1);
-      setShowAddCombo(false);
-    } catch (err) {
-      console.error(err);
-    }
+      await supabase.from('combos').insert({ name: newComboName, level: newComboLevel, video_approved: false, manillas_approved: false, contacto_approved: false, desarrollo_approved: false });
+      setNewComboName(''); setNewComboLevel(1); setShowAddCombo(false);
+    } catch (err) { console.error(err); }
   };
 
   const handleUpdateComboLevel = async (comboId: string, newLevel: number) => {
-    try {
-      await updateDoc(doc(db, 'combos', comboId), { level: newLevel });
-      // fetchCombos(); removed, onSnapshot handles it
-      setEditingComboLevel(null);
-    } catch (err) {
-      console.error('Error updating combo level:', err);
-    }
+    try { await supabase.from('combos').update({ level: newLevel }).eq('id', comboId); setEditingComboLevel(null); } catch (err) { console.error(err); }
   };
 
   const handleDeleteProgressVideo = (comboId: string, userId: string) => {
@@ -520,22 +416,9 @@ export function Saberes() {
   };
 
   const handleDeleteCombo = (id: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar Combo',
-      message: '¿Estás seguro de que deseas eliminar este combo de forma definitiva?',
+    setConfirmDialog({ isOpen: true, title: 'Eliminar Combo', message: '¿Estás seguro?',
       onConfirm: async () => {
-        try {
-          const comboToDelete = combos.find(c => c.id === id);
-          if (comboToDelete) {
-            await deleteStorageFile(storage, comboToDelete.videoUrl);
-            await deleteStorageFile(storage, comboToDelete.imageUrl);
-          }
-          await deleteDoc(doc(db, 'combos', id));
-          // fetchCombos(); removed, onSnapshot handles it
-        } catch (err) {
-          console.error(err);
-        }
+        try { await supabase.from('combos').delete().eq('id', id); } catch (err) { console.error(err); }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -543,21 +426,9 @@ export function Saberes() {
 
   const handleApproveCombo = async (comboId: string, type: 'video' | 'manillas' | 'contacto' | 'desarrollo', userId: string) => {
     try {
-      const comboRef = doc(db, 'combos', comboId);
-      await updateDoc(comboRef, { [`${type}_approved`]: true });
-      
-      // Send notification
-      await sendPushNotification(
-        userId,
-        '✅ ¡Combo Aprobado!',
-        `Tu progreso en ${type} para este combo ha sido aprobado. ¡Sigue así!`,
-        'success'
-      );
-      
-      // fetchCombos(); removed, onSnapshot handles it
-    } catch (err) {
-      console.error(err);
-    }
+      await supabase.from('combos').update({ [`${type}_approved`]: true }).eq('id', comboId);
+      await sendPushNotification(userId, '✅ ¡Combo Aprobado!', `Tu progreso en ${type} ha sido aprobado. ¡Sigue así!`, 'success');
+    } catch (err) { console.error(err); }
   };
 
   // Show ALL combos to students (no video requirement), sorted by level then name
