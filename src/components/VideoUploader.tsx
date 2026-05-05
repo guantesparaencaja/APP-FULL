@@ -171,6 +171,8 @@ export function VideoUploader({
         ref={fileInputRef}
         onChange={handleInputChange}
         className="hidden"
+        aria-label="Seleccionar archivo de video"
+        title="Seleccionar archivo de video"
       />
 
       {/* Modal de Preview + Confirmación */}
@@ -187,7 +189,12 @@ export function VideoUploader({
                 </p>
               </div>
               {!uploading && (
-                <button onClick={handleCancel} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+                <button
+                  onClick={handleCancel}
+                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+                  title="Cerrar vista previa"
+                  aria-label="Cerrar vista previa"
+                >
                   <X className="w-5 h-5 text-slate-400" />
                 </button>
               )}
@@ -224,7 +231,8 @@ export function VideoUploader({
                 <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
                   <div
                     className="bg-gradient-to-r from-primary to-orange-400 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${progress}%` }}
+                    data-progress={progress}
+                    ref={(el) => { if (el) el.style.width = `${progress}%`; }}
                   />
                 </div>
               </div>
