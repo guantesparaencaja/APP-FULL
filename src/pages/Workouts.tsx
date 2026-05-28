@@ -4,7 +4,7 @@ import {
   Dumbbell, Play, Clock, ArrowLeft, Upload, Home, X, Plus, Trash2,
   Video, Search, RefreshCw, ChevronRight, AlertCircle, Loader2,
   Settings, Info, CheckSquare, Target, Filter, Download, Shield,
-  SlidersHorizontal, ChevronDown, BarChart2, Heart,
+  SlidersHorizontal, ChevronDown, BarChart2, Heart, LayoutGrid, List,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -644,6 +644,13 @@ export function Workouts() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+            className="flex items-center justify-center p-3.5 rounded-2xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:text-primary transition-all shadow-sm"
+            title={viewMode === 'grid' ? 'Ver como lista' : 'Ver como cuadrícula'}
+          >
+            {viewMode === 'grid' ? <List className="w-5 h-5" /> : <LayoutGrid className="w-5 h-5" />}
+          </button>
         </div>
 
         {/* Active filters pills */}
@@ -792,21 +799,39 @@ export function Workouts() {
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
-            <div className="flex flex-col gap-3">
-              {filteredVideos.map((video, i) => (
-                <WorkoutVideoRow
-                  key={video.id}
-                  video={video}
-                  category={categories.find((c) => c.id === video.category_id)}
-                  isAdmin={!!isAdmin}
-                  onPlay={handleVideoClick}
-                  onApprove={isAdmin ? handleApproveVideo : undefined}
-                  onReject={isAdmin ? handleRejectVideo : undefined}
-                  onEdit={isAdmin ? startEditVideo : undefined}
-                  onDelete={isAdmin ? handleDeleteVideo : undefined}
-                />
-              ))}
-            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredVideos.map((video) => (
+                  <WorkoutVideoCard
+                    key={video.id}
+                    video={video}
+                    category={categories.find((c) => c.id === video.category_id)}
+                    isAdmin={!!isAdmin}
+                    onPlay={handleVideoClick}
+                    onApprove={isAdmin ? handleApproveVideo : undefined}
+                    onReject={isAdmin ? handleRejectVideo : undefined}
+                    onEdit={isAdmin ? startEditVideo : undefined}
+                    onDelete={isAdmin ? handleDeleteVideo : undefined}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {filteredVideos.map((video) => (
+                  <WorkoutVideoRow
+                    key={video.id}
+                    video={video}
+                    category={categories.find((c) => c.id === video.category_id)}
+                    isAdmin={!!isAdmin}
+                    onPlay={handleVideoClick}
+                    onApprove={isAdmin ? handleApproveVideo : undefined}
+                    onReject={isAdmin ? handleRejectVideo : undefined}
+                    onEdit={isAdmin ? startEditVideo : undefined}
+                    onDelete={isAdmin ? handleDeleteVideo : undefined}
+                  />
+                ))}
+              </div>
+            )}
           </AnimatePresence>
         )}
       </main>
