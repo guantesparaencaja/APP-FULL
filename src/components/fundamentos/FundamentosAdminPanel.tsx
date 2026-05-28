@@ -109,12 +109,11 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      const driveUrl = await uploadVideoToDrive(
-        file,
-        user.id,
-        (p) => setUploadProgress(p),
-        { type: 'fundamentos', title: videoFormData.title || file.name }
-      );
+      const driveUrl = await uploadVideoToDrive({
+        video: file,
+        name: `fundamentos_${Date.now()}_${file.name}`,
+        onProgress: (p) => setUploadProgress(p),
+      });
       setVideoFormData(prev => ({ ...prev, videoUrl: driveUrl }));
       alert('✅ Video subido a Drive');
     } catch (err) {

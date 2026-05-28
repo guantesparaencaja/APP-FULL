@@ -6,6 +6,7 @@ import { getYouTubeEmbedUrl } from '../../services/geminiService';
 import { LazyVideoWrapper } from '../LazyVideoWrapper';
 
 interface WorkoutVideoCardProps {
+  key?: React.Key;
   video: WorkoutVideo;
   category?: WorkoutCategory;
   isAdmin?: boolean;

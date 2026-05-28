@@ -309,11 +309,11 @@ export function Workouts() {
       let currentVideoUrl = uploadForm.video_url || editingVideo?.video_url || '';
       if (videoFile) {
         setOverallProgress(50);
-        currentVideoUrl = await uploadVideoToDrive(
-          videoFile, String(user?.id || 'admin'),
-          (p) => setOverallProgress(50 + p / 2),
-          { title: uploadForm.title, type: uploadForm.tipo }
-        );
+        currentVideoUrl = await uploadVideoToDrive({
+          video: videoFile,
+          name: `workout_${Date.now()}_${videoFile.name}`,
+          onProgress: (p) => setOverallProgress(50 + p / 2),
+        });
       }
 
       let finalCategoryId = uploadForm.categoryId;

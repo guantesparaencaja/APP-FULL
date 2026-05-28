@@ -48,6 +48,21 @@ export interface Profile {
   xp?: number;
   created_at?: string;
   updated_at?: string;
+  username?: string;
+  boxing_goal?: string;
+  goal_timeframe?: string;
+  activity_level?: string;
+  experience_level?: string;
+  injuries?: string;
+  dietary_restrictions?: string;
+  assessment_completed?: boolean;
+  assessment_updated_at?: string;
+  vendaje_progreso?: number;
+  water_intake?: any;
+  custom_routines?: any[];
+  weekly_workout_plan?: any;
+  weekly_meal_plan?: any;
+  has_seen_vendaje?: boolean;
 }
 
 export interface Availability {

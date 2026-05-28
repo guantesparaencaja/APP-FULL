@@ -28,6 +28,9 @@
     "node_modules",
     "dist",
     "android",
-    "ios"
+    "ios",
+    "api",
+    "functions",
+    "temp_calendar_original.tsx"
   ]
 }

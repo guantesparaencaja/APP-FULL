@@ -588,6 +588,7 @@ export function Home() {
                         key={idx}
                         onClick={async () => {
                           if (isChallengeCompleted) return;
+                          const today = new Date().toISOString().split('T')[0];
                           const next = new Set(checkedTasks);
                           done ? next.delete(idx) : next.add(idx);
                           setCheckedTasks(next);

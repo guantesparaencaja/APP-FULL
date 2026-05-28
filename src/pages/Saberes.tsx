@@ -86,6 +86,7 @@ export function Saberes() {
   const [newComboLevel, setNewComboLevel] = useState(1);
   const [editingComboLevel, setEditingComboLevel] = useState<{id: string, level: number} | null>(null);
   const adminVideoInputRef = useRef<HTMLInputElement>(null);
+  const tutorialFileInputRef = useRef<HTMLInputElement>(null);
   const [editingCombo, setEditingCombo] = useState<Combo | null>(null);
   const [showAddTutorial, setShowAddTutorial] = useState(false);
   const [newTutorial, setNewTutorial] = useState({ title: '', description: '', duration: 60, level: 1, category: 'técnica', video_url: '' });
@@ -438,7 +439,7 @@ export function Saberes() {
   const handleApproveCombo = async (comboId: string, type: 'video' | 'manillas' | 'contacto' | 'desarrollo', userId: string) => {
     try {
       await supabase.from('combos').update({ [`${type}_approved`]: true }).eq('id', comboId);
-      await sendPushNotification(userId, '✅ ¡Combo Aprobado!', `Tu progreso en ${type} ha sido aprobado. ¡Sigue así!`, 'success');
+      await sendPushNotification(userId, '✅ ¡Combo Aprobado!', `Tu progreso en ${type} ha sido aprobado. ¡Sigue así!`, { type: 'success' });
     } catch (err) { console.error(err); }
   };
 

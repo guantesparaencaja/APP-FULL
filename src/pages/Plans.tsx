@@ -62,6 +62,7 @@ export function Plans() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const { data: bookingsData } = useRealtimeCollection<{
+    id: string;
     class_id: string;
     date: string;
     status: string;
