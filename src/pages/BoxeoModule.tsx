@@ -38,7 +38,7 @@ const SUBCATEGORIAS = [
   { id: 'Defensa',         label: 'Defensa',            icon: '🛡️', color: 'from-emerald-600 to-emerald-800', desc: 'Esquivas y bloqueos',             min_level: 2 },
   { id: 'Sombra',          label: 'Sombra',             icon: '👻', color: 'from-slate-500 to-slate-700',  desc: 'Shadow boxing',                       min_level: 3 },
   { id: 'Combinaciones',   label: 'Combinaciones',      icon: '💥', color: 'from-orange-600 to-orange-800', desc: 'Secuencias de golpes',              min_level: 4 },
-  { id: 'Saco',            label: 'Saco',               icon: '🎯', color: 'from-purple-600 to-purple-800', desc: 'Trabajo en el saco',                min_level: 4 },
+  { id: 'Saco',            label: 'Saco',               icon: '🎯', color: 'from-indigo-600 to-indigo-800', desc: 'Trabajo en el saco',                min_level: 4 },
 ];
 
 // ─── Seed data ────────────────────────────────────────────────────────────────

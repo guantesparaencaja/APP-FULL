@@ -62,7 +62,7 @@ const DBZ_RANKS = [
   { level: 9, name: "Super Sayayin Blue", icon: "🔵", color: "text-blue-500", glow: "shadow-blue-500/80" },
   { level: 10, name: "Ultra Instinto (S)", icon: "🌀", color: "text-slate-300", glow: "shadow-slate-200/90" },
   { level: 11, name: "Ultra Instinto (D)", icon: "⚪", color: "text-white", glow: "shadow-white/100" },
-  { level: 12, name: "Dios de la Destrucción", icon: "🟣", color: "text-purple-500", glow: "shadow-purple-500/100" }
+  { level: 12, name: "Dios de la Destrucción", icon: "🟣", color: "text-violet-400", glow: "shadow-violet-400/100" }
 ];
 
 

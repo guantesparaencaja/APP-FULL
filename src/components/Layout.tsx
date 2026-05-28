@@ -74,7 +74,7 @@ export function Layout() {
     supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
-      .eq('userId', String(user.id))
+      .eq('user_id', String(user.id))
       .eq('read', false)
       .then(({ count }) => setUnreadCount(count || 0));
 
@@ -85,7 +85,7 @@ export function Layout() {
         supabase
           .from('notifications')
           .select('id', { count: 'exact', head: true })
-          .eq('userId', String(user.id))
+          .eq('user_id', String(user.id))
           .eq('read', false)
           .then(({ count }) => setUnreadCount(count || 0));
       })
