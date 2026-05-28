@@ -62,7 +62,7 @@ export function Tutorial({ onComplete }: { onComplete: () => void }) {
   const handleComplete = async () => {
     if (!user) return;
     try {
-      await supabase.from('users').update({ tutorial_completed: true }).eq('id', user.id);
+      await supabase.from('profiles').update({ tutorial_completed: true }).eq('id', user.id);
       setUser({ ...user, tutorial_completed: true } as any);
       onComplete();
     } catch (error) {

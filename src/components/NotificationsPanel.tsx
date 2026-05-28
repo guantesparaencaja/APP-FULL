@@ -9,7 +9,8 @@ import { es } from 'date-fns/locale';
 interface Notification {
   id: string;
   title: string;
-  message: string;
+  body?: string;
+  message?: string;
   type?: 'info' | 'success' | 'error' | 'community';
   read: boolean;
   created_at: any;
@@ -194,7 +195,7 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
                           )}
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-3">
-                          {n.message}
+                          {n.body ?? n.message ?? ''}
                         </p>
                         <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 group-hover:text-primary transition-colors">
                           {n.created_at

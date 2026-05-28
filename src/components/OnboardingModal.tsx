@@ -143,8 +143,8 @@ export function OnboardingModal() {
         is_new_user: false,
       };
 
-      await supabase.from('users').update(updatedData).eq('id', user.id);
-      setUser({ ...user, ...updatedData } as any);
+      await supabase.from('profiles').update(updatedData).eq('id', user.id);
+      setUser({ ...user, ...updatedData, fitnessGoal: updatedData.fitness_goal } as any);
 
       // ✉️ Correo de bienvenida
       sendWelcomeEmail({

@@ -41,13 +41,29 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     setLoading(true);
     try {
       const now = new Date().toISOString();
-      const updateData = {
-        ...formData,
+      const dbUpdateData = {
+        goal: formData.goal,
+        fitness_goal: formData.fitnessGoal,
+        activity_level: formData.activity_level,
+        experience_level: formData.experience_level,
+        injuries: formData.injuries,
+        dietary_restrictions: formData.dietary_restrictions,
         assessment_completed: true,
         assessment_updated_at: now,
       };
-      await supabase.from('users').update(updateData).eq('id', user.id);
-      setUser({ ...user, ...updateData });
+      await supabase.from('profiles').update(dbUpdateData).eq('id', user.id);
+      
+      const storeUpdateData = {
+        goal: formData.goal,
+        fitnessGoal: formData.fitnessGoal,
+        activity_level: formData.activity_level,
+        experience_level: formData.experience_level,
+        injuries: formData.injuries,
+        dietary_restrictions: formData.dietary_restrictions,
+        assessment_completed: true,
+        assessment_updated_at: now,
+      };
+      setUser({ ...user, ...storeUpdateData });
       onClose();
     } catch (error: any) {
       console.error('Error saving assessment:', error);

@@ -30,7 +30,7 @@ export async function initializePushNotifications(userId: string) {
       console.log('Push registration success, token: ' + token.value);
       // Save token to Supabase
       try {
-        await supabase.from('users').update({
+        await supabase.from('profiles').update({
           fcm_token: token.value,
         }).eq('id', userId);
       } catch (err) {

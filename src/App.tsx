@@ -148,7 +148,21 @@ export default function App() {
             height: profile?.height,
             is_new_user: profile?.is_new_user ?? true,
             tutorial_completed: profile?.tutorial_completed ?? false,
-            fitness_goal: profile?.fitness_goal as any,
+            fitnessGoal: profile?.fitness_goal as any,
+            username: profile?.username,
+            boxing_goal: profile?.boxing_goal,
+            goal_timeframe: profile?.goal_timeframe,
+            activity_level: profile?.activity_level,
+            experience_level: profile?.experience_level,
+            injuries: profile?.injuries,
+            dietary_restrictions: profile?.dietary_restrictions,
+            assessment_completed: profile?.assessment_completed ?? false,
+            assessment_updated_at: profile?.assessment_updated_at,
+            vendaje_progreso: profile?.vendaje_progreso ?? 0,
+            water_intake: profile?.water_intake,
+            custom_routines: profile?.custom_routines,
+            weekly_workout_plan: profile?.weekly_workout_plan,
+            weekly_meal_plan: profile?.weekly_meal_plan,
             profile_pic: profile?.profile_pic,
             before_pic: profile?.before_pic,
             after_pic: profile?.after_pic,
@@ -180,6 +194,10 @@ export default function App() {
 
           if (!currentUser || JSON.stringify(mergedUser) !== JSON.stringify(currentUser)) {
             setUser(mergedUser);
+          }
+
+          if (profile?.has_seen_vendaje !== undefined) {
+            useStore.getState().setHasSeenVendaje(profile.has_seen_vendaje);
           }
         } catch (err) {
           console.error('[App] Error cargando perfil:', err);

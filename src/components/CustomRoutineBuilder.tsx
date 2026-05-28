@@ -44,7 +44,7 @@ export function CustomRoutineBuilder({ onClose }: CustomRoutineBuilderProps) {
     const updatedRoutines = [...currentRoutines, newRoutine];
 
     try {
-      await supabase.from('users').update({ custom_routines: updatedRoutines }).eq('id', user.id);
+      await supabase.from('profiles').update({ custom_routines: updatedRoutines }).eq('id', user.id);
       useStore.getState().setUser({ ...user, custom_routines: updatedRoutines });
       onClose();
     } catch (err) {

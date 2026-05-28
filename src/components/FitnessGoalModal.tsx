@@ -16,7 +16,7 @@ export function FitnessGoalModal() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      await supabase.from('users').update({ fitnessGoal: goal }).eq('id', user.id);
+      await supabase.from('profiles').update({ fitness_goal: goal }).eq('id', user.id);
       setUser({ ...user, fitnessGoal: goal });
     } catch (error) {
       console.error('Error saving fitness goal:', error);

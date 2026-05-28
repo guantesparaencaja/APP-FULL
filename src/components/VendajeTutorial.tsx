@@ -60,9 +60,9 @@ export function VendajeTutorial() {
     setHasSeenVendaje(true);
     if (user) {
       try {
-        await supabase.from('users').update({
+        await supabase.from('profiles').update({
           vendaje_progreso: 100,
-          hasSeenVendaje: true,
+          has_seen_vendaje: true,
         }).eq('id', user.id);
         setUser({ ...user, vendaje_progreso: 100 });
       } catch (err) {
