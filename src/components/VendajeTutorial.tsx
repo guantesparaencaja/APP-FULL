@@ -2,16 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Video, CheckCircle, Plus, Trash2, Upload, X, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { db, storage } from '../lib/firebase';
-import {
-  doc,
-  updateDoc,
-  collection,
-  onSnapshot,
-  addDoc,
-  deleteDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { uploadVideoToDrive } from '../lib/driveService';
 
 interface VendajeVideo {
@@ -37,29 +28,40 @@ export function VendajeTutorial() {
 
   // ✅ onSnapshot — tiempo real para vendaje_videos
   useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, 'vendaje_videos'),
-      (snapshot) => {
-        setVideos(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as VendajeVideo));
+    // Initial fetch
+    supabase
+      .from('vendaje_videos')
+      .select('*')
+      .then(({ data, error }) => {
+        if (error) console.error('Error fetching vendaje_videos:', error);
+        if (data) setVideos(data as VendajeVideo[]);
         setLoading(false);
-      },
-      (err) => {
-        console.error('Error en listener vendaje_videos:', err);
-        setLoading(false);
-      }
-    );
-    return () => unsub();
+      });
+
+    // Realtime channel
+    const channel = supabase
+      .channel('vendaje_videos_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendaje_videos' }, () => {
+        supabase
+          .from('vendaje_videos')
+          .select('*')
+          .then(({ data }) => {
+            if (data) setVideos(data as VendajeVideo[]);
+          });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const handleComplete = async () => {
     setHasSeenVendaje(true);
     if (user) {
       try {
-        const userRef = doc(db, 'users', String(user.id));
-        await updateDoc(userRef, {
+        await supabase.from('users').update({
           vendaje_progreso: 100,
           hasSeenVendaje: true,
-        });
+        }).eq('id', user.id);
         setUser({ ...user, vendaje_progreso: 100 });
       } catch (err) {
         console.error('Error updating vendaje progress:', err);
@@ -109,9 +111,9 @@ export function VendajeTutorial() {
     e.preventDefault();
     if (!newVideo.title || !newVideo.video_url) return;
     try {
-      await addDoc(collection(db, 'vendaje_videos'), {
+      await supabase.from('vendaje_videos').insert({
         ...newVideo,
-        created_at: serverTimestamp(),
+        created_at: new Date().toISOString(),
       });
       setNewVideo({ title: '', description: '', video_url: '' });
       setShowAdd(false);
@@ -124,7 +126,7 @@ export function VendajeTutorial() {
   const handleDeleteVideo = async (id: string) => {
     if (!confirm('¿Eliminar este video de vendaje?')) return;
     try {
-      await deleteDoc(doc(db, 'vendaje_videos', id));
+      await supabase.from('vendaje_videos').delete().eq('id', id);
       // onSnapshot actualiza automáticamente
     } catch (err) {
       console.error('Error deleting video:', err);

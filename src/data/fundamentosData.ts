@@ -6,6 +6,7 @@ export const FUNDAMENTOS_MODULES: FundamentosModule[] = [
     title: 'Módulo 1: Golpes Básicos',
     emoji: '👊',
     description: 'La base ofensiva del boxeador: Jab, Cross, Hook y Uppercut.',
+    order: 1,
     content: [
       {
         title: 'Jab',
@@ -52,6 +53,7 @@ export const FUNDAMENTOS_MODULES: FundamentosModule[] = [
     title: 'Módulo 2: Postura y Guardia',
     emoji: '🛡️',
     description: 'Cimientos defensivos y equilibrio en el ring.',
+    order: 2,
     content: [
       {
         title: 'Guardia Ortodoxa',
@@ -85,6 +87,7 @@ export const FUNDAMENTOS_MODULES: FundamentosModule[] = [
     title: 'Módulo 3: Defensas y Esquivas',
     emoji: '🌀',
     description: 'El arte de no ser golpeado: Slips, Rolls y Parries.',
+    order: 3,
     content: [
       {
         title: 'Slip (Esquiva lateral)',
@@ -118,6 +121,7 @@ export const FUNDAMENTOS_MODULES: FundamentosModule[] = [
     title: 'Módulo 4: Desplazamientos',
     emoji: '👣',
     description: 'Control de la distancia y posicionamiento táctico.',
+    order: 4,
     content: [
       {
         title: 'Paso Lateral y Frontal',
@@ -145,6 +149,7 @@ export const FUNDAMENTOS_MODULES: FundamentosModule[] = [
     title: 'Módulo 5: Sombra (Shadowboxing)',
     emoji: '👤',
     description: 'Visualización y perfeccionamiento técnico sin contacto.',
+    order: 5,
     content: [
       {
         title: 'Propósito y Estructura',
@@ -166,6 +171,7 @@ export const FUNDAMENTOS_MODULES: FundamentosModule[] = [
     title: 'Módulo 8: Trabajo con Implementos',
     emoji: '🥋',
     description: 'Sacos, mitts, pera y herramientas de entrenamiento.',
+    order: 8,
     content: [
       {
         title: 'Saco Pesado (Heavy Bag)',
@@ -193,6 +199,7 @@ export const FUNDAMENTOS_MODULES: FundamentosModule[] = [
     title: 'Módulo 9: Acondicionamiento Físico',
     emoji: '💪',
     description: 'Fuerza, cardio y resistencia específica para combate.',
+    order: 9,
     content: [
       {
         title: 'Salto de Cuerda',
@@ -214,6 +221,7 @@ export const FUNDAMENTOS_MODULES: FundamentosModule[] = [
     title: 'Módulo 11: Errores Comunes',
     emoji: '⚠️',
     description: 'Identificación y corrección de vicios técnicos.',
+    order: 11,
     content: [
       {
         title: 'Top Errores de Guardia',

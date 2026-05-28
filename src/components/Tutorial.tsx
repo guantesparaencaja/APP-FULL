@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 import { BookOpen, Calendar, ArrowRight, CheckCircle2, Trophy, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -63,8 +62,7 @@ export function Tutorial({ onComplete }: { onComplete: () => void }) {
   const handleComplete = async () => {
     if (!user) return;
     try {
-      const userRef = doc(db, 'users', String(user.id));
-      await updateDoc(userRef, { tutorial_completed: true });
+      await supabase.from('users').update({ tutorial_completed: true }).eq('id', user.id);
       setUser({ ...user, tutorial_completed: true } as any);
       onComplete();
     } catch (error) {

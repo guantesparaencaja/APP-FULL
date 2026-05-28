@@ -1,4 +1,5 @@
-import { Timestamp } from 'firebase/firestore';
+// Timestamp legacy, now stored as string ISO
+export type Timestamp = any;
 
 export type FundamentosLevel = 'Principiante' | 'Intermedio' | 'Avanzado';
 

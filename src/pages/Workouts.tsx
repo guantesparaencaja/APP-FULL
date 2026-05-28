@@ -1019,7 +1019,7 @@ export function Workouts() {
                     onClick={async () => {
                       try {
                         const updated = [...routine.exercises, selectedVideoDetails.id];
-                        await updateDoc(doc(db, 'custom_routines', routine.id), { exercises: updated });
+                        await supabase.from('custom_routines').update({ exercises: updated }).eq('id', routine.id);
                         setUserRoutines(userRoutines.map((r) => r.id === routine.id ? { ...r, exercises: updated } : r));
                         setShowRoutineModal(false);
                         alert(`Añadido a ${routine.name}`);
@@ -1051,8 +1051,8 @@ export function Workouts() {
                         exercises: [selectedVideoDetails.id],
                         createdAt: new Date().toISOString(),
                       };
-                      const ref_ = await addDoc(collection(db, 'custom_routines'), data);
-                      setUserRoutines([...userRoutines, { id: ref_.id, ...data }]);
+                      const { data: newRoutine } = await supabase.from('custom_routines').insert(data).select().single();
+                      if (newRoutine) setUserRoutines([...userRoutines, newRoutine]);
                       setNewRoutineName('');
                       setShowRoutineModal(false);
                       alert(`Rutina "${newRoutineName}" creada.`);

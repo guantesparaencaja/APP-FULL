@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Save, GripVertical, Trash2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { db } from '../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 
 interface CustomExercise {
   id: string;
@@ -45,9 +44,7 @@ export function CustomRoutineBuilder({ onClose }: CustomRoutineBuilderProps) {
     const updatedRoutines = [...currentRoutines, newRoutine];
 
     try {
-      await updateDoc(doc(db, 'users', String(user.id)), {
-        custom_routines: updatedRoutines,
-      });
+      await supabase.from('users').update({ custom_routines: updatedRoutines }).eq('id', user.id);
       useStore.getState().setUser({ ...user, custom_routines: updatedRoutines });
       onClose();
     } catch (err) {

@@ -1,5 +1,8 @@
-import { db } from '../lib/firebase';
-import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+/**
+ * achievements.ts — Supabase (purga Firebase)
+ * Regla de oro: Supabase = única fuente.
+ */
+import { supabase } from '../lib/supabase';
 
 export interface Achievement {
   id: string;
@@ -17,52 +20,28 @@ export interface UserStats {
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'first_workout',
-    title: 'Primer Round',
-    description: 'Completa tu primer entrenamiento.',
-    icon: 'Trophy',
-    condition: (stats) => stats.totalWorkouts >= 1,
-  },
-  {
-    id: 'workout_10',
-    title: 'Constancia',
-    description: 'Completa 10 entrenamientos.',
-    icon: 'Flame',
-    condition: (stats) => stats.totalWorkouts >= 10,
-  },
-  {
-    id: 'rounds_100',
-    title: 'Centurión',
-    description: 'Completa 100 rounds totales.',
-    icon: 'Target',
-    condition: (stats) => stats.totalRounds >= 100,
-  },
-  {
-    id: 'hours_10',
-    title: 'Veterano',
-    description: 'Entrena por más de 10 horas totales.',
-    icon: 'Clock',
-    condition: (stats) => stats.totalMinutes >= 600,
-  },
+  { id: 'first_workout', title: 'Primer Round', description: 'Completa tu primer entrenamiento.', icon: 'Trophy', condition: (s) => s.totalWorkouts >= 1 },
+  { id: 'workout_10', title: 'Constancia', description: 'Completa 10 entrenamientos.', icon: 'Flame', condition: (s) => s.totalWorkouts >= 10 },
+  { id: 'rounds_100', title: 'Centurión', description: 'Completa 100 rounds totales.', icon: 'Target', condition: (s) => s.totalRounds >= 100 },
+  { id: 'hours_10', title: 'Veterano', description: 'Entrena por más de 10 horas totales.', icon: 'Clock', condition: (s) => s.totalMinutes >= 600 },
 ];
 
 export async function checkAndUnlockAchievements(userId: string, stats: UserStats) {
   try {
-    // Get already unlocked achievements
-    const q = query(collection(db, 'user_achievements'), where('userId', '==', userId));
-    const querySnapshot = await getDocs(q);
-    const unlockedIds = new Set(querySnapshot.docs.map((doc) => doc.data().achievementId));
+    const { data: existing } = await supabase
+      .from('user_achievements')
+      .select('achievement_id')
+      .eq('user_id', userId);
 
-    const newUnlocks = [];
+    const unlockedIds = new Set((existing ?? []).map((r: { achievement_id: string }) => r.achievement_id));
+    const newUnlocks: Achievement[] = [];
 
     for (const achievement of ACHIEVEMENTS) {
       if (!unlockedIds.has(achievement.id) && achievement.condition(stats)) {
-        // Unlock!
-        await addDoc(collection(db, 'user_achievements'), {
-          userId,
-          achievementId: achievement.id,
-          unlockedAt: serverTimestamp(),
+        await supabase.from('user_achievements').insert({
+          user_id: userId,
+          achievement_id: achievement.id,
+          unlocked_at: new Date().toISOString(),
         });
         newUnlocks.push(achievement);
       }
@@ -70,7 +49,7 @@ export async function checkAndUnlockAchievements(userId: string, stats: UserStat
 
     return newUnlocks;
   } catch (error) {
-    console.error('Error checking achievements:', error);
+    console.error('[achievements] Error:', error);
     return [];
   }
 }

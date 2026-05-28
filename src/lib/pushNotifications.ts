@@ -1,7 +1,6 @@
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { supabase } from './supabase';
 
 export async function initializePushNotifications(userId: string) {
   // Push notifications are only supported on native platforms
@@ -29,12 +28,11 @@ export async function initializePushNotifications(userId: string) {
     // On success, we should be able to receive notifications
     PushNotifications.addListener('registration', async (token) => {
       console.log('Push registration success, token: ' + token.value);
-      // Save token to Firestore
+      // Save token to Supabase
       try {
-        const userRef = doc(db, 'users', userId);
-        await updateDoc(userRef, {
+        await supabase.from('users').update({
           fcm_token: token.value,
-        });
+        }).eq('id', userId);
       } catch (err) {
         console.error('Error saving FCM token:', err);
       }

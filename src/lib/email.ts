@@ -5,14 +5,13 @@
  * Las funciones exportadas mantienen la misma firma para compatibilidad total.
  */
 
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { supabase } from './supabase';
 import { emailService } from './resendEmailService';
 
-// ─── Fallback genérico a Firestore ────────────────────────────────────────────
+// ─── Fallback genérico a Supabase ─────────────────────────────────────────────
 
 /**
- * Envío genérico de email via Resend. Si falla, encola en Firestore.
+ * Envío genérico de email via Resend. Si falla, encola en Supabase.
  * Mantiene backward-compat con código antiguo que usa sendEmail() directo.
  */
 export const sendEmail = async (to: string | string[], subject: string, html: string) => {
@@ -32,18 +31,18 @@ export const sendEmail = async (to: string | string[], subject: string, html: st
     if (res.ok) return;
   } catch {}
 
-  // Fallback Firestore (Firebase Email Extension)
+  // Fallback Supabase
   try {
-    await addDoc(collection(db, 'mail'), {
+    await supabase.from('mail').insert({
       to: recipients,
       from: '"GPTE" <guantesparaencajar@gmail.com>',
-      replyTo: 'guantesparaencajar@gmail.com',
+      reply_to: 'guantesparaencajar@gmail.com',
       message: { subject, html },
       queued_at: new Date().toISOString(),
     });
-    console.log('[email] Encolado en Firestore para:', recipients);
+    console.log('[email] Encolado en Supabase para:', recipients);
   } catch (error) {
-    console.error('[email] Error al encolar en Firestore:', error);
+    console.error('[email] Error al encolar en Supabase:', error);
   }
 };
 

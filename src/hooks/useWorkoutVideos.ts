@@ -1,14 +1,10 @@
 /**
- * GPTE useWorkoutVideos Hook v5.0
- * Hook de sincronización bidireccional en tiempo real con Firebase.
- * - Escucha `workout_videos` y `workout_categories` simultáneamente.
- * - Filtra automáticamente por rol (admin ve todo, usuarios solo 'approved').
- * - Cache ligero con sessionStorage para evitar parpadeos en navegación.
+ * useWorkoutVideos — Supabase Realtime v6.0 (purga Firebase)
+ * Regla de oro: Supabase = fuente única de verdad.
+ * Realtime universal: reacciona a cambios en workout_videos y workout_categories.
  */
-
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { db } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import {
   WorkoutVideo,
   WorkoutCategory,
@@ -19,7 +15,7 @@ import {
 
 const CACHE_KEY_VIDEOS = 'gpte_workout_videos_cache';
 const CACHE_KEY_CATS = 'gpte_workout_cats_cache';
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface CacheEntry<T> {
   data: T;
@@ -43,10 +39,9 @@ function readCache<T>(key: string): T | null {
 
 function writeCache<T>(key: string, data: T): void {
   try {
-    const entry: CacheEntry<T> = { data, timestamp: Date.now() };
-    sessionStorage.setItem(key, JSON.stringify(entry));
+    sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
   } catch {
-    // sessionStorage puede estar lleno, ignorar silenciosamente
+    // ignorar si sessionStorage lleno
   }
 }
 
@@ -62,28 +57,23 @@ interface UseWorkoutVideosReturn {
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
-  // Contadores útiles para el admin
-  counts: {
-    total: number;
-    approved: number;
-    pending: number;
-  };
+  counts: { total: number; approved: number; pending: number };
 }
 
 export function useWorkoutVideos({
   isAdmin = false,
   filters,
 }: UseWorkoutVideosOptions = {}): UseWorkoutVideosReturn {
-  const [allVideos, setAllVideos] = useState<WorkoutVideo[]>(() => {
-    return readCache<WorkoutVideo[]>(CACHE_KEY_VIDEOS) ?? [];
-  });
-  const [categories, setCategories] = useState<WorkoutCategory[]>(() => {
-    return readCache<WorkoutCategory[]>(CACHE_KEY_CATS) ?? [];
-  });
+  const [allVideos, setAllVideos] = useState<WorkoutVideo[]>(
+    () => readCache<WorkoutVideo[]>(CACHE_KEY_VIDEOS) ?? []
+  );
+  const [categories, setCategories] = useState<WorkoutCategory[]>(
+    () => readCache<WorkoutCategory[]>(CACHE_KEY_CATS) ?? []
+  );
   const [isLoading, setIsLoading] = useState(allVideos.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
-  const unsubRefs = useRef<Array<() => void>>([]);
+  const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
 
   const refetch = useCallback(() => {
     sessionStorage.removeItem(CACHE_KEY_VIDEOS);
@@ -91,119 +81,86 @@ export function useWorkoutVideos({
     setRefreshTick((t) => t + 1);
   }, []);
 
-  useEffect(() => {
-    // Limpiar listeners anteriores
-    unsubRefs.current.forEach((u) => u());
-    unsubRefs.current = [];
-
+  const fetchAll = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    try {
+      const [{ data: vids, error: eVids }, { data: cats, error: eCats }] = await Promise.all([
+        supabase.from('workout_videos').select('*').order('order_index'),
+        supabase.from('workout_categories').select('*').order('order_index'),
+      ]);
+      if (eVids) throw new Error(eVids.message);
+      if (eCats) throw new Error(eCats.message);
 
-    // ── Listener de Categorías ──────────────────────────────────────────────
-    const unsubCats = onSnapshot(
-      collection(db, 'workout_categories'),
-      (snap) => {
-        const cats = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as WorkoutCategory);
-        setCategories(cats);
-        writeCache(CACHE_KEY_CATS, cats);
-      },
-      (err) => {
-        console.error('[useWorkoutVideos] Categories error:', err);
-        setError('Error al cargar categorías.');
-      }
-    );
+      const videosData = (vids ?? []) as WorkoutVideo[];
+      const catsData = (cats ?? []) as WorkoutCategory[];
+      setAllVideos(videosData);
+      setCategories(catsData);
+      writeCache(CACHE_KEY_VIDEOS, videosData);
+      writeCache(CACHE_KEY_CATS, catsData);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al cargar datos.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-    // ── Listener de Videos ──────────────────────────────────────────────────
-    const videosQuery = query(collection(db, 'workout_videos'));
-    const unsubVideos = onSnapshot(
-      videosQuery,
-      (snap) => {
-        const vids = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as WorkoutVideo);
-        setAllVideos(vids);
-        writeCache(CACHE_KEY_VIDEOS, vids);
-        setIsLoading(false);
-      },
-      (err) => {
-        console.error('[useWorkoutVideos] Videos error:', err);
-        setError('Error al cargar videos.');
-        setIsLoading(false);
-      }
-    );
+  useEffect(() => {
+    // Limpiar canales anteriores
+    channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
+    channelsRef.current = [];
 
-    unsubRefs.current = [unsubCats, unsubVideos];
+    fetchAll();
+
+    // Realtime universal para ambas tablas
+    const chVideos = supabase
+      .channel('realtime:workout_videos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workout_videos' }, fetchAll)
+      .subscribe();
+
+    const chCats = supabase
+      .channel('realtime:workout_categories')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workout_categories' }, fetchAll)
+      .subscribe();
+
+    channelsRef.current = [chVideos, chCats];
 
     return () => {
-      unsubCats();
-      unsubVideos();
+      channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
     };
-  }, [refreshTick]);
+  }, [fetchAll, refreshTick]);
 
-  // ── Filtrado con lógica de roles ──────────────────────────────────────────
+  // Filtrado con lógica de roles
   const visibleVideos = allVideos.filter((v) => isVideoVisible(v, isAdmin));
   const pendingVideos = allVideos.filter((v) => getVideoStatus(v) === 'pending');
-
-  // Contadores para el dashboard de admin
   const counts = {
     total: allVideos.length,
     approved: allVideos.filter((v) => getVideoStatus(v) === 'approved').length,
     pending: pendingVideos.length,
   };
 
-  // ── Aplicar filtros adicionales ───────────────────────────────────────────
   let filteredVideos = visibleVideos;
-
   if (filters) {
-    const { searchQuery, lugar, categoria, herramienta, difficulty, objetivo, muscleGroup } =
-      filters;
-
+    const { searchQuery, lugar, categoria, herramienta, difficulty, objetivo, muscleGroup } = filters;
     filteredVideos = filteredVideos.filter((v) => {
-      // Lugar
       if (lugar && v.tipo !== lugar) return false;
-
-      // Categoría
-      if (categoria) {
-        if (v.category_id !== categoria) return false;
-      }
-
-      // Herramienta / Equipo
-      if (herramienta && v.equipment) {
-        if (!v.equipment.toLowerCase().includes(herramienta.toLowerCase())) return false;
-      }
-
-      // Dificultad
-      if (difficulty && v.difficulty) {
-        if (!v.difficulty.toLowerCase().includes(difficulty.toLowerCase())) return false;
-      }
-
-      // Objetivo
+      if (categoria && v.category_id !== categoria) return false;
+      if (herramienta && v.equipment && !v.equipment.toLowerCase().includes(herramienta.toLowerCase())) return false;
+      if (difficulty && v.difficulty && !v.difficulty.toLowerCase().includes(difficulty.toLowerCase())) return false;
       if (objetivo && v.objetivo !== objetivo) return false;
-
-      // Grupo muscular
-      if (muscleGroup && v.muscleGroups) {
-        if (!v.muscleGroups.includes(muscleGroup)) return false;
-      }
-
-      // Búsqueda de texto
+      if (muscleGroup && v.muscleGroups && !v.muscleGroups.includes(muscleGroup)) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const matchesTitle = v.title.toLowerCase().includes(q);
-        const matchesDesc = v.description?.toLowerCase().includes(q) ?? false;
-        const matchesEquip = v.equipment?.toLowerCase().includes(q) ?? false;
-        const matchesTags = v.tags?.some((t) => t.toLowerCase().includes(q)) ?? false;
-        if (!matchesTitle && !matchesDesc && !matchesEquip && !matchesTags) return false;
+        const matches =
+          v.title.toLowerCase().includes(q) ||
+          (v.description?.toLowerCase().includes(q) ?? false) ||
+          (v.equipment?.toLowerCase().includes(q) ?? false) ||
+          (v.tags?.some((t) => t.toLowerCase().includes(q)) ?? false);
+        if (!matches) return false;
       }
-
       return true;
     });
   }
 
-  return {
-    videos: filteredVideos,
-    categories,
-    pendingVideos,
-    isLoading,
-    error,
-    refetch,
-    counts,
-  };
+  return { videos: filteredVideos, categories, pendingVideos, isLoading, error, refetch, counts };
 }

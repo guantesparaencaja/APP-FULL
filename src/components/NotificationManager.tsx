@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { sendPushNotification } from '../lib/fcmService';
 
 export function NotificationManager() {
@@ -40,15 +39,15 @@ export function NotificationManager() {
 
       if (todayStr !== lastMotivationDate) {
         // Check if user has a booking today
-        const q = query(
-          collection(db, 'bookings'),
-          where('user_id', '==', String(user.id)),
-          where('date', '==', todayStr),
-          where('status', '==', 'active')
-        );
-        const snap = await getDocs(q);
+        const { data: bookingData } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('user_id', String(user.id))
+          .eq('date', todayStr)
+          .eq('status', 'active')
+          .limit(1);
 
-        if (snap.empty) {
+        if (!bookingData || bookingData.length === 0) {
           const quotes = [
             '¡El único entrenamiento malo es el que no sucedió! 🥊',
             'La disciplina es el puente entre tus metas y tus logros. 💪',
@@ -62,16 +61,15 @@ export function NotificationManager() {
       }
 
       // 3. CLASS REMINDER (2 hours before)
-      const bookingsQ = query(
-        collection(db, 'bookings'),
-        where('user_id', '==', String(user.id)),
-        where('date', '==', todayStr),
-        where('status', '==', 'active')
-      );
-      const bookingsSnap = await getDocs(bookingsQ);
+      const { data: bookingsData } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('user_id', String(user.id))
+        .eq('date', todayStr)
+        .eq('status', 'active');
 
-      bookingsSnap.forEach((doc) => {
-        const data = doc.data();
+      (bookingsData || []).forEach((data: any) => {
+        const bookingId = data.id;
         if (!data.time || typeof data.time !== 'string') return; // ✅ guard undefined
         // ✅ El tiempo puede ser "09:00" o "09:00 - 11:00" (formato admin)
         const startTimePart = data.time.split(' - ')[0].trim();
@@ -87,13 +85,13 @@ export function NotificationManager() {
         const diffHours = diffMs / (1000 * 60 * 60);
 
         // Notify if exactly ~2 hours before (within 10 min window)
-        if (diffHours > 1.8 && diffHours < 2.1 && !checks.classes[doc.id]) {
+        if (diffHours > 1.8 && diffHours < 2.1 && !checks.classes[bookingId]) {
           sendPushNotification(
             String(user.id),
             '🥊 ¡Tu clase comienza pronto!',
             `Te recordamos que tu clase de las ${data.time} comienza en 2 horas.`
           );
-          checks.classes[doc.id] = true;
+          checks.classes[bookingId] = true;
         }
       });
 

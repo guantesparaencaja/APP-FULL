@@ -591,13 +591,14 @@ export function Home() {
                           const next = new Set(checkedTasks);
                           done ? next.delete(idx) : next.add(idx);
                           setCheckedTasks(next);
-                          const today = new Date().toISOString().split('T')[0];
                           try {
-                            await setDoc(doc(db, 'challenge_completions', user.id, 'records', today), {
-                              challengeId: currentChallenge.id,
-                              userId: user.id,
-                              checkedTasks: Array.from(next),
-                            }, { merge: true });
+                            await supabase.from('challenge_completions').upsert({
+                              id: `${user.id}_${today}`,
+                              challenge_id: currentChallenge.id,
+                              user_id: user.id,
+                              date: today,
+                              checked_tasks: Array.from(next),
+                            });
                           } catch (_) {}
                         }}
                         whileTap={{ scale: 0.97 }}
@@ -629,20 +630,21 @@ export function Home() {
                     try {
                       setIsChallengeCompleted(true);
                       const today = new Date().toISOString().split('T')[0];
-                      await setDoc(doc(db, 'challenge_completions', user.id, 'records', today), {
-                        challengeId: currentChallenge.id,
-                        completedAt: new Date().toISOString(),
-                        userId: user.id,
-                        checkedTasks: Array.from(checkedTasks),
+                      await supabase.from('challenge_completions').upsert({
+                        id: `${user.id}_${today}`,
+                        challenge_id: currentChallenge.id,
+                        completed_at: new Date().toISOString(),
+                        user_id: user.id,
+                        checked_tasks: Array.from(checkedTasks),
                       });
 
                       // Log to Activity Feed
-                      await addDoc(collection(db, 'activity_feed'), {
+                      await supabase.from('activity_feed').insert({
                         type: 'challenge_completion',
-                        userId: user.id,
-                        userName: user.name,
+                        user_id: user.id,
+                        user_name: user.name,
                         message: '¡ha completado el reto del día!',
-                        createdAt: serverTimestamp(),
+                        created_at: new Date().toISOString(),
                       });
 
                       showAlert(

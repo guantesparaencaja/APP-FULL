@@ -1,17 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Plus, Trash2, Edit2, Play, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
-import { db } from '../../lib/firebase';
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  query,
-  where,
-  getDocs
-} from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 import { uploadVideoToDrive, deleteVideoFromDrive } from '../../lib/driveService';
 import { FundamentosVideo, FundamentosModule } from '../../types/fundamentos.types';
 import { useStore } from '../../store/useStore';
@@ -59,12 +48,12 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
     e.preventDefault();
     if (!newModuleTitle.trim() || !user) return;
     try {
-      await addDoc(collection(db, 'fundamentos_v4_modules'), {
+      await supabase.from('fundamentos_v4_modules').insert({
         title: newModuleTitle.trim(),
         emoji: newModuleEmoji,
         description: newModuleDesc.trim(),
         order: modules.length + 1,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         createdBy: user.id,
       });
       setNewModuleTitle('');
@@ -82,20 +71,21 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
     setIsDeleting(moduleId);
     try {
       // 1. Obtener todos los videos de este módulo
-      const videosQuery = query(collection(db, 'fundamentos_videos'), where('moduleId', '==', moduleId));
-      const videosSnap = await getDocs(videosQuery);
+      const { data: videosData } = await supabase
+        .from('fundamentos_videos')
+        .select('*')
+        .eq('moduleId', moduleId);
 
       // 2. Eliminar videos en Drive y Firestore
-      for (const videoDoc of videosSnap.docs) {
-        const videoData = videoDoc.data() as FundamentosVideo;
-        if (videoData.videoUrl) {
-          await deleteVideoFromDrive(videoData.videoUrl).catch(console.warn);
+      for (const video of (videosData || [])) {
+        if (video.videoUrl) {
+          await deleteVideoFromDrive(video.videoUrl).catch(console.warn);
         }
-        await deleteDoc(doc(db, 'fundamentos_videos', videoDoc.id));
+        await supabase.from('fundamentos_videos').delete().eq('id', video.id);
       }
 
       // 3. Eliminar el módulo
-      await deleteDoc(doc(db, 'fundamentos_v4_modules', moduleId));
+      await supabase.from('fundamentos_v4_modules').delete().eq('id', moduleId);
       setConfirmDelete(null);
       alert('✅ Módulo y sus videos eliminados correctamente');
     } catch (err) {
@@ -149,17 +139,17 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
         moduleId: selectedModuleId,
         commonErrors: videoFormData.commonErrors.split('\n').filter(l => l.trim()),
         tags: [],
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
         createdBy: user.id,
         isPublished: true,
         order: existingVideos.length + 1,
       };
 
       if (editingVideoId) {
-        await updateDoc(doc(db, 'fundamentos_videos', editingVideoId), data);
+        await supabase.from('fundamentos_videos').update(data).eq('id', editingVideoId);
         alert('✅ Video actualizado');
       } else {
-        await addDoc(collection(db, 'fundamentos_videos'), { ...data, createdAt: serverTimestamp() });
+        await supabase.from('fundamentos_videos').insert({ ...data, createdAt: new Date().toISOString() });
         alert('✅ Video publicado');
       }
 
@@ -175,7 +165,7 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
   const handleDeleteVideo = async (video: FundamentosVideo) => {
     setIsDeleting(video.id);
     try {
-      await deleteDoc(doc(db, 'fundamentos_videos', video.id));
+      await supabase.from('fundamentos_videos').delete().eq('id', video.id);
       if (video.videoUrl) await deleteVideoFromDrive(video.videoUrl).catch(console.warn);
       setConfirmDelete(null);
       alert('✅ Video eliminado');

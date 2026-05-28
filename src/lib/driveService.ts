@@ -1,16 +1,10 @@
 /**
  * GPTE Drive Service v3.0 — Migrado a Supabase Storage
  * 
- * BREAKING: uploadVideoToDrive ahora sube a Supabase Storage (sin OAuth).
- * Todas las demás funciones (hardDelete, approveVideoWithAudit, etc.) se mantienen.
+ * Regla de oro: Supabase = único backend.
  */
 
-import { db, storage } from './firebase';
-import {
-  doc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp,
-  getDocs, query, where,
-} from 'firebase/firestore';
-import { ref, deleteObject } from 'firebase/storage';
+import { supabase } from './supabase';
 import { AuditEntry } from '../types/workout.types';
 import { uploadVideo, deleteVideo } from './videoService';
 
@@ -67,24 +61,14 @@ export async function hardDeleteVideo(
 
   console.log(`[hardDeleteVideo] Eliminando: ${title} (${videoId})`);
 
-  // 1. Eliminar portada de Firebase Storage
+  // 1. Eliminar portada de Firebase Storage (Legacy - Ignorado)
   if (cover_url && cover_url.includes('firebasestorage.googleapis.com')) {
-    try {
-      await deleteObject(ref(storage, cover_url));
-      console.log('[hardDeleteVideo] ✅ Portada eliminada de Storage');
-    } catch (err: any) {
-      errors.push(`Storage cover: ${err?.message || err}`);
-    }
+    console.log('[hardDeleteVideo] Cover Firebase legacy ignorado.');
   }
 
-  // 2. Eliminar video de Firebase Storage (si aplica)
+  // 2. Eliminar video de Firebase Storage (Legacy - Ignorado)
   if (video_url && video_url.includes('firebasestorage.googleapis.com')) {
-    try {
-      await deleteObject(ref(storage, video_url));
-      console.log('[hardDeleteVideo] ✅ Video eliminado de Firebase Storage');
-    } catch (err: any) {
-      errors.push(`Storage video: ${err?.message || err}`);
-    }
+    console.log('[hardDeleteVideo] Video Firebase legacy ignorado.');
   }
 
   // 3. Eliminar de Supabase Storage (si aplica)
@@ -103,23 +87,25 @@ export async function hardDeleteVideo(
 
   // 4. Registrar en ban-list
   try {
-    await addDoc(collection(db, 'rejected_videos'), {
-      originalId: videoId,
+    const { error } = await supabase.from('rejected_videos').insert({
+      original_id: videoId,
       video_url: video_url || null,
       title,
-      rejectedBy: adminId,
-      rejectedAt: new Date().toISOString(),
+      rejected_by: adminId,
+      rejected_at: new Date().toISOString(),
     });
+    if (error) throw error;
   } catch (err: any) {
     errors.push(`Ban-list: ${err?.message || err}`);
   }
 
-  // 5. Eliminar documento de Firestore (punto de no retorno)
+  // 5. Eliminar documento de Supabase (punto de no retorno)
   try {
-    await deleteDoc(doc(db, 'workout_videos', videoId));
-    console.log('[hardDeleteVideo] ✅ Documento eliminado de Firestore');
+    const { error } = await supabase.from('workout_videos').delete().eq('id', videoId);
+    if (error) throw error;
+    console.log('[hardDeleteVideo] ✅ Documento eliminado de Supabase');
   } catch (err: any) {
-    errors.push(`Firestore: ${err?.message || err}`);
+    errors.push(`Supabase delete: ${err?.message || err}`);
     return { success: false, errors };
   }
 
@@ -140,11 +126,16 @@ export async function approveVideoWithAudit(
     timestamp: new Date().toISOString(),
   };
 
-  await updateDoc(doc(db, 'workout_videos', videoId), {
-    status: 'approved',
-    isApproved: true,
-    auditLog: [auditEntry],
-  });
+  const { error } = await supabase
+    .from('workout_videos')
+    .update({
+      status: 'approved',
+      is_approved: true,
+      audit_log: [auditEntry],
+    })
+    .eq('id', videoId);
+
+  if (error) throw error;
 }
 
 // ─── Lyfta Video Importer ─────────────────────────────────────────────────────
@@ -166,37 +157,50 @@ export async function importLyftaVideo(
   metadata: LyftaVideoMetadata,
   uploadedBy: string
 ): Promise<string> {
-  const bannedQ = query(collection(db, 'rejected_videos'), where('video_url', '==', sourceUrl));
-  const bannedSnap = await getDocs(bannedQ);
-  if (!bannedSnap.empty) {
+  // Check banned
+  const { data: bannedData } = await supabase
+    .from('rejected_videos')
+    .select('id')
+    .eq('video_url', sourceUrl);
+
+  if (bannedData && bannedData.length > 0) {
     throw new Error('Este video fue rechazado previamente y no puede volver a importarse.');
   }
 
-  const dupQ = query(collection(db, 'workout_videos'), where('video_url', '==', sourceUrl));
-  const dupSnap = await getDocs(dupQ);
-  if (!dupSnap.empty) {
+  // Check duplicate
+  const { data: dupData } = await supabase
+    .from('workout_videos')
+    .select('id')
+    .eq('video_url', sourceUrl);
+
+  if (dupData && dupData.length > 0) {
     throw new Error('Este video ya existe en la biblioteca.');
   }
 
-  const docRef = await addDoc(collection(db, 'workout_videos'), {
-    ...metadata,
-    video_url: sourceUrl,
-    sourceUrl,
-    status: 'pending',
-    isApproved: false,
-    createdAt: new Date().toISOString(),
-    createdBy: uploadedBy,
-    auditLog: [
-      {
-        action: 'uploaded',
-        adminId: uploadedBy,
-        timestamp: new Date().toISOString(),
-        notes: 'Importado desde Lyfta',
-      } as AuditEntry,
-    ],
-  });
+  const { data, error } = await supabase
+    .from('workout_videos')
+    .insert({
+      ...metadata,
+      video_url: sourceUrl,
+      source_url: sourceUrl,
+      status: 'pending',
+      is_approved: false,
+      created_at: new Date().toISOString(),
+      created_by: uploadedBy,
+      audit_log: [
+        {
+          action: 'uploaded',
+          adminId: uploadedBy,
+          timestamp: new Date().toISOString(),
+          notes: 'Importado desde Lyfta',
+        } as AuditEntry,
+      ],
+    })
+    .select('id')
+    .single();
 
-  return docRef.id;
+  if (error) throw error;
+  return data.id;
 }
 
 // ─── Sync Status ──────────────────────────────────────────────────────────────
@@ -206,15 +210,20 @@ export async function syncVideoStatus(
   status: 'approved' | 'pending',
   adminId: string
 ): Promise<void> {
-  await updateDoc(doc(db, 'workout_videos', videoId), {
-    status,
-    isApproved: status === 'approved',
-    auditLog: [
-      {
-        action: status === 'approved' ? 'approved' : 'uploaded',
-        adminId,
-        timestamp: new Date().toISOString(),
-      },
-    ],
-  });
+  const { error } = await supabase
+    .from('workout_videos')
+    .update({
+      status,
+      is_approved: status === 'approved',
+      audit_log: [
+        {
+          action: status === 'approved' ? 'approved' : 'uploaded',
+          adminId,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    })
+    .eq('id', videoId);
+
+  if (error) throw error;
 }

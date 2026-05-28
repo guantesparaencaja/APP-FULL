@@ -1,15 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { db } from '../lib/firebase';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  doc,
-  updateDoc,
-  limit,
-} from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Bell, CheckCircle2, Info, AlertCircle, Trash2, MessageSquare } from 'lucide-react';
@@ -37,23 +27,39 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
   useEffect(() => {
     if (!user || !isOpen) return;
 
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', String(user.id)),
-      orderBy('created_at', 'desc'),
-      limit(20)
-    );
+    // Initial fetch
+    supabase
+      .from('notifications')
+      .select('*')
+      .eq('userId', String(user.id))
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data) setNotifications(data as Notification[]);
+      });
 
-    const unsub = onSnapshot(q, (snap) => {
-      setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification));
-    });
+    // Realtime subscription
+    const channel = supabase
+      .channel(`notifications_panel_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('userId', String(user.id))
+          .order('created_at', { ascending: false })
+          .limit(20)
+          .then(({ data }) => {
+            if (data) setNotifications(data as Notification[]);
+          });
+      })
+      .subscribe();
 
-    return () => unsub();
+    return () => { supabase.removeChannel(channel); };
   }, [user, isOpen]);
 
   const markAsRead = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'notifications', id), { read: true });
+      await supabase.from('notifications').update({ read: true }).eq('id', id);
     } catch (e) {
       console.error('Error marking as read:', e);
     }
@@ -169,8 +175,8 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
                         {n.message}
                       </p>
                       <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 group-hover:text-primary transition-colors">
-                        {n.created_at?.toMillis
-                          ? format(n.created_at.toMillis(), "d 'de' MMMM, HH:mm", { locale: es })
+                        {n.created_at
+                          ? format(new Date(n.created_at), "d 'de' MMMM, HH:mm", { locale: es })
                           : 'Recién'}
                       </span>
                     </div>

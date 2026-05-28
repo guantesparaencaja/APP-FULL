@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { db } from '../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import {
   X,
   CheckCircle2,
@@ -41,14 +40,13 @@ export function AssessmentModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     if (!user) return;
     setLoading(true);
     try {
-      const userRef = doc(db, 'users', String(user.id));
       const now = new Date().toISOString();
       const updateData = {
         ...formData,
         assessment_completed: true,
         assessment_updated_at: now,
       };
-      await updateDoc(userRef, updateData);
+      await supabase.from('users').update(updateData).eq('id', user.id);
       setUser({ ...user, ...updateData });
       onClose();
     } catch (error: any) {

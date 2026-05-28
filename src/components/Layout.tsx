@@ -21,8 +21,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { OnboardingModal } from './OnboardingModal';
 import { useStore } from '../store/useStore';
-import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { NotificationsPanel } from './NotificationsPanel';
 const MIN_SWIPE_DISTANCE = 50;
@@ -45,12 +44,20 @@ export function Layout() {
   });
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
-      if (doc.exists()) {
-        setAppSettings(doc.data() as any);
-      }
+    // Fetch initial settings
+    supabase.from('settings').select('*').eq('id', 'global').single().then(({ data }) => {
+      if (data) setAppSettings(data as any);
     });
-    return () => unsubscribe();
+
+    // Subscribe to settings changes
+    const settingsChannel = supabase
+      .channel('settings_global')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
+        if ((payload.new as any)?.id === 'global') setAppSettings(payload.new as any);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(settingsChannel); };
   }, []);
 
   useEffect(() => {
@@ -63,18 +70,28 @@ export function Layout() {
       localStorage.removeItem('show_weekly_notifications_panel');
     }
 
-    // Listen for unread count
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', String(user.id)),
-      where('read', '==', false)
-    );
+    // Fetch initial unread count
+    supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('userId', String(user.id))
+      .eq('read', false)
+      .then(({ count }) => setUnreadCount(count || 0));
 
-    const unsub = onSnapshot(q, (snap) => {
-      setUnreadCount(snap.docs.length);
-    });
+    // Subscribe to notification changes
+    const notifChannel = supabase
+      .channel(`notifications_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('userId', String(user.id))
+          .eq('read', false)
+          .then(({ count }) => setUnreadCount(count || 0));
+      })
+      .subscribe();
 
-    return () => unsub();
+    return () => { supabase.removeChannel(notifChannel); };
   }, [user]);
 
   const navItems = [

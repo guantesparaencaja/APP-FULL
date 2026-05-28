@@ -1,6 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   children?: ReactNode;
@@ -24,9 +23,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
 
-    // Log error to Firestore
+    // Log error to Supabase
     try {
-      addDoc(collection(db, 'system_errors'), {
+      supabase.from('system_errors').insert({
         error: error.message,
         stack: error.stack,
         componentStack: errorInfo.componentStack,
@@ -35,7 +34,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         userAgent: navigator.userAgent,
       });
     } catch (e) {
-      console.error('Failed to log error to Firestore', e);
+      console.error('Failed to log error to Supabase', e);
     }
   }
 

@@ -1,30 +1,57 @@
-import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, QueryConstraint } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+/**
+ * useRealtimeCollection — Supabase Realtime (reemplaza Firebase onSnapshot)
+ * Regla de oro: SOLO Supabase. Sin Firebase.
+ */
+import { useEffect, useState, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
 
-export function useRealtimeCollection<T>(
-  collectionPath: string,
-  ...constraints: QueryConstraint[]
+export function useRealtimeCollection<T extends { id: string }>(
+  table: string,
+  // filtros opcionales: { column: value }
+  filters?: Record<string, string | number | boolean>
 ) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const q = query(collection(db, collectionPath), ...constraints);
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setData(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as T));
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      }
-    );
-    return () => unsub();
-  }, [collectionPath, JSON.stringify(constraints)]); // Using stringify as a simple way to detect constraint changes
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    let query = supabase.from(table).select('*');
+    if (filters) {
+      Object.entries(filters).forEach(([col, val]) => {
+        query = query.eq(col, val as string);
+      });
+    }
+    const { data: rows, error: err } = await query;
+    if (err) {
+      setError(err.message);
+    } else {
+      setData((rows ?? []) as T[]);
+    }
+    setLoading(false);
+  }, [table, JSON.stringify(filters)]);
 
-  return { data, loading, error };
+  useEffect(() => {
+    fetchData();
+
+    // Realtime universal — escucha INSERT/UPDATE/DELETE en la tabla
+    const channel = supabase
+      .channel(`realtime:${table}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table },
+        () => {
+          // Re-fetch al detectar cualquier cambio
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData]);
+
+  return { data, loading, error, refetch: fetchData };
 }

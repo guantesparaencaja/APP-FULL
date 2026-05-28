@@ -7,11 +7,7 @@
  * - Aprobado → se queda (Drive o URL). Rechazado → hardDeleteVideo lo borra de todo.
  */
 
-import { db } from '../lib/firebase';
-import {
-  collection, addDoc, getDocs, query, where, updateDoc,
-  doc, serverTimestamp,
-} from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 
 // ─── BIBLIOTECA COMPLETA LYFTA ────────────────────────────────────────────────
 // Patrón: https://apilyfta.com/static/GymvisualMP4/[ID]-[Nombre]_[Músculo].mp4
@@ -410,21 +406,20 @@ const CATEGORIA_ORDER = ['Peso Corporal', 'Boxeo', 'Fuerza', 'Movilidad'];
 // ─── seedBoxeoVideos: actualiza URLs en BoxeoModule (silencioso) ──────────────
 export async function seedBoxeoVideos(): Promise<{ added: number; skipped: number }> {
   let added = 0, skipped = 0;
-  const existing = await getDocs(collection(db, 'boxeo_videos'));
-  const byName = new Map(existing.docs.map(d => [(d.data().nombre || '').toLowerCase(), d]));
+  const { data: existing } = await supabase.from('boxeo_videos').select('id, nombre, url_directa');
+  const byName = new Map((existing || []).map((d: any) => [(d.nombre || '').toLowerCase(), d]));
 
   for (const v of LYFTA_BOXEO_VIDEOS) {
     const key = v.nombre.toLowerCase();
     if (byName.has(key)) {
       const existingDoc = byName.get(key)!;
-      if (!existingDoc.data().url_directa) {
-        await updateDoc(doc(db, 'boxeo_videos', existingDoc.id), { url_directa: v.url });
+      if (!existingDoc.url_directa) {
+        await supabase.from('boxeo_videos').update({ url_directa: v.url }).eq('id', existingDoc.id);
         added++;
       } else {
         skipped++;
       }
     }
-    // no crear nuevos aquí — BoxeoModule usa su propio SEED_VIDEOS con los datos completos
   }
   return { added, skipped };
 }
@@ -436,28 +431,24 @@ export async function syncWorkoutBatch(adminId = 'system'): Promise<{
   category: string;
   message: string;
 }> {
-  // 1. Obtener URLs ya en Firestore y en ban-list
-  const [existingSnap, bannedSnap] = await Promise.all([
-    getDocs(collection(db, 'workout_videos')),
-    getDocs(collection(db, 'rejected_videos')),
+  const [{ data: existingVideos }, { data: bannedVideos }] = await Promise.all([
+    supabase.from('workout_videos').select('video_url'),
+    supabase.from('rejected_videos').select('video_url'),
   ]);
-  const existingUrls = new Set(existingSnap.docs.map(d => d.data().video_url || d.data().sourceUrl || ''));
-  const bannedUrls   = new Set(bannedSnap.docs.map(d => d.data().video_url || ''));
+  const existingUrls = new Set((existingVideos || []).map((d: any) => d.video_url || d.sourceUrl || ''));
+  const bannedUrls   = new Set((bannedVideos || []).map((d: any) => d.video_url || ''));
 
-  // 2. Contar cuántos hay por categoría para determinar cuál viene
   const countByCategory: Record<string, number> = {};
   for (const cat of CATEGORIA_ORDER) countByCategory[cat] = 0;
-  existingSnap.docs.forEach(d => {
-    const cat = d.data().categoria || '';
+  (existingVideos || []).forEach((d: any) => {
+    const cat = d.categoria || '';
     if (countByCategory[cat] !== undefined) countByCategory[cat]++;
   });
 
-  // 3. Elegir la categoría con MENOS videos (rotación inteligente)
   const targetCategory = CATEGORIA_ORDER.reduce((prev, curr) =>
     (countByCategory[curr] ?? 0) <= (countByCategory[prev] ?? 0) ? curr : prev
   );
 
-  // 4. Filtrar videos de esa categoría que no estén añadidos ni baneados
   const batch = LYFTA_LIBRARY.filter(v =>
     v.categoria === targetCategory &&
     !existingUrls.has(v.video_url) &&
@@ -465,24 +456,21 @@ export async function syncWorkoutBatch(adminId = 'system'): Promise<{
   );
 
   if (batch.length === 0) {
-    // Si la categoría objetivo está completa, tomar de cualquier categoría
     const fallback = LYFTA_LIBRARY.filter(v =>
       !existingUrls.has(v.video_url) && !bannedUrls.has(v.video_url)
     );
     if (fallback.length === 0) {
       return { added: 0, skipped: 0, category: '—', message: '✅ Toda la biblioteca ya está cargada.' };
     }
-    // Tomar hasta 8 del fallback
     const toAdd = fallback.slice(0, 8);
-    return addBatchToFirestore(toAdd, adminId, toAdd[0].categoria);
+    return addBatchToSupabase(toAdd, adminId, toAdd[0].categoria);
   }
 
-  // 5. Añadir hasta 8 videos a la vez
   const toAdd = batch.slice(0, 8);
-  return addBatchToFirestore(toAdd, adminId, targetCategory);
+  return addBatchToSupabase(toAdd, adminId, targetCategory);
 }
 
-async function addBatchToFirestore(
+async function addBatchToSupabase(
   batch: typeof LYFTA_LIBRARY,
   adminId: string,
   category: string
@@ -490,26 +478,23 @@ async function addBatchToFirestore(
   let added = 0, skipped = 0;
 
   // Asegurar categoría en workout_categories
-  const catSnap = await getDocs(collection(db, 'workout_categories'));
-  let catId = catSnap.docs.find(d => d.data().name === category)?.id;
+  const { data: catData } = await supabase.from('workout_categories').select('id').eq('name', category).single();
+  let catId = catData?.id;
   if (!catId) {
-    const ref_ = await addDoc(collection(db, 'workout_categories'), { name: category });
-    catId = ref_.id;
+    const { data: newCat } = await supabase.from('workout_categories').insert({ name: category }).select('id').single();
+    catId = newCat?.id;
   }
 
   for (const v of batch) {
-    // doble-check duplicado
-    const dupQ = query(collection(db, 'workout_videos'), where('video_url', '==', v.video_url));
-    const dupSnap = await getDocs(dupQ);
-    if (!dupSnap.empty) { skipped++; continue; }
+    const { count } = await supabase.from('workout_videos').select('*', { count: 'exact', head: true }).eq('video_url', v.video_url);
+    if (count && count > 0) { skipped++; continue; }
 
-    await addDoc(collection(db, 'workout_videos'), {
+    await supabase.from('workout_videos').insert({
       title:       v.title,
       description: v.description,
       video_url:   v.video_url,
-      sourceUrl:   v.video_url,
       cover_url:   '',
-      level:       v.level,
+      difficulty:  v.level,
       duration:    v.duration,
       equipment:   v.equipment,
       tipo:        v.tipo,
@@ -517,11 +502,10 @@ async function addBatchToFirestore(
       categoria:   v.categoria,
       category_id: catId,
       tags:        v.tags,
-      status:      'approved',  // admin lo carga ya aprobado
+      status:      'approved',
       isApproved:  true,
-      created_at:  serverTimestamp(),
-      uploaded_by: adminId,
-      source:      'lyfta_seed',
+      created_at:  new Date().toISOString(),
+      createdBy:   adminId,
     });
     added++;
   }

@@ -1,6 +1,10 @@
+/**
+ * useFundamentosVideos — Supabase (purga Firebase)
+ * Regla de oro: Supabase = fuente única de verdad.
+ * Fallback a datos estáticos si tabla vacía.
+ */
 import { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { FundamentosVideo, FundamentosModule } from '../types/fundamentos.types';
 import { FUNDAMENTOS_MODULES } from '../data/fundamentosData';
 
@@ -11,64 +15,53 @@ export function useFundamentosVideos() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    let loadedVideos = false;
-    let loadedModules = false;
+    let active = true;
+    setLoading(true);
 
-    const checkDone = () => {
-      if (loadedVideos && loadedModules) setLoading(false);
-    };
+    const fetchAll = async () => {
+      try {
+        const [{ data: vids, error: eVids }, { data: mods, error: eMods }] = await Promise.all([
+          supabase.from('fundamentos_videos').select('*').order('order', { ascending: true }),
+          supabase.from('fundamentos_modules').select('*').order('order', { ascending: true }),
+        ]);
 
-    // 1. Escuchar videos
-    const qVideos = query(
-      collection(db, 'fundamentos_videos'),
-      orderBy('order', 'asc')
-    );
+        if (!active) return;
 
-    const unsubVideos = onSnapshot(
-      qVideos,
-      (snapshot) => {
-        setVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundamentosVideo)));
-        loadedVideos = true;
-        checkDone();
-      },
-      (err) => {
-        console.error('Error fetching fundamentos videos:', err);
-        setError(err);
-        loadedVideos = true;
-        checkDone();
-      }
-    );
+        if (eVids) console.error('[useFundamentosVideos] videos:', eVids.message);
+        else setVideos((vids ?? []) as FundamentosVideo[]);
 
-    // 2. Escuchar módulos dinámicos de Firestore
-    const qModules = query(
-      collection(db, 'fundamentos_v4_modules'),
-      orderBy('order', 'asc')
-    );
-
-    const unsubModules = onSnapshot(
-      qModules,
-      (snapshot) => {
-        if (snapshot.empty) {
-          // Si aún no hay módulos en Firestore, caer en los datos estáticos
+        if (eMods || !mods || mods.length === 0) {
+          // Fallback a datos estáticos
           setModules(FUNDAMENTOS_MODULES.map((m, i) => ({ ...m, order: i + 1 })));
         } else {
-          setModules(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundamentosModule)));
+          setModules(mods as FundamentosModule[]);
         }
-        loadedModules = true;
-        checkDone();
-      },
-      (err) => {
-        console.error('Error fetching fundamentos modules:', err);
-        // Fallback a datos estáticos en caso de error
+      } catch (err: unknown) {
+        if (!active) return;
+        setError(err instanceof Error ? err : new Error('Error cargando fundamentos'));
         setModules(FUNDAMENTOS_MODULES.map((m, i) => ({ ...m, order: i + 1 })));
-        loadedModules = true;
-        checkDone();
+      } finally {
+        if (active) setLoading(false);
       }
-    );
+    };
+
+    fetchAll();
+
+    // Realtime universal para fundamentos
+    const chVideos = supabase
+      .channel('realtime:fundamentos_videos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fundamentos_videos' }, fetchAll)
+      .subscribe();
+
+    const chMods = supabase
+      .channel('realtime:fundamentos_modules')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fundamentos_modules' }, fetchAll)
+      .subscribe();
 
     return () => {
-      unsubVideos();
-      unsubModules();
+      active = false;
+      supabase.removeChannel(chVideos);
+      supabase.removeChannel(chMods);
     };
   }, []);
 

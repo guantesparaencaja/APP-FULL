@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Target, TrendingDown, Scale, TrendingUp } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 
 export function FitnessGoalModal() {
   const user = useStore((state) => state.user);
@@ -17,8 +16,7 @@ export function FitnessGoalModal() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, { fitnessGoal: goal });
+      await supabase.from('users').update({ fitnessGoal: goal }).eq('id', user.id);
       setUser({ ...user, fitnessGoal: goal });
     } catch (error) {
       console.error('Error saving fitness goal:', error);

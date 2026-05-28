@@ -4,10 +4,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ExerciseVideoPlayer } from '../components/ExerciseVideoPlayer';
 import { ExerciseDetailCard } from '../components/ExerciseDetailCard';
 import { BoxingTimer } from '../components/BoxingTimer';
-import { saveWorkoutHistory } from '../utils/firebaseHelpers';
-import { auth, db } from '../lib/firebase';
+import { saveWorkoutHistory } from '../utils/supabaseHelpers';
+import { supabase } from '../lib/supabase';
 import { checkAndUnlockAchievements } from '../utils/achievements';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface Exercise {
   id: string;
@@ -67,8 +66,9 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
     setTotalTimeElapsed(duration);
     setFlowState('finished');
 
-    // Save to Firestore
-    const userId = auth.currentUser?.uid || 'guest_user';
+    // Save to Supabase
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const userId = authUser?.id || 'guest_user';
     await saveWorkoutHistory({
       userId,
       durationSeconds: duration,
@@ -81,32 +81,30 @@ export const GuidedWorkoutFlow: React.FC<GuidedWorkoutFlowProps> = ({
       })),
     });
 
-    // Check for achievements
-    if (auth.currentUser) {
+    // Check for achievements — Supabase
+    if (authUser) {
       try {
-        const q = query(collection(db, 'workout_history'), where('userId', '==', userId));
-        const snapshot = await getDocs(q);
-        const allWorkouts = snapshot.docs.map((doc) => doc.data());
+        const { data: allWorkouts } = await supabase
+          .from('workout_history')
+          .select('duration_seconds, exercises')
+          .eq('user_id', userId);
 
+        const rows = allWorkouts ?? [];
         const stats = {
-          totalWorkouts: allWorkouts.length,
+          totalWorkouts: rows.length,
           totalMinutes: Math.floor(
-            allWorkouts.reduce((acc, w) => acc + (w.durationSeconds || 0), 0) / 60
+            rows.reduce((acc: number, w: { duration_seconds?: number }) => acc + (w.duration_seconds || 0), 0) / 60
           ),
-          totalRounds: allWorkouts.reduce((acc, w) => acc + (w.exercises?.length || 0), 0),
-          exercisesCompleted: allWorkouts.reduce((acc, w) => acc + (w.exercises?.length || 0), 0),
+          totalRounds: rows.reduce((acc: number, w: { exercises?: unknown[] }) => acc + (w.exercises?.length || 0), 0),
+          exercisesCompleted: rows.reduce((acc: number, w: { exercises?: unknown[] }) => acc + (w.exercises?.length || 0), 0),
         };
 
         const unlocked = await checkAndUnlockAchievements(userId, stats);
         if (unlocked.length > 0) {
-          console.log(
-            'Nuevos logros desbloqueados:',
-            unlocked.map((a) => a.title)
-          );
-          // You could show a toast or modal here
+          console.log('Nuevos logros desbloqueados:', unlocked.map((a) => a.title));
         }
       } catch (error) {
-        console.error('Error checking achievements after workout:', error);
+        console.error('[GuidedWorkoutFlow] Error checking achievements:', error);
       }
     }
 

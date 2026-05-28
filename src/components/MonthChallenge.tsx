@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
-import { doc, onSnapshot, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import {
   format,
   startOfMonth,
@@ -43,16 +42,29 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'user_challenges', userId), (snap) => {
-      if (snap.exists()) {
-        setChallenge(snap.data());
-        setSelectedDays(snap.data().selectedDays || []);
+    // Initial fetch
+    supabase.from('user_challenges').select('*').eq('id', userId).single().then(({ data }) => {
+      if (data) {
+        setChallenge(data);
+        setSelectedDays(data.selectedDays || []);
       } else {
         setShowDaySelector(true);
       }
       setLoading(false);
     });
-    return () => unsub();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`user_challenges_${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_challenges' }, (payload) => {
+        if ((payload.new as any)?.id === userId) {
+          setChallenge(payload.new as any);
+          setSelectedDays((payload.new as any).selectedDays || []);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
   const handleDayToggle = (dayIndex: number) => {
@@ -66,16 +78,13 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
       alert('Debes escoger entre 5 y 6 días para tu meta del mes.');
       return;
     }
-    await setDoc(
-      doc(db, 'user_challenges', userId),
-      {
-        selectedDays,
-        createdAt: serverTimestamp(),
-        completions: [],
-        streak: 0,
-      },
-      { merge: true }
-    );
+    await supabase.from('user_challenges').upsert({
+      id: userId,
+      selectedDays,
+      createdAt: new Date().toISOString(),
+      completions: [],
+      streak: 0,
+    });
     setShowDaySelector(false);
   };
 
@@ -87,10 +96,10 @@ export const MonthChallenge: React.FC<MonthChallengeProps> = ({ userId, onMotiva
       ? completions.filter((d: string) => d !== dateStr)
       : [...completions, dateStr];
 
-    await updateDoc(doc(db, 'user_challenges', userId), {
+    await supabase.from('user_challenges').update({
       completions: newCompletions,
-      updatedAt: serverTimestamp(),
-    });
+      updatedAt: new Date().toISOString(),
+    }).eq('id', userId);
   };
 
   if (loading) return null;

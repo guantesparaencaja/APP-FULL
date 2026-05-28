@@ -7,8 +7,7 @@
  * Reemplaza completamente a n8nEmailService.ts
  */
 
-import { db } from './firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { supabase } from './supabase';
 
 type EmailType =
   | 'welcome'
@@ -28,16 +27,16 @@ interface EmailPayload {
   motivo?: string;
 }
 
-/** Fallback: guarda en Firestore si Resend falla */
+/** Fallback: guarda en Supabase si Resend falla */
 async function queueEmail(payload: EmailPayload): Promise<void> {
   try {
-    await addDoc(collection(db, 'email_queue'), {
+    await supabase.from('email_queue').insert({
       ...payload,
       status: 'pending',
-      created_at: serverTimestamp(),
+      created_at: new Date().toISOString(),
       retry_count: 0,
     });
-    console.log('[Email] Encolado en Firestore para reintento:', payload.type);
+    console.log('[Email] Encolado en Supabase para reintento:', payload.type);
   } catch (err) {
     console.warn('[Email] No se pudo encolar:', err);
   }

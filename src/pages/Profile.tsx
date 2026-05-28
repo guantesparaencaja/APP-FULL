@@ -136,15 +136,6 @@ export function Profile() {
     }
   };
 
-  const handleFirestoreError = useCallback(
-    (error: any, operationType: string, path: string | null) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`Firestore Error [${operationType}] on ${path}:`, msg);
-      // Do NOT throw — throwing kills onSnapshot listeners and leaves state empty
-    },
-    []
-  );
-
   const showAlert = useCallback(
     (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
       setAlertModal({ isOpen: true, title, message, type });
@@ -344,24 +335,23 @@ export function Profile() {
     try {
       const field = `step${step}_status`;
       const nextField = step < 4 ? `step${step + 1}_status` : null;
-      const approvalRef = doc(db, 'student_approvals', userId);
       const updates: any = {
+        id: userId,
         [field]: 'approved',
         [`step${step}_approved_at`]: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
       if (nextField) updates[nextField] = 'pending';
-      await setDoc(approvalRef, updates, { merge: true });
+      await supabase.from('student_approvals').upsert(updates, { onConflict: 'id' });
 
       // Log to Activity Feed
       if (step === 4) {
-        // Step 4 is usually the final step or a big milestone
-        await addDoc(collection(db, 'activity_feed'), {
+        await supabase.from('activity_feed').insert({
           type: 'milestone',
-          userId: userId,
-          userName: 'Un Estudiante', // We should ideally have the name here
+          user_id: userId,
+          user_name: 'Un Estudiante',
           message: 'ha superado un paso clave en su proceso de licencia!',
-          createdAt: serverTimestamp(),
+          created_at: new Date().toISOString(),
         });
       }
 
@@ -371,26 +361,30 @@ export function Profile() {
         'success'
       );
     } catch (err) {
-      handleFirestoreError(err, 'update', `student_approvals/${userId}`);
+      console.error('Error updating student_approvals:', err);
     }
   };
 
   const handleRejectStep = async (userId: string, step: number) => {
     try {
       if (step === 1) {
-        const approvalSnap = await getDoc(doc(db, 'student_approvals', userId));
-        if (approvalSnap.exists() && approvalSnap.data().step1_video_url) {
-          await deleteStorageFile(approvalSnap.data().step1_video_url);
+        const { data: approvalData } = await supabase
+          .from('student_approvals')
+          .select('step1_video_url')
+          .eq('id', userId)
+          .single();
+        if (approvalData?.step1_video_url) {
+          await deleteStorageFile(approvalData.step1_video_url);
         }
       }
       const field = `step${step}_status`;
-      await setDoc(
-        doc(db, 'student_approvals', userId),
+      await supabase.from('student_approvals').upsert(
         {
+          id: userId,
           [field]: 'rejected',
           updated_at: new Date().toISOString(),
         },
-        { merge: true }
+        { onConflict: 'id' }
       );
       showAlert(
         '❌ Rechazado',
@@ -398,7 +392,7 @@ export function Profile() {
         'info'
       );
     } catch (err) {
-      handleFirestoreError(err, 'update', `student_approvals/${userId}`);
+      console.error('Error rejecting step:', err);
     }
   };
 
@@ -407,7 +401,6 @@ export function Profile() {
     method: 'manillas' | 'combo' | 'contacto'
   ) => {
     try {
-      const evalRef = doc(db, 'combo_evaluations', evaluation.id);
       const updates: any = {
         [`${method}_status`]: 'approved',
         [`${method}_feedback`]: '',
@@ -420,62 +413,72 @@ export function Profile() {
         updates.combo_video_url = '';
       }
 
-      await updateDoc(evalRef, updates);
+      await supabase.from('combo_evaluations').update(updates).eq('id', evaluation.id);
 
       if (method === 'combo') {
         try {
-          const evalSnap = await getDocs(
-            query(
-              collection(db, 'combo_evaluations'),
-              where('user_id', '==', evaluation.user_id),
-              where('combo_status', '==', 'approved')
-            )
-          );
-          const approvedCount = evalSnap.size;
-          const newLevel = Math.floor(approvedCount / 5) + 1;
+          const { count: approvedCount } = await supabase
+            .from('combo_evaluations')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', evaluation.user_id)
+            .eq('combo_status', 'approved');
 
-          const studentRef = doc(db, 'users', evaluation.user_id);
-          const studentDoc = await getDoc(studentRef);
+          const newLevel = Math.floor((approvedCount || 0) / 5) + 1;
 
-          if (studentDoc.exists() && (studentDoc.data().license_level || 1) < newLevel) {
-            await updateDoc(studentRef, { license_level: newLevel });
+          const { data: studentData } = await supabase
+            .from('profiles')
+            .select('license_level')
+            .eq('id', evaluation.user_id)
+            .single();
 
-            await addDoc(collection(db, 'activity_feed'), {
+          if (studentData && (studentData.license_level || 1) < newLevel) {
+            await supabase
+              .from('profiles')
+              .update({ license_level: newLevel })
+              .eq('id', evaluation.user_id);
+
+            await supabase.from('activity_feed').insert({
               type: 'level_up',
-              userId: evaluation.user_id,
-              userName: evaluation.user_name || 'Estudiante',
+              user_id: evaluation.user_id,
+              user_name: evaluation.user_name || 'Estudiante',
               message: `¡ha alcanzado el Nivel ${newLevel}! 🛡️`,
-              createdAt: serverTimestamp(),
+              created_at: new Date().toISOString(),
             });
 
-            await sendPushNotification(
-              evaluation.user_id,
-              '🚀 ¡SUBIDA DE NIVEL!',
-              `¡Felicidades! Has alcanzado el Nivel ${newLevel}. Sigue así guerrero.`
-            );
+            await supabase.from('notifications').insert({
+              user_id: evaluation.user_id,
+              type: 'level_up',
+              title: '🚀 ¡SUBIDA DE NIVEL!',
+              body: `¡Felicidades! Has alcanzado el Nivel ${newLevel}. Sigue así guerrero.`,
+              read: false,
+              created_at: new Date().toISOString(),
+            });
           }
         } catch (e) {
           console.error('Error updating level:', e);
         }
 
-        await addDoc(collection(db, 'activity_feed'), {
+        await supabase.from('activity_feed').insert({
           type: 'combo_mastery',
-          userId: evaluation.user_id,
-          userName: evaluation.user_name || 'Estudiante',
+          user_id: evaluation.user_id,
+          user_name: evaluation.user_name || 'Estudiante',
           message: `¡ha dominado el combo: ${evaluation.combo_name}!`,
-          createdAt: serverTimestamp(),
+          created_at: new Date().toISOString(),
         });
       }
 
-      await sendPushNotification(
-        evaluation.user_id,
-        '✅ Técnica Aprobada',
-        `¡Tu evaluación de ${method} para ${evaluation.combo_name} ha sido aprobada!`
-      );
+      await supabase.from('notifications').insert({
+        user_id: evaluation.user_id,
+        type: 'technique_approved',
+        title: '✅ Técnica Aprobada',
+        body: `¡Tu evaluación de ${method} para ${evaluation.combo_name} ha sido aprobada!`,
+        read: false,
+        created_at: new Date().toISOString(),
+      });
 
       showAlert('✅ Éxito', `Método ${method} aprobado correctamente.`, 'success');
     } catch (err) {
-      handleFirestoreError(err, 'update', `combo_evaluations/${evaluation.id}`);
+      console.error('Error approving combo method:', err);
     }
   };
 
@@ -490,18 +493,20 @@ export function Profile() {
     }
 
     try {
-      const evalRef = doc(db, 'combo_evaluations', evaluation.id);
-      await updateDoc(evalRef, {
+      await supabase.from('combo_evaluations').update({
         [`${method}_status`]: 'rejected',
         [`${method}_feedback`]: feedback,
         updated_at: new Date().toISOString(),
-      });
+      }).eq('id', evaluation.id);
 
-      await sendPushNotification(
-        evaluation.user_id,
-        '❌ Técnica: Requiere Mejora',
-        `Tu evaluación de ${method} para ${evaluation.combo_name} ha sido rechazada. Feedback: ${feedback}`
-      );
+      await supabase.from('notifications').insert({
+        user_id: evaluation.user_id,
+        type: 'technique_rejected',
+        title: '❌ Técnica: Requiere Mejora',
+        body: `Tu evaluación de ${method} para ${evaluation.combo_name} ha sido rechazada. Feedback: ${feedback}`,
+        read: false,
+        created_at: new Date().toISOString(),
+      });
 
       setComboFeedback((prev) => {
         const next = { ...prev };
@@ -511,7 +516,7 @@ export function Profile() {
 
       showAlert('Info', `Método ${method} rechazado con feedback.`, 'info');
     } catch (err) {
-      handleFirestoreError(err, 'update', `combo_evaluations/${evaluation.id}`);
+      console.error('Error rejecting combo method:', err);
     }
   };
 

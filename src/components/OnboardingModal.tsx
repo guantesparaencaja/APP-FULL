@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { db } from '../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { Tutorial } from './Tutorial';
 import { sendWelcomeEmail } from '../lib/email';
 import { motion, AnimatePresence } from 'motion/react';
@@ -123,7 +122,6 @@ export function OnboardingModal() {
     if (!user) return;
     setLoading(true);
     try {
-      const userRef = doc(db, 'users', String(user.id));
       const updatedData = {
         name: formData.name,
         username: formData.username,
@@ -145,7 +143,7 @@ export function OnboardingModal() {
         is_new_user: false,
       };
 
-      await updateDoc(userRef, updatedData);
+      await supabase.from('users').update(updatedData).eq('id', user.id);
       setUser({ ...user, ...updatedData } as any);
 
       // ✉️ Correo de bienvenida

@@ -67,7 +67,11 @@ export const Calentamiento: React.FC = () => {
       let finalUrl = editForm.videoUrl;
       if (videoFile) {
         setUploading(true);
-        finalUrl = await uploadVideoToDrive(videoFile, user.id, (p) => setUploadProgress(p), { type: 'calentamiento', title: editForm.titulo });
+        finalUrl = await uploadVideoToDrive({
+          video: videoFile,
+          name: `calentamiento_${user.id}_${videoFile.name}`,
+          onProgress: (p) => setUploadProgress(p),
+        });
       }
       if (!finalUrl && !videoFile) throw new Error('Debes subir un video para guardar la configuración.');
       await supabase.from('configuracion').upsert({ id: 'calentamiento', tipo: 'storage', videoUrl: finalUrl, titulo: editForm.titulo, descripcion: editForm.descripcion, duracion: editForm.duracion, updated_at: new Date().toISOString(), updated_by: user.email });

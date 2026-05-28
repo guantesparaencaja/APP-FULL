@@ -65,15 +65,7 @@ const DBZ_RANKS = [
   { level: 12, name: "Dios de la Destrucción", icon: "🟣", color: "text-purple-500", glow: "shadow-purple-500/100" }
 ];
 
-const deleteStorageFile = async (storage: any, url?: string) => {
-  if (!url || !url.includes('firebasestorage.googleapis.com')) return;
-  try {
-    const fileRef = ref(storage, url);
-    await deleteObject(fileRef);
-  } catch (error) {
-    console.warn("Could not delete file from storage:", url, error);
-  }
-};
+
 
 export function Saberes() {
   const user = useStore((state) => state.user);
@@ -787,8 +779,7 @@ export function Saberes() {
                     <div className="flex gap-2">
                       <button 
                         onClick={async () => {
-                          await updateDoc(doc(db, 'combo_progress', progress.id), { status: 'approved' });
-                          // fetchComboProgress(); removed, onSnapshot handles it
+                          await supabase.from('combo_progress').update({ status: 'approved' }).eq('id', progress.id);
                         }}
                         className="flex-1 bg-emerald-500/20 text-emerald-500 py-2 rounded-lg text-sm font-bold hover:bg-emerald-500/30 transition-colors"
                       >
@@ -796,8 +787,7 @@ export function Saberes() {
                       </button>
                       <button 
                         onClick={async () => {
-                          await updateDoc(doc(db, 'combo_progress', progress.id), { status: 'rejected' });
-                          // fetchComboProgress(); removed, onSnapshot handles it
+                          await supabase.from('combo_progress').update({ status: 'rejected' }).eq('id', progress.id);
                         }}
                         className="flex-1 bg-red-500/20 text-red-500 py-2 rounded-lg text-sm font-bold hover:bg-red-500/30 transition-colors"
                       >
@@ -1037,28 +1027,28 @@ export function Saberes() {
                               <video src={progress.video_url} controls className="w-full h-36 object-cover rounded-lg bg-slate-950 mb-2" />
                               <div className="flex flex-wrap gap-4 mb-3 border-y border-slate-700/50 py-2">
                                 <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 cursor-pointer">
-                                  <input type="checkbox" checked={!!progress.video_approved} onChange={async (e) => await updateDoc(doc(db, 'combo_progress', progress.id), { video_approved: e.target.checked })} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Video
+                                  <input type="checkbox" checked={!!progress.video_approved} onChange={async (e) => await supabase.from('combo_progress').update({ video_approved: e.target.checked }).eq('id', progress.id)} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Video
                                 </label>
                                 <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 cursor-pointer">
-                                  <input type="checkbox" checked={!!progress.manillas_approved} onChange={async (e) => await updateDoc(doc(db, 'combo_progress', progress.id), { manillas_approved: e.target.checked })} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Manillas
+                                  <input type="checkbox" checked={!!progress.manillas_approved} onChange={async (e) => await supabase.from('combo_progress').update({ manillas_approved: e.target.checked }).eq('id', progress.id)} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Manillas
                                 </label>
                                 <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 cursor-pointer">
-                                  <input type="checkbox" checked={!!progress.contacto_approved} onChange={async (e) => await updateDoc(doc(db, 'combo_progress', progress.id), { contacto_approved: e.target.checked })} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Contacto
+                                  <input type="checkbox" checked={!!progress.contacto_approved} onChange={async (e) => await supabase.from('combo_progress').update({ contacto_approved: e.target.checked }).eq('id', progress.id)} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Contacto
                                 </label>
                                 <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 cursor-pointer">
-                                  <input type="checkbox" checked={!!progress.desarrollo_approved} onChange={async (e) => await updateDoc(doc(db, 'combo_progress', progress.id), { desarrollo_approved: e.target.checked })} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Desarrollo
+                                  <input type="checkbox" checked={!!progress.desarrollo_approved} onChange={async (e) => await supabase.from('combo_progress').update({ desarrollo_approved: e.target.checked }).eq('id', progress.id)} className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary" /> Desarrollo
                                 </label>
                               </div>
                               <div className="flex gap-2">
                                 {progress.status !== 'approved' && (
                                   <button
-                                    onClick={async () => { await updateDoc(doc(db, 'combo_progress', progress.id), { status: 'approved' }); }}
+                                    onClick={async () => { await supabase.from('combo_progress').update({ status: 'approved' }).eq('id', progress.id); }}
                                     className="flex-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 py-2 rounded-lg text-xs font-bold hover:bg-emerald-500/30 transition-colors"
                                   >✓ Aprobar Combo</button>
                                 )}
                                 {progress.status !== 'rejected' && (
                                   <button
-                                    onClick={async () => { await updateDoc(doc(db, 'combo_progress', progress.id), { status: 'rejected' }); }}
+                                    onClick={async () => { await supabase.from('combo_progress').update({ status: 'rejected' }).eq('id', progress.id); }}
                                     className="flex-1 bg-red-500/20 text-red-400 border border-red-500/30 py-2 rounded-lg text-xs font-bold hover:bg-red-500/30 transition-colors"
                                   >✗ Rechazar Combo</button>
                                 )}
@@ -1142,10 +1132,10 @@ export function Saberes() {
               const newLevel = Math.floor(newXp / 100) + 1; // 100 XP per level
               
               try {
-                await updateDoc(doc(db, 'users', String(user.id)), { 
+                await supabase.from('profiles').update({
                   xp: newXp,
                   license_level: newLevel > user.license_level ? newLevel : user.license_level
-                });
+                }).eq('id', user.id);
                 setUser({ 
                   ...user, 
                   xp: newXp,
