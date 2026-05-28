@@ -4,36 +4,49 @@
  *
  * App.tsx — Migrado a Supabase Auth.
  * Firebase completamente eliminado de este archivo.
+ * Code-splitting habilitado con React.lazy para reducir el bundle inicial.
  */
 
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore } from './store/useStore';
 import { Layout } from './components/Layout';
-import { Home } from './pages/Home';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
-import { Saberes } from './pages/Saberes';
-import { Workouts } from './pages/Workouts';
-import { Calentamiento } from './pages/Calentamiento';
-import { Calendar } from './pages/Calendar';
-import { Profile } from './pages/Profile';
-import { Store } from './pages/Store';
-import { FundamentosBoxeo } from './pages/fundamentos/FundamentosBoxeo';
-import { FundamentosVideoPlayer } from './pages/fundamentos/FundamentosVideoPlayer';
-import { Meals } from './pages/Meals';
-import { Plans } from './pages/Plans';
-import { Payments } from './pages/Payments';
-import { PaymentReview } from './pages/PaymentReview';
-import { Timer } from './pages/Timer';
-import { Chat } from './pages/Chat';
-import { Recipes } from './pages/Recipes';
 import { useClassReminders } from './hooks/useClassReminders';
 import { useAppNotifications } from './hooks/useAppNotifications';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { VersionCheckModal } from './components/VersionCheckModal';
+
+// ── Páginas cargadas dinámicamente (Code-Splitting) ────────────────────────
+const Home                 = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
+const Login                = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
+const Register             = lazy(() => import('./pages/Register').then(m => ({ default: m.Register })));
+const Saberes              = lazy(() => import('./pages/Saberes').then(m => ({ default: m.Saberes })));
+const Workouts             = lazy(() => import('./pages/Workouts').then(m => ({ default: m.Workouts })));
+const Calentamiento        = lazy(() => import('./pages/Calentamiento').then(m => ({ default: m.Calentamiento })));
+const Calendar             = lazy(() => import('./pages/Calendar').then(m => ({ default: m.Calendar })));
+const Profile              = lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })));
+const Store                = lazy(() => import('./pages/Store').then(m => ({ default: m.Store })));
+const FundamentosBoxeo     = lazy(() => import('./pages/fundamentos/FundamentosBoxeo').then(m => ({ default: m.FundamentosBoxeo })));
+const FundamentosVideoPlayer = lazy(() => import('./pages/fundamentos/FundamentosVideoPlayer').then(m => ({ default: m.FundamentosVideoPlayer })));
+const Meals                = lazy(() => import('./pages/Meals').then(m => ({ default: m.Meals })));
+const Plans                = lazy(() => import('./pages/Plans').then(m => ({ default: m.Plans })));
+const Payments             = lazy(() => import('./pages/Payments').then(m => ({ default: m.Payments })));
+const PaymentReview        = lazy(() => import('./pages/PaymentReview').then(m => ({ default: m.PaymentReview })));
+const Timer                = lazy(() => import('./pages/Timer').then(m => ({ default: m.Timer })));
+const Chat                 = lazy(() => import('./pages/Chat').then(m => ({ default: m.Chat })));
+const Recipes              = lazy(() => import('./pages/Recipes').then(m => ({ default: m.Recipes })));
+
+// ── Pantalla de carga entre páginas ───────────────────────────────────────
+function LoadingFallback() {
+  return (
+    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 gap-4">
+      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <p className="text-slate-400 text-sm font-semibold tracking-widest uppercase">Cargando...</p>
+    </div>
+  );
+}
 import { Capacitor } from '@capacitor/core';
 
 // ── Supabase Auth (reemplaza Firebase) ──────────────────────────────────────
@@ -331,30 +344,32 @@ export default function App() {
       </AnimatePresence>
       <ErrorBoundary>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-            <Route element={<Layout />}>
-              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-              <Route path="/saberes" element={<ProtectedRoute><Saberes /></ProtectedRoute>} />
-              <Route path="/saberes/fundamentos" element={<ProtectedRoute><FundamentosBoxeo /></ProtectedRoute>} />
-              <Route path="/saberes/fundamentos/:videoId" element={<ProtectedRoute><FundamentosVideoPlayer /></ProtectedRoute>} />
-              <Route path="/workouts" element={<ProtectedRoute><Workouts /></ProtectedRoute>} />
-              <Route path="/calentamiento" element={<ProtectedRoute><Calentamiento /></ProtectedRoute>} />
-              <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              <Route path="/meals" element={<ProtectedRoute><Meals /></ProtectedRoute>} />
-              <Route path="/plans" element={<ProtectedRoute><Plans /></ProtectedRoute>} />
-              <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
-              <Route path="/payment-review" element={<ProtectedRoute><PaymentReview /></ProtectedRoute>} />
-              <Route path="/timer" element={<ProtectedRoute><Timer /></ProtectedRoute>} />
-              <Route path="/aprobacion" element={<ProtectedRoute><Saberes /></ProtectedRoute>} />
-              <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-              <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
-              <Route path="/store" element={<ProtectedRoute><Store /></ProtectedRoute>} />
-            </Route>
-          </Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                <Route path="/saberes" element={<ProtectedRoute><Saberes /></ProtectedRoute>} />
+                <Route path="/saberes/fundamentos" element={<ProtectedRoute><FundamentosBoxeo /></ProtectedRoute>} />
+                <Route path="/saberes/fundamentos/:videoId" element={<ProtectedRoute><FundamentosVideoPlayer /></ProtectedRoute>} />
+                <Route path="/workouts" element={<ProtectedRoute><Workouts /></ProtectedRoute>} />
+                <Route path="/calentamiento" element={<ProtectedRoute><Calentamiento /></ProtectedRoute>} />
+                <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                <Route path="/meals" element={<ProtectedRoute><Meals /></ProtectedRoute>} />
+                <Route path="/plans" element={<ProtectedRoute><Plans /></ProtectedRoute>} />
+                <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+                <Route path="/payment-review" element={<ProtectedRoute><PaymentReview /></ProtectedRoute>} />
+                <Route path="/timer" element={<ProtectedRoute><Timer /></ProtectedRoute>} />
+                <Route path="/aprobacion" element={<ProtectedRoute><Saberes /></ProtectedRoute>} />
+                <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+                <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
+                <Route path="/store" element={<ProtectedRoute><Store /></ProtectedRoute>} />
+              </Route>
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </ErrorBoundary>
 
