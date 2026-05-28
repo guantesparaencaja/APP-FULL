@@ -22,21 +22,32 @@ export async function uploadVideo({
   path,
   onProgress,
 }: UploadVideoOptions): Promise<string> {
-  if (!supabase) {
-    throw new Error('Supabase no está configurado. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.');
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  if (!supabase || !supabaseUrl || supabaseUrl.includes('placeholder')) {
+    throw new Error('Supabase no está configurado en las variables de entorno de Vercel. Por favor, agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en la configuración de Vercel.');
   }
 
   // Simular progreso al 10% para dar feedback inmediato
   onProgress?.(10);
 
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .upload(path, file, {
-      cacheControl: '3600',
-      upsert: true,
-    });
+  let uploadResult;
+  try {
+    uploadResult = await supabase.storage
+      .from(bucket)
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+  } catch (fetchErr: any) {
+    throw new Error('Failed to fetch. Por favor, asegúrate de haber configurado VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en Vercel, y de que el bucket \'gpte-videos\' existe y es público en Supabase Storage.');
+  }
+
+  const { data, error } = uploadResult;
 
   if (error) {
+    if (error.message && error.message.includes('Failed to fetch')) {
+      throw new Error('Failed to fetch. Asegúrate de que el bucket \'gpte-videos\' existe y tiene políticas públicas de subida en Supabase.');
+    }
     throw new Error('Error al subir video: ' + error.message);
   }
 

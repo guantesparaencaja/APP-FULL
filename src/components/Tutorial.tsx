@@ -30,10 +30,10 @@ const TUTORIAL_STEPS = [
     icon: Calendar,
     description:
       'Agenda fácilmente tus sesiones presenciales, selecciona tu horario ideal y asegura tu cupo en tiempo real.',
-    color: 'text-purple-500',
-    bg: 'bg-purple-500/20',
-    border: 'border-purple-500/50',
-    shadow: 'shadow-purple-500/30',
+    color: 'text-sky-500',
+    bg: 'bg-sky-500/20',
+    border: 'border-sky-500/50',
+    shadow: 'shadow-sky-500/30',
   },
   {
     title: 'Sube de Nivel',

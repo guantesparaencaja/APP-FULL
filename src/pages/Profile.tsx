@@ -1870,7 +1870,7 @@ export function Profile() {
                           </div>
                           <div className="flex items-center gap-3">
                             <span
-                              className={`text-[9px] uppercase font-black px-3 py-1 rounded-lg tracking-[0.15em] border ${u.role === 'admin' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : 'bg-primary/10 text-primary border-primary/20'}`}
+                              className={`text-[9px] uppercase font-black px-3 py-1 rounded-lg tracking-[0.15em] border ${u.role === 'admin' ? 'bg-accent-purple/10 text-accent-purple border-accent-purple/20' : 'bg-primary/10 text-primary border-primary/20'}`}
                             >
                               {u.role}
                             </span>
@@ -2226,7 +2226,7 @@ export function Profile() {
                   console.error('Error claiming admin:', err);
                 }
               }}
-              className="w-full flex items-center justify-center p-5 bg-purple-600 text-white rounded-4xl hover:bg-purple-700 transition-all shadow-xl shadow-purple-600/20"
+              className="w-full flex items-center justify-center p-5 bg-primary text-white rounded-4xl hover:bg-primary-dark transition-all shadow-xl shadow-primary/20"
             >
               <div className="flex items-center gap-3">
                 <Shield className="w-6 h-6" />

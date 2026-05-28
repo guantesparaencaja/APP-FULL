@@ -150,7 +150,7 @@ export function InteractiveLesson({
                 ? 'bg-blue-500/20 text-blue-400'
                 : currentStep.type === 'practice'
                   ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'bg-purple-500/20 text-purple-400'
+                  : 'bg-indigo-500/20 text-indigo-400'
             }`}
           >
             {currentStep.type === 'video'

@@ -227,7 +227,7 @@ export const UserProgressDashboard: React.FC = () => {
               </div>
             )}
             {streak.currentStreak >= 30 && (
-              <div className="mt-2 inline-flex items-center gap-1 bg-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-purple-500/30">
+              <div className="mt-2 inline-flex items-center gap-1 bg-accent-purple/20 text-accent-purple px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-accent-purple/30">
                 <Flame className="w-3 h-3" /> ¡Leyenda Activa (1 mes)!
               </div>
             )}

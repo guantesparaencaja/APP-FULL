@@ -286,7 +286,7 @@ export function Store() {
           className="flex flex-col items-center justify-center py-24 text-center"
         >
           <div className="relative mb-8">
-            <div className="w-32 h-32 rounded-full bg-linear-to-br from-primary/20 to-purple-500/20 flex items-center justify-center border border-primary/20">
+            <div className="w-32 h-32 rounded-full bg-linear-to-br from-primary/20 to-accent-purple/20 flex items-center justify-center border border-primary/20">
               <ShoppingBag className="w-14 h-14 text-primary/60" />
             </div>
             <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary flex items-center justify-center animate-bounce">

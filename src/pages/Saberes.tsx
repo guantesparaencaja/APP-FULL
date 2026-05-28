@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { PlayCircle, CheckCircle, Lock, ArrowLeft, Upload, Check, Video, Plus, X, Edit2, Trash2, Play, Loader2, Award, Shield, AlertTriangle, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { uploadVideoToDrive } from '../lib/driveService';
+import { uploadVideoToDrive, deleteVideoFromDrive } from '../lib/driveService';
 import { supabase } from '../lib/supabase';
 import { sendPushNotification } from '../lib/fcmService';
 import { InteractiveLesson } from '../components/InteractiveLesson';
@@ -97,7 +97,7 @@ export function Saberes() {
   const [seeding, setSeeding] = useState(false);
   const [activeTab, setActiveTab] = useState<'Aprender' | 'Combos y Evaluación'>('Aprender');
   // ✅ Preview de video: muestra el video al estudiante antes de confirmar el envío
-  const [videoPreview, setVideoPreview] = useState<{ file: File; previewUrl: string; comboId: string } | null>(null);
+  const [videoPreview, setVideoPreview] = useState<{ file: File; previewUrl: string; comboId: string; isAdmin?: boolean } | null>(null);
   // ✅ Fullscreen video tutorial
   const [fullscreenVideo, setFullscreenVideo] = useState<Tutorial | null>(null);
 
@@ -337,8 +337,7 @@ export function Saberes() {
       // ✅ Mostrar preview antes de confirmar
       const previewUrl = URL.createObjectURL(file);
       if (user?.role === 'admin' && editingCombo) {
-        // Admin: sube directamente a Storage
-        handleConfirmVideoUpload(file, true);
+        setVideoPreview({ file, previewUrl, comboId: editingCombo.id, isAdmin: true });
       } else if (uploadingComboId) {
         setVideoPreview({ file, previewUrl, comboId: uploadingComboId });
       }
@@ -408,12 +407,32 @@ export function Saberes() {
   };
 
   const handleDeleteCombo = (id: string) => {
+    const combo = combos.find(c => c.id === id);
     setConfirmDialog({ isOpen: true, title: 'Eliminar Combo', message: '¿Estás seguro?',
       onConfirm: async () => {
-        try { await supabase.from('combos').delete().eq('id', id); } catch (err) { console.error(err); }
+        try {
+          if (combo?.video_url) {
+            await deleteVideoFromDrive(combo.video_url);
+          }
+          await supabase.from('combos').delete().eq('id', id);
+        } catch (err) { console.error(err); }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
+  };
+
+  const handleDeleteComboVideo = async (combo: Combo) => {
+    if (!confirm('¿Eliminar el video explicativo de este combo?')) return;
+    try {
+      if (combo.video_url) {
+        await deleteVideoFromDrive(combo.video_url);
+      }
+      await supabase.from('combos').update({ video_url: '' }).eq('id', combo.id);
+      alert('✅ Video explicativo eliminado.');
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar el video.');
+    }
   };
 
   const handleApproveCombo = async (comboId: string, type: 'video' | 'manillas' | 'contacto' | 'desarrollo', userId: string) => {
@@ -493,7 +512,7 @@ export function Saberes() {
                   <X className="w-4 h-4" /> Rechazar — Elegir otro
                 </button>
                 <button
-                  onClick={() => handleConfirmVideoUpload(videoPreview.file)}
+                  onClick={() => handleConfirmVideoUpload(videoPreview.file, videoPreview.isAdmin)}
                   disabled={uploadProgress !== null}
                   className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
@@ -933,6 +952,15 @@ export function Saberes() {
                                 >
                                   <Upload className="w-4 h-4" />
                                 </button>
+                                {combo.video_url && (
+                                  <button 
+                                    onClick={() => handleDeleteComboVideo(combo)}
+                                    className="p-1.5 text-red-400 hover:text-red-300 bg-slate-700/50 rounded-lg transition-colors"
+                                    title="Eliminar Video Explicativo"
+                                  >
+                                    <Video className="w-4 h-4 text-red-500" />
+                                  </button>
+                                )}
                                 <button 
                                   onClick={() => handleDeleteCombo(combo.id)}
                                   className="p-1.5 text-slate-400 hover:text-red-400 bg-slate-700/50 rounded-lg transition-colors"

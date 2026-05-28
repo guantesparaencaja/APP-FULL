@@ -907,19 +907,19 @@ export function Home() {
 
         <button
           onClick={() => navigate('/calendar')}
-          className="relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-4xl sm:rounded-[2.5rem] hover:border-purple-500/40 transition-all text-left group min-h-[200px] sm:min-h-[240px] hover:shadow-xl hover:shadow-purple-500/5"
+          className="relative overflow-hidden flex flex-col gap-4 sm:gap-6 glass-card p-6 sm:p-10 rounded-4xl sm:rounded-[2.5rem] hover:border-primary/40 transition-all text-left group min-h-[200px] sm:min-h-[240px] hover:shadow-xl hover:shadow-primary/5"
         >
-          <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-purple-500/5 rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-110"></div>
+          <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-primary/5 rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-110"></div>
           <div className="flex items-center justify-between relative z-10">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 border border-purple-500/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
               <Calendar className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
-            <span className="bg-purple-500/10 text-purple-500 text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-purple-500/20">
+            <span className="bg-primary/10 text-primary text-[9px] sm:text-[11px] font-black px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl uppercase tracking-[0.2em] border border-primary/20">
               Presencial
             </span>
           </div>
           <div className="relative z-10">
-            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-purple-500 transition-colors uppercase tracking-tight leading-none">
+            <h3 className="font-black text-2xl sm:text-3xl text-slate-900 dark:text-white group-hover:text-primary transition-colors uppercase tracking-tight leading-none">
               Reservar Clase
             </h3>
             <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 sm:mt-4 font-medium leading-relaxed">
@@ -1049,14 +1049,14 @@ export function Home() {
             {dailyJokes.dark.length > 0 && (
               <div className="bg-slate-900/50 p-6 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-700/50 shadow-inner relative overflow-hidden">
                 <div className="absolute -right-4 -top-4 text-4xl sm:text-6xl opacity-10">🦇</div>
-                <span className="text-[10px] sm:text-[11px] font-black text-purple-400 uppercase tracking-[0.25em] mb-4 sm:mb-6 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-purple-500 animate-pulse"></span>
+                <span className="text-[10px] sm:text-[11px] font-black text-blue-400 uppercase tracking-[0.25em] mb-4 sm:mb-6 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 animate-pulse"></span>
                   Humor Negro 💀
                 </span>
                 <div className="space-y-4 sm:space-y-6 relative z-10">
                   {dailyJokes.dark.map((joke, idx) => (
                     <div key={idx} className="flex gap-3 sm:gap-4 items-start">
-                      <span className="text-purple-500/50 font-black text-lg sm:text-xl">
+                      <span className="text-blue-500/50 font-black text-lg sm:text-xl">
                         {idx + 1}.
                       </span>
                       <p className="text-sm sm:text-base text-slate-400 leading-relaxed font-medium">

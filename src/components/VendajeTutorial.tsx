@@ -3,7 +3,7 @@ import { ShieldCheck, Video, CheckCircle, Plus, Trash2, Upload, X, Loader2 } fro
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
-import { uploadVideoToDrive } from '../lib/driveService';
+import { uploadVideoToDrive, deleteVideoFromDrive } from '../lib/driveService';
 
 interface VendajeVideo {
   id: string;
@@ -23,6 +23,8 @@ export function VendajeTutorial() {
   const [showAdd, setShowAdd] = useState(false);
   const [newVideo, setNewVideo] = useState({ title: '', description: '', video_url: '' });
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +83,7 @@ export function VendajeTutorial() {
 
     const tempVideo = document.createElement('video');
     tempVideo.preload = 'metadata';
-    tempVideo.onloadedmetadata = async () => {
+    tempVideo.onloadedmetadata = () => {
       URL.revokeObjectURL(tempVideo.src);
       if (tempVideo.duration > 300) {
         alert('El video no puede durar más de 5 minutos (300 segundos).');
@@ -89,22 +91,43 @@ export function VendajeTutorial() {
         return;
       }
       
-      setUploadProgress(0);
-      try {
-        const url = await uploadVideoToDrive({
-          video: file,
-          name: `vendaje_${Date.now()}_${file.name}`,
-          onProgress: (pct) => setUploadProgress(pct)
-        });
-        setNewVideo(prev => ({ ...prev, video_url: url }));
-      } catch (err: any) {
-        alert('Error Drive: ' + err.message);
-      } finally {
-        setUploadProgress(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
+      const pUrl = URL.createObjectURL(file);
+      setSelectedFile(file);
+      setPreviewUrl(pUrl);
     };
     tempVideo.src = URL.createObjectURL(file);
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!selectedFile) return;
+    setUploadProgress(0);
+    try {
+      const url = await uploadVideoToDrive({
+        video: selectedFile,
+        name: `vendaje_${Date.now()}_${selectedFile.name}`,
+        onProgress: (pct) => setUploadProgress(pct)
+      });
+      setNewVideo(prev => ({ ...prev, video_url: url }));
+      setSelectedFile(null);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl('');
+      }
+    } catch (err: any) {
+      alert('Error al subir: ' + err.message);
+    } finally {
+      setUploadProgress(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCancelFile = () => {
+    setSelectedFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl('');
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleAddVideo = async (e: React.FormEvent) => {
@@ -123,10 +146,13 @@ export function VendajeTutorial() {
     }
   };
 
-  const handleDeleteVideo = async (id: string) => {
+  const handleDeleteVideo = async (video: VendajeVideo) => {
     if (!confirm('¿Eliminar este video de vendaje?')) return;
     try {
-      await supabase.from('vendaje_videos').delete().eq('id', id);
+      if (video.video_url) {
+        await deleteVideoFromDrive(video.video_url);
+      }
+      await supabase.from('vendaje_videos').delete().eq('id', video.id);
       // onSnapshot actualiza automáticamente
     } catch (err) {
       console.error('Error deleting video:', err);
@@ -196,32 +222,68 @@ export function VendajeTutorial() {
                 />
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold text-slate-400 uppercase">Subir Video</label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="video/*"
-                    onChange={handleVideoUpload}
-                    disabled={uploadProgress !== null}
-                    className="text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-primary/20 file:text-primary hover:file:bg-primary/30 disabled:opacity-50"
-                  />
-                  {uploadProgress !== null && (
-                    <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-primary h-full transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      ></div>
+                  {!selectedFile && !newVideo.video_url && (
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoUpload}
+                      disabled={uploadProgress !== null}
+                      className="text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-primary/20 file:text-primary hover:file:bg-primary/30 disabled:opacity-50"
+                    />
+                  )}
+                  
+                  {selectedFile && uploadProgress === null && (
+                    <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 my-2">
+                      <p className="text-xs text-slate-300 font-bold truncate">🎥 {selectedFile.name}</p>
+                      <video 
+                        src={previewUrl} 
+                        controls 
+                        className="w-full h-32 object-contain bg-black rounded-lg" 
+                      />
+                      <div className="flex gap-2">
+                        <button type="button" onClick={handleCancelFile} className="flex-1 py-2 rounded-lg border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800">Elegir Otro</button>
+                        <button type="button" onClick={handleConfirmUpload} className="flex-1 py-2 rounded-lg bg-primary text-black text-xs font-black uppercase hover:bg-primary/90 flex justify-center items-center gap-1"><Upload className="w-3 h-3"/> Confirmar y Subir</button>
+                      </div>
                     </div>
                   )}
-                  <span className="text-xs text-slate-500 text-center my-1">
-                    O pega una URL directamente
-                  </span>
-                  <input
-                    type="url"
-                    placeholder="URL del video"
-                    value={newVideo.video_url}
-                    onChange={(e) => setNewVideo({ ...newVideo, video_url: e.target.value })}
-                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                  />
+
+                  {uploadProgress !== null && (
+                    <div className="bg-slate-950/50 p-4 flex flex-col items-center justify-center rounded-xl border border-primary/50 my-2">
+                      <Loader2 className="w-6 h-6 text-primary animate-spin mb-2" />
+                      <span className="text-xs font-bold text-slate-300">Subiendo... {uploadProgress}%</span>
+                      <div className="w-full bg-slate-700 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div className="bg-primary h-full transition-all" style={{ width: `${uploadProgress}%` }}></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {newVideo.video_url && (
+                    <div className="bg-slate-950/50 p-3 rounded-xl border border-emerald-500/20 text-emerald-400 text-xs font-bold flex justify-between items-center my-2">
+                      <span>✅ Video subido y listo</span>
+                      <button type="button" onClick={() => {
+                        if (newVideo.video_url.includes('supabase.co')) {
+                          deleteVideoFromDrive(newVideo.video_url);
+                        }
+                        setNewVideo(prev => ({ ...prev, video_url: '' }));
+                      }} className="text-red-400 hover:text-red-300">Eliminar</button>
+                    </div>
+                  )}
+
+                  {!selectedFile && !newVideo.video_url && (
+                    <>
+                      <span className="text-[10px] text-slate-500 text-center my-1 font-bold uppercase tracking-wider">
+                        O pega una URL directamente
+                      </span>
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={newVideo.video_url}
+                        onChange={(e) => setNewVideo({ ...newVideo, video_url: e.target.value })}
+                        className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none"
+                      />
+                    </>
+                  )}
                 </div>
                 <button
                   type="submit"
@@ -272,7 +334,7 @@ export function VendajeTutorial() {
                 <video src={v.video_url} controls className="w-full h-full object-cover" />
                 {isAdmin && (
                   <button
-                    onClick={() => handleDeleteVideo(v.id)}
+                    onClick={() => handleDeleteVideo(v)}
                     className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full z-30 shadow-lg opacity-100"
                     title="Eliminar video"
                   >

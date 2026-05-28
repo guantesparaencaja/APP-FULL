@@ -7,7 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
-import { uploadVideoToDrive } from '../lib/driveService';
+import { uploadVideoToDrive, deleteVideoFromDrive } from '../lib/driveService';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -271,9 +271,12 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     await supabase.from('boxeo_videos').update({ activo: !v.activo }).eq('id', v.id);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (v: BoxeoVideo) => {
     if (!confirm('¿Eliminar este video permanentemente?')) return;
-    await supabase.from('boxeo_videos').delete().eq('id', id);
+    if (v.url_directa) {
+      await deleteVideoFromDrive(v.url_directa);
+    }
+    await supabase.from('boxeo_videos').delete().eq('id', v.id);
   };
 
   // ── Derived data ───────────────────────────────────────────────────────────
@@ -386,6 +389,11 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                     {selectedFile && !uploading && (
                       <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col gap-3">
                         <p className="text-sm text-slate-300 font-bold truncate">🎥 {selectedFile.name}</p>
+                        <video 
+                          src={URL.createObjectURL(selectedFile)} 
+                          controls 
+                          className="w-full h-40 object-contain bg-black rounded-lg" 
+                        />
                         <div className="flex gap-2">
                           <button type="button" onClick={handleCancelFile} className="flex-1 py-2 rounded-lg border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-700">Elegir Otro</button>
                           <button type="button" onClick={handleConfirmUpload} className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 flex justify-center items-center gap-1"><Upload className="w-3 h-3"/> Subir Video</button>
@@ -494,7 +502,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                   <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditModal(v); }} className="flex-1 text-[10px] font-black px-3 py-2 rounded-xl uppercase bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center justify-center gap-1">
                     <Edit2 className="w-3 h-3" /> Editar
                   </button>
-                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(v.id); }} className="flex-1 text-[10px] font-black px-3 py-2 rounded-xl uppercase bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all flex items-center justify-center gap-1">
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(v); }} className="flex-1 text-[10px] font-black px-3 py-2 rounded-xl uppercase bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all flex items-center justify-center gap-1">
                     <Trash2 className="w-3 h-3" /> Eliminar
                   </button>
                 </div>

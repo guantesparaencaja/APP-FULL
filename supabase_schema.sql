@@ -408,3 +408,26 @@ create or replace view public.v_top_users_month as
   from public.user_stats
   order by classes_this_month desc
   limit 20;
+
+-- ─── 19. CONFIGURACIÓN DE STORAGE (BÚCKETS Y POLÍTICAS DE ACCESO) ──────────────
+-- Ejecutar esto en el editor SQL de Supabase para crear el búcket y habilitar la subida y borrado de videos.
+--
+-- 1. Crear el bucket 'gpte-videos' como público si no existe
+-- insert into storage.buckets (id, name, public)
+-- values ('gpte-videos', 'gpte-videos', true)
+-- on conflict (id) do nothing;
+--
+-- 2. Habilitar políticas de acceso para lectura, inserción y borrado
+--
+-- create policy "Acceso público de lectura a videos"
+--   on storage.objects for select
+--   using (bucket_id = 'gpte-videos');
+--
+-- create policy "Permitir a cualquiera subir videos"
+--   on storage.objects for insert
+--   with check (bucket_id = 'gpte-videos');
+--
+-- create policy "Permitir borrar videos"
+--   on storage.objects for delete
+--   using (bucket_id = 'gpte-videos');
+

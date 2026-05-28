@@ -369,12 +369,12 @@ export function Plans() {
                       {/* Decisao Box */}
                       <button
                         onClick={() => handleSelectPlan(plan, 'decisao')}
-                        className="bg-white/30 dark:bg-slate-900/40 p-5 rounded-3xl border border-white/20 dark:border-slate-800/50 hover:bg-purple-500/5 dark:hover:bg-purple-500/10 hover:border-purple-500/30 transition-all text-left group/btn"
+                        className="bg-white/30 dark:bg-slate-900/40 p-5 rounded-3xl border border-white/20 dark:border-slate-800/50 hover:bg-accent-purple/5 dark:hover:bg-accent-purple/10 hover:border-accent-purple/30 transition-all text-left group/btn"
                       >
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2 opacity-80 group-hover/btn:text-purple-500 transition-colors">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2 opacity-80 group-hover/btn:text-accent-purple transition-colors">
                           Sede Decisao
                         </span>
-                        <span className="text-xl md:text-2xl font-black text-purple-500 tracking-tighter">
+                        <span className="text-xl md:text-2xl font-black text-accent-purple tracking-tighter">
                           ${plan.price_decisao.toLocaleString()}
                         </span>
                       </button>
