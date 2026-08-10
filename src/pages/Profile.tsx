@@ -2057,9 +2057,13 @@ export function Profile() {
                           setTogglingSection(key);
                           try {
                             const { data } = await supabase.from('settings').select('*').eq('id', 'global').single();
-                            const currentVal = data ? data[key] : false;
-                            await supabase.from('settings').upsert({ id: 'global', [key]: !currentVal });
-                            setAppSettings((prev: any) => ({ ...prev, [key]: !currentVal }));
+                            const currentVal = data && data.data ? data.data[key] : false;
+                            const updatedData = {
+                              ...(data && data.data ? data.data : {}),
+                              [key]: !currentVal
+                            };
+                            await supabase.from('settings').upsert({ id: 'global', data: updatedData });
+                            setAppSettings(updatedData);
                           } catch (e) {
                             console.error('Error toggling section:', e);
                           } finally { setTogglingSection(null); }

@@ -46,14 +46,16 @@ export function Layout() {
   useEffect(() => {
     // Fetch initial settings
     supabase.from('settings').select('*').eq('id', 'global').single().then(({ data }) => {
-      if (data) setAppSettings(data as any);
+      if (data && data.data) setAppSettings(data.data);
     });
 
     // Subscribe to settings changes
     const settingsChannel = supabase
       .channel('settings_global')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
-        if ((payload.new as any)?.id === 'global') setAppSettings(payload.new as any);
+        if ((payload.new as any)?.id === 'global' && (payload.new as any)?.data) {
+          setAppSettings((payload.new as any).data);
+        }
       })
       .subscribe();
 

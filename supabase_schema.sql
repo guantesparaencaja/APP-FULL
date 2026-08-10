@@ -446,3 +446,209 @@ create or replace view public.v_top_users_month as
 --   on storage.objects for delete
 --   using (bucket_id = 'gpte-videos');
 
+
+-- ─── 20. TABLAS ADICIONALES REQUERIDAS POR EL FRONTEND ─────────────────────────
+
+-- ─── A. TABLAS DE RETOS Y COMUNIDAD ───
+
+-- 1. challenges
+create table if not exists public.challenges (
+  id            uuid          default gen_random_uuid() primary key,
+  title         text          not null,
+  text          text,
+  text_bajar_peso text,
+  text_mantener text,
+  text_aumentar text,
+  url           text,
+  categoria     text          default 'Boxeo',
+  dificultad    text          default 'intermedio',
+  objetivo      text          default 'general',
+  tasks         text[],
+  period        text          default 'dia',
+  created_at    timestamptz   default now(),
+  created_by    uuid          references auth.users(id) on delete set null
+);
+
+alter table public.challenges enable row level security;
+create policy "Desafíos públicos" on public.challenges for select using (true);
+create policy "Admin gestiona desafíos" on public.challenges for all using (true);
+
+-- 2. challenge_completions
+create table if not exists public.challenge_completions (
+  id            text          primary key, -- user_id + "_" + date
+  challenge_id  uuid          references public.challenges(id) on delete cascade,
+  user_id       uuid          references auth.users(id) on delete cascade,
+  date          date          not null,
+  checked_tasks int[],
+  completed_at  timestamptz,
+  created_at    timestamptz   default now()
+);
+
+alter table public.challenge_completions enable row level security;
+create policy "Completados públicos" on public.challenge_completions for select using (true);
+create policy "Cualquiera gestiona completados" on public.challenge_completions for all using (true);
+
+-- 3. activity_feed
+create table if not exists public.activity_feed (
+  id            uuid          default gen_random_uuid() primary key,
+  type          text          not null,
+  user_id       uuid          references auth.users(id) on delete cascade,
+  user_name     text,
+  message       text,
+  created_at    timestamptz   default now()
+);
+
+alter table public.activity_feed enable row level security;
+create policy "Activity feed público" on public.activity_feed for select using (true);
+create policy "Cualquiera inserta activity feed" on public.activity_feed for insert with check (true);
+
+-- 4. user_challenges (Meta Mensual)
+create table if not exists public.user_challenges (
+  id            uuid          primary key references auth.users(id) on delete cascade,
+  "selectedDays" int[],       -- array de días seleccionados (0-6)
+  completions   text[],       -- array de fechas completadas ("YYYY-MM-DD")
+  streak        int           default 0,
+  "createdAt"   timestamptz   default now(),
+  "updatedAt"   timestamptz   default now()
+);
+
+alter table public.user_challenges enable row level security;
+create policy "User challenges público" on public.user_challenges for select using (true);
+create policy "Cualquiera gestiona user challenges" on public.user_challenges for all using (true);
+
+
+-- ─── B. TABLAS DE VIDEOS COMPLEMENTARIOS Y ERRORES ───
+
+-- 5. vendaje_videos
+create table if not exists public.vendaje_videos (
+  id            uuid          default gen_random_uuid() primary key,
+  title         text          not null,
+  description   text,
+  video_url     text          not null,
+  created_at    timestamptz   default now()
+);
+
+alter table public.vendaje_videos enable row level security;
+create policy "Vendaje videos público" on public.vendaje_videos for select using (true);
+create policy "Admin gestiona vendaje videos" on public.vendaje_videos for all using (true);
+
+-- 6. system_errors
+create table if not exists public.system_errors (
+  id            uuid          default gen_random_uuid() primary key,
+  error         text,
+  stack         text,
+  "componentStack" text,
+  url           text,
+  timestamp     timestamptz   default now(),
+  "userAgent"   text
+);
+
+alter table public.system_errors enable row level security;
+create policy "Insertar errores público" on public.system_errors for insert with check (true);
+create policy "Admin lee errores" on public.system_errors for select using (true);
+
+
+-- ─── C. TABLAS DE SABERES Y COMBOS TÉCNICOS ───
+
+-- 7. combos
+create table if not exists public.combos (
+  id                uuid          default gen_random_uuid() primary key,
+  name              text          not null,
+  level             int           not null,
+  video_approved    boolean       default false,
+  manillas_approved boolean       default false,
+  contacto_approved boolean       default false,
+  desarrollo_approved boolean     default false,
+  video_url         text,
+  created_at        timestamptz   default now()
+);
+
+alter table public.combos enable row level security;
+create policy "Combos públicos" on public.combos for select using (true);
+create policy "Admin gestiona combos" on public.combos for all using (true);
+
+-- 8. tutorials
+create table if not exists public.tutorials (
+  id            uuid          default gen_random_uuid() primary key,
+  title         text          not null,
+  description   text,
+  duration      int           default 60,
+  level         int           default 1,
+  category      text          default 'técnica',
+  video_url     text,
+  created_at    timestamptz   default now()
+);
+
+alter table public.tutorials enable row level security;
+create policy "Tutoriales públicos" on public.tutorials for select using (true);
+create policy "Admin gestiona tutoriales" on public.tutorials for all using (true);
+
+-- 9. combo_progress
+create table if not exists public.combo_progress (
+  id                uuid          default gen_random_uuid() primary key,
+  combo_id          uuid          references public.combos(id) on delete cascade,
+  user_id           uuid          references auth.users(id) on delete cascade,
+  user_name         text,
+  video_url         text          not null,
+  status            text          default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at        timestamptz   default now(),
+  video_approved    boolean       default false,
+  manillas_approved boolean       default false,
+  contacto_approved boolean       default false,
+  desarrollo_approved boolean     default false
+);
+
+alter table public.combo_progress enable row level security;
+create policy "Combo progress público" on public.combo_progress for select using (true);
+create policy "Cualquiera gestiona combo progress" on public.combo_progress for all using (true);
+
+
+-- ─── D. TABLAS DEL MÓDULO DE BOXEO ───
+
+-- 10. boxeo_videos
+create table if not exists public.boxeo_videos (
+  id              uuid          default gen_random_uuid() primary key,
+  nombre          text          not null,
+  subcategoria    text          not null,
+  nivel           text          default 'Principiante' check (nivel in ('Principiante', 'Intermedio', 'Avanzado')),
+  duracion_seg    int           default 45,
+  descripcion     text,
+  puntos_clave    text[],
+  errores_comunes text[],
+  url_directa     text          not null,
+  miniatura_url   text,
+  activo          boolean       default true,
+  orden           int           default 999,
+  drive_file_id   text,
+  creado_en       timestamptz   default now()
+);
+
+alter table public.boxeo_videos enable row level security;
+create policy "Videos de boxeo públicos" on public.boxeo_videos for select using (true);
+create policy "Admin gestiona videos de boxeo" on public.boxeo_videos for all using (true);
+
+-- 11. boxeo_ocultos
+create table if not exists public.boxeo_ocultos (
+  id            uuid          default gen_random_uuid() primary key,
+  user_id       uuid          references auth.users(id) on delete cascade,
+  video_id      uuid          references public.boxeo_videos(id) on delete cascade,
+  created_at    timestamptz   default now()
+);
+
+alter table public.boxeo_ocultos enable row level security;
+create policy "Videos ocultos públicos" on public.boxeo_ocultos for select using (true);
+create policy "Cualquiera gestiona sus videos ocultos" on public.boxeo_ocultos for all using (true);
+
+
+-- ─── E. HABILITAR REPLICACIÓN EN TIEMPO REAL ───
+
+alter publication supabase_realtime add table public.challenges;
+alter publication supabase_realtime add table public.challenge_completions;
+alter publication supabase_realtime add table public.activity_feed;
+alter publication supabase_realtime add table public.user_challenges;
+alter publication supabase_realtime add table public.vendaje_videos;
+alter publication supabase_realtime add table public.combos;
+alter publication supabase_realtime add table public.tutorials;
+alter publication supabase_realtime add table public.combo_progress;
+alter publication supabase_realtime add table public.boxeo_videos;
+

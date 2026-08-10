@@ -200,19 +200,19 @@ export function Home() {
 
     // Actualizar presencia
     const updatePresence = () => {
-      supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id).then(() => {});
+      supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id).then(() => {});
     };
     updatePresence();
     const presenceInterval = setInterval(updatePresence, 120000);
 
     // Fetch global settings
     supabase.from('settings').select('*').eq('id', 'global').single().then(({ data }) => {
-      if (data) setAppSettings(data as any);
+      if (data && data.data) setAppSettings(data.data);
     });
     const settingsChannel = supabase.channel('home-settings')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.global' }, async () => {
         const { data } = await supabase.from('settings').select('*').eq('id', 'global').single();
-        if (data) setAppSettings(data as any);
+        if (data && data.data) setAppSettings(data.data);
       }).subscribe();
 
     // Assessment check
