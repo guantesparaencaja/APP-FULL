@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /register
+Disallow: /profile
+
+Sitemap: https://gpte007.web.app/sitemap.xml

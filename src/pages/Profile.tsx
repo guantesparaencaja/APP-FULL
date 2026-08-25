@@ -1,0 +1,2535 @@
+import { useStore } from '../store/useStore';
+import {
+  User,
+  Settings,
+  LogOut,
+  Shield,
+  ArrowLeft,
+  UserPlus,
+  Camera,
+  Image as ImageIcon,
+  Edit2,
+  Check,
+  X,
+  Users,
+  Lock,
+  Trash2,
+  Moon,
+  Sun,
+  Monitor,
+  Flame,
+  Award,
+  CalendarCheck,
+  TrendingUp,
+  Bell,
+  MessageSquare,
+  CreditCard,
+  Heart,
+  ChevronRight,
+  ToggleLeft,
+  ToggleRight,
+  Target,
+  Video,
+  Activity,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import { signOut } from '../lib/authService';
+import { motion, AnimatePresence } from 'motion/react';
+
+import { Modal } from '../components/Modal';
+import { EvolvingAvatar } from '../components/EvolvingAvatar';
+import { AlertCircle, Info, CheckCircle2, Send } from 'lucide-react';
+import { twMerge } from 'tailwind-merge';
+import { compressImage } from '../utils/imageUtils';
+import { Reveal } from '../components/Reveal';
+import { PageHeader } from '../components/PageHeader';
+import { staggerContainer, staggerItem, liftCard, fadeUp } from '../lib/animations';
+
+export function Profile() {
+  const user = useStore((state) => state.user);
+  const theme = useStore((state) => state.theme);
+  const setTheme = useStore((state) => state.setTheme);
+  const setUser = useStore((state) => state.setUser);
+  const navigate = useNavigate();
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'student' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const beforeInputRef = useRef<HTMLInputElement>(null);
+  const afterInputRef = useRef<HTMLInputElement>(null);
+
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  const [beforePic, setBeforePic] = useState<string | null>(null);
+  const [afterPic, setAfterPic] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ type: string; progress: number } | null>(
+    null
+  );
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [attendanceCount, setAttendanceCount] = useState(0);
+  const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleteAdminPassword, setDeleteAdminPassword] = useState('');
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [allPayments, setAllPayments] = useState<any[]>([]);
+  const [pendingPayments, setPendingPayments] = useState<any[]>([]);
+  const [paymentTab, setPaymentTab] = useState<'pendientes' | 'historial'>('pendientes');
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [allComboEvals, setAllComboEvals] = useState<any[]>([]);
+  const [combos, setCombos] = useState<any[]>([]);
+  const [additionalProducts, setAdditionalProducts] = useState<any[]>([]); // GPTE STORE
+  const [plans, setPlans] = useState<any[]>([]); // Gestion de Planes
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [planForm, setPlanForm] = useState<any>({});
+
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [upcomingBookings, setUpcomingBookings] = useState<any[]>([]);
+  const [showManualNotification, setShowManualNotification] = useState(false);
+  const [manualNotification, setManualNotification] = useState({
+    userId: '',
+    title: '',
+    message: '',
+  });
+  const [appSettings, setAppSettings] = useState({
+    workouts_unlocked: false,
+    nutrition_unlocked: false,
+    technique_unlocked: false,
+    challenge_unlocked: false,
+  });
+  const [togglingSection, setTogglingSection] = useState<string | null>(null);
+  const [expandedAdminSections, setExpandedAdminSections] = useState<Set<string>>(
+    new Set(['pagos', 'gestionPlanes'])
+  );
+
+  // States for Editing Discounts in Admin Payment Panel
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [editPriceForm, setEditPriceForm] = useState({ final_price: 0, discount_reason: '' });
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+
+  // Combo CRUD states
+  const [comboFormOpen, setComboFormOpen] = useState(false);
+  const [editingCombo, setEditingCombo] = useState<any>(null);
+  const [comboForm, setComboForm] = useState({ name: '', level: 1 });
+  const [savingCombo, setSavingCombo] = useState(false);
+  const [comboToDelete, setComboToDelete] = useState<any>(null);
+
+  const toggleAdminSection = (id: string) => {
+    setExpandedAdminSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const deleteStorageFile = async (url?: string) => {
+    if (!url) return;
+    try {
+      // Extract path from Supabase public URL
+      const match = url.match(/gpte-videos\/(.+)/);
+      if (match) await supabase.storage.from('gpte-videos').remove([match[1]]);
+    } catch (error) {
+      console.warn('Could not delete file from storage:', url, error);
+    }
+  };
+
+  const showAlert = useCallback(
+    (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+      setAlertModal({ isOpen: true, title, message, type });
+    },
+    []
+  );
+
+  const refreshCombos = async () => {
+    const { data } = await supabase.from('combos').select('*').order('level');
+    if (data) setCombos(data);
+  };
+
+  const handleSaveCombo = async () => {
+    if (!comboForm.name.trim()) return;
+    setSavingCombo(true);
+    try {
+      if (editingCombo) {
+        const { error } = await supabase.from('combos').update({ name: comboForm.name.trim(), level: comboForm.level }).eq('id', editingCombo.id);
+        if (error) throw error;
+        showAlert('Combo actualizado', `"${comboForm.name.trim()}" nivel ${comboForm.level}`, 'success');
+      } else {
+        const { error } = await supabase.from('combos').insert({ name: comboForm.name.trim(), level: comboForm.level });
+        if (error) throw error;
+        showAlert('Combo agregado', `"${comboForm.name.trim()}" nivel ${comboForm.level}`, 'success');
+      }
+      await refreshCombos();
+      setComboFormOpen(false);
+      setEditingCombo(null);
+      setComboForm({ name: '', level: 1 });
+    } catch (e: any) {
+      showAlert('Error', e.message || 'No se pudo guardar el combo', 'error');
+    } finally {
+      setSavingCombo(false);
+    }
+  };
+
+  const handleDeleteCombo = async () => {
+    if (!comboToDelete) return;
+    setSavingCombo(true);
+    try {
+      const { error } = await supabase.from('combos').delete().eq('id', comboToDelete.id);
+      if (error) throw error;
+      showAlert('Combo eliminado', `"${comboToDelete.name}" fue eliminado`, 'success');
+      await refreshCombos();
+      setComboToDelete(null);
+    } catch (e: any) {
+      showAlert('Error', e.message || 'No se pudo eliminar', 'error');
+    } finally {
+      setSavingCombo(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    const isAdmin = user.role === 'admin' || user.email === 'hernandezkevin001998@gmail.com';
+
+    const load = async () => {
+      if (isAdmin) {
+        const [usersRes, paymentsRes, approvalsRes, comboProgressRes] = await Promise.all([
+          supabase.from('profiles').select('*'),
+          supabase.from('payments').select('*').order('created_at', { ascending: false }),
+          supabase.from('student_approvals').select('*'),
+          supabase.from('combo_progress').select('*').order('created_at', { ascending: false }),
+        ]);
+        if (usersRes.data) setAllUsers(usersRes.data);
+        if (paymentsRes.data) {
+          setAllPayments(paymentsRes.data);
+          setPendingPayments(paymentsRes.data.filter((p: any) => p.status === 'submitted' || p.status === 'pending_class_payment'));
+        }
+        if (approvalsRes.data) setPendingApprovals(approvalsRes.data);
+        if (comboProgressRes.data) setAllComboEvals(comboProgressRes.data);
+
+        const combosRes = await supabase.from('combos').select('*').order('level');
+        if (combosRes.data) setCombos(combosRes.data);
+      }
+
+      // Bookings del usuario
+      const { data: bookData } = await supabase.from('bookings').select('*').eq('user_id', String(user.id));
+      if (bookData) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        setAttendanceCount(bookData.filter((b: any) => b.status === 'active' && b.date <= todayStr).length);
+        setUpcomingBookings(bookData.filter((b: any) => b.status === 'active' && b.date >= todayStr).sort((a: any, b: any) => a.date.localeCompare(b.date)));
+      }
+
+      // Notificaciones
+      const { data: notifData } = await supabase.from('notifications').select('*').eq('read', false).or(`user_id.eq.${user.id},user_id.eq.admin`);
+      if (notifData) setNotifications(notifData);
+
+      // Planes
+      const { data: planesData } = await supabase.from('planes').select('*');
+      if (planesData) setPlans(planesData);
+    };
+    load();
+
+    // Realtime pagos (admin)
+    const paymentsChannel = supabase.channel('profile-payments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, async () => {
+        const { data } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
+        if (data) { setAllPayments(data); setPendingPayments(data.filter((p: any) => p.status === 'submitted')); }
+      }).subscribe();
+
+    try { if ('Notification' in window) setNotificationsEnabled(Notification.permission === 'granted'); } catch (e) { /**/ }
+
+    return () => { supabase.removeChannel(paymentsChannel); };
+  }, [user?.id, user?.role, user?.email]);
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) { showAlert('No soportado', 'Tu navegador no soporta notificaciones.', 'info'); return; }
+    const permission = await Notification.requestPermission();
+    setNotificationsEnabled(permission === 'granted');
+    if (user) {
+      await supabase.from('profiles').update({ notifications_enabled: permission === 'granted' } as any).eq('id', user.id);
+      setUser({ ...user, notifications_enabled: permission === 'granted' } as any);
+    }
+    if (permission === 'granted') {
+      new Notification('¡Notificaciones activadas!', { body: 'Te avisaremos 1 hora antes de tus clases.', icon: '/favicon.ico' });
+    } else {
+      showAlert('Permiso Denegado', 'Habilita las notificaciones en configuración del navegador.', 'error');
+    }
+  };
+
+  const markNotificationAsRead = async (id: string) => {
+    try {
+      await supabase.from('notifications').update({ read: true }).eq('id', id);
+      setNotifications(notifications.filter((n) => n.id !== id));
+    } catch (err) { console.error('Error marking notification as read:', err); }
+  };
+
+  const sendNotification = async (userId: string, title: string, message: string, type: string = 'info') => {
+    try {
+      await supabase.from('notifications').insert({ user_id: userId, title, body: message, type, read: false, created_at: new Date().toISOString() });
+    } catch (err) { console.error('Error sending notification:', err); }
+  };
+
+  const handleSendManualNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualNotification.userId || !manualNotification.title || !manualNotification.message) {
+      showAlert('Error', 'Todos los campos son obligatorios', 'error'); return;
+    }
+    try {
+      await sendNotification(manualNotification.userId, manualNotification.title, manualNotification.message, 'info');
+      showAlert('Éxito', 'Notificación enviada correctamente', 'success');
+      setShowManualNotification(false);
+      setManualNotification({ userId: '', title: '', message: '' });
+    } catch (err) { showAlert('Error', 'Error al enviar la notificación', 'error'); }
+  };
+
+  const handleApprovePayment = async (payment: any) => {
+    if (!payment?.user_id) { showAlert('Error', 'Información de pago incompleta.', 'error'); return; }
+    try {
+      const finalPrice = editingPaymentId === payment.id ? editPriceForm.final_price : payment.final_price || payment.amount || 0;
+      const discountReason = editingPaymentId === payment.id ? editPriceForm.discount_reason : payment.discount_reason || '';
+
+      await supabase.from('payments').update({ status: 'approved', final_price: finalPrice, discount_reason: discountReason, verified_by: user?.id, verified_at: new Date().toISOString() }).eq('id', payment.id);
+
+      const isSingleClass = payment.notes === 'single_class' || payment.plan_name?.toLowerCase().includes('clase individual');
+      if (isSingleClass && payment.booking_id) {
+        await supabase.from('bookings').update({ status: 'active' }).eq('id', payment.booking_id);
+        await supabase.from('notifications').insert({ user_id: payment.user_id, type: 'booking_confirmed', title: '✅ Clase Confirmada', body: `Tu pago fue aprobado. ¡Tu clase está confirmada!`, read: false, created_at: new Date().toISOString() });
+        showAlert('Éxito', 'Pago de clase individual aprobado.', 'success');
+      } else {
+        const planName = payment.plan_name || 'Plan Mensual';
+        await supabase.from('profiles').update({ plan_id: payment.plan_id || 'manual', plan_name: planName, plan_status: 'active', plan_start_date: new Date().toISOString(), classes_per_month: payment.classes_per_month || 0, classes_remaining: payment.classes_per_month || 0 }).eq('id', payment.user_id);
+        await supabase.from('notifications').insert({ user_id: payment.user_id, type: 'plan_approved', title: '🎉 ¡Plan Aprobado!', body: `Tu plan ${planName} fue aprobado.`, read: false, created_at: new Date().toISOString() });
+        showAlert('Éxito', 'Pago de plan aprobado correctamente', 'success');
+      }
+      setEditingPaymentId(null);
+    } catch (err) { console.error('Error approving payment:', err); }
+  };
+
+  const handleRejectPayment = async (payment: any) => {
+    if (!payment?.user_id) { showAlert('Error', 'Información de pago incompleta.', 'error'); return; }
+    try {
+      await supabase.from('payments').update({ status: 'rejected', rejected_at: new Date().toISOString() }).eq('id', payment.id);
+      await supabase.from('profiles').update({ plan_status: 'pending_payment' }).eq('id', payment.user_id);
+      showAlert('Info', 'Pago rechazado', 'info');
+    } catch (err) { console.error('Error rejecting payment:', err); }
+  };
+
+  const generateGoogleCalendarUrl = (booking: any) => {
+    try {
+      if (!booking.date || !booking.time) return '#';
+
+      const dateParts = booking.date.split('-');
+      if (dateParts.length !== 3) return '#';
+
+      // Handle the time ranges like "14:00 - 15:30" or just "14:00"
+      const startTimeStr = booking.time.includes('-')
+        ? booking.time.split('-')[0].trim()
+        : booking.time;
+      const endTimeStr = booking.time.includes('-')
+        ? booking.time.split('-')[1].trim()
+        : `${parseInt(startTimeStr.split(':')[0]) + 1}:${startTimeStr.split(':')[1] || '00'}`;
+
+      const d = new Date(
+        parseInt(dateParts[0]),
+        parseInt(dateParts[1]) - 1,
+        parseInt(dateParts[2])
+      );
+
+      const [startH, startM] = startTimeStr.split(':').map(Number);
+      const startD = new Date(d);
+      startD.setHours(startH, startM, 0);
+
+      const [endH, endM] = endTimeStr.split(':').map(Number);
+      const endD = new Date(d);
+      endD.setHours(endH, endM, 0);
+
+      const formatTz = (date: Date) => {
+        return date.toISOString().replace(/-|:|\.\d\d\d/g, '');
+      };
+
+      const title = encodeURIComponent('Clase de Boxeo - GUANTES');
+      const details = encodeURIComponent(
+        `Hola ${user?.name || ''}, esta es tu clase reservada. ¡No faltes!`
+      );
+      const location = encodeURIComponent('GUANTES Boxing Studio');
+
+      return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatTz(startD)}/${formatTz(endD)}&details=${details}&location=${location}`;
+    } catch (e) {
+      console.error('Error generating GCal link', e);
+      return '#';
+    }
+  };
+
+  if (!user) return null;
+
+  const handleLogout = async () => {
+    await signOut();
+    setUser(null);
+    navigate('/login');
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { data, error } = await supabase.auth.admin.createUser({ email: newUser.email, password: newUser.password, email_confirm: true });
+      if (error) throw new Error(error.message);
+      if (data.user) {
+        await supabase.from('profiles').insert({ id: data.user.id, email: newUser.email, name: 'Nuevo Estudiante', role: 'student', streak: 0, lives: 3, license_level: 1, is_new_user: true, tutorial_completed: false, plan_status: 'none', created_at: new Date().toISOString() });
+      }
+      showAlert('Éxito', 'Usuario creado con éxito', 'success');
+      setShowCreateUser(false);
+      setNewUser({ email: '', password: '', role: 'student' });
+    } catch (err: any) { showAlert('Error', err.message, 'error'); }
+  };
+
+  const handleApproveStep = async (userId: string, step: number) => {
+    try {
+      const field = `step${step}_status`;
+      const nextField = step < 4 ? `step${step + 1}_status` : null;
+      const updates: any = {
+        id: userId,
+        [field]: 'approved',
+        [`step${step}_approved_at`]: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      if (nextField) updates[nextField] = 'pending';
+      await supabase.from('student_approvals').upsert(updates, { onConflict: 'id' });
+
+      // Log to Activity Feed
+      if (step === 4) {
+        await supabase.from('activity_feed').insert({
+          type: 'milestone',
+          user_id: userId,
+          user_name: 'Un Estudiante',
+          message: 'ha superado un paso clave en su proceso de licencia!',
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      showAlert(
+        '✅ Aprobado',
+        `Paso ${step} aprobado exitosamente. El estudiante puede continuar.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Error updating student_approvals:', err);
+    }
+  };
+
+  const handleRejectStep = async (userId: string, step: number) => {
+    try {
+      if (step === 1) {
+        const { data: approvalData } = await supabase
+          .from('student_approvals')
+          .select('step1_video_url')
+          .eq('id', userId)
+          .single();
+        if (approvalData?.step1_video_url) {
+          await deleteStorageFile(approvalData.step1_video_url);
+        }
+      }
+      const field = `step${step}_status`;
+      await supabase.from('student_approvals').upsert(
+        {
+          id: userId,
+          [field]: 'rejected',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
+      showAlert(
+        '❌ Rechazado',
+        `Paso ${step} rechazado. El estudiante recibirá la notificación.`,
+        'info'
+      );
+    } catch (err) {
+      console.error('Error rejecting step:', err);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete || !deleteAdminPassword) {
+      showAlert('Error', 'Debe ingresar su contraseña para confirmar.', 'error'); return;
+    }
+    setIsDeletingUser(true);
+    try {
+      // Limpiar imágenes de perfil
+      const u = allUsers.find((x: any) => x.id === userToDelete.id);
+      if (u) {
+        if (u.profile_pic) await deleteStorageFile(u.profile_pic).catch(() => null);
+        if (u.before_pic) await deleteStorageFile(u.before_pic).catch(() => null);
+        if (u.after_pic) await deleteStorageFile(u.after_pic).catch(() => null);
+      }
+
+      // Eliminar datos relacionados
+      const { data: approvalData } = await supabase.from('student_approvals').select('*').eq('id', userToDelete.id).single();
+      if (approvalData?.step1_video_url) await deleteStorageFile(approvalData.step1_video_url).catch(() => null);
+      await supabase.from('student_approvals').delete().eq('id', userToDelete.id);
+      await supabase.from('notifications').delete().eq('user_id', userToDelete.id);
+      await supabase.from('payments').delete().eq('user_id', userToDelete.id);
+      await supabase.from('bookings').delete().eq('user_id', userToDelete.id);
+      await supabase.from('profiles').delete().eq('id', userToDelete.id);
+
+      showAlert('Éxito', 'Usuario y todos sus datos han sido eliminados permanentemente.', 'success');
+      setUserToDelete(null);
+      setDeleteAdminPassword('');
+    } catch (error: any) {
+      showAlert('Error', error.message || 'Error al eliminar usuario', 'error');
+    } finally { setIsDeletingUser(false); }
+  };
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: user?.name === 'HONORARIOS' || user?.name === 'honorarios' ? '' : user?.name || '',
+    weight: user?.weight || 0,
+    height: user?.height || 0,
+    dominant_hand: user?.dominant_hand || 'Derecha',
+    gender: user?.gender || 'male',
+    fitnessGoal: user?.fitnessGoal || 'general',
+  });
+
+  const [canUploadAfter, setCanUploadAfter] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setEditForm({
+        name: user.name === 'HONORARIOS' || user.name === 'honorarios' ? '' : user.name || '',
+        weight: user.weight || 0,
+        height: user.height || 0,
+        dominant_hand: user.dominant_hand || 'Derecha',
+        gender: user.gender || 'male',
+        fitnessGoal: user.fitnessGoal || 'general',
+      });
+      if (user.profile_pic) setProfilePic(user.profile_pic);
+      if (user.before_pic) setBeforePic(user.before_pic);
+      if (user.after_pic) setAfterPic(user.after_pic);
+
+      if (user.created_at) {
+        const createdAt = user.created_at.toDate
+          ? user.created_at.toDate()
+          : new Date(user.created_at);
+        const diffTime = Math.abs(new Date().getTime() - createdAt.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        setCanUploadAfter(diffDays >= 30);
+      } else {
+        setCanUploadAfter(true);
+      }
+    }
+  }, [user]);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    try {
+      const updatedData = { ...editForm, profile_pic: profilePic, before_pic: beforePic, after_pic: afterPic };
+      await supabase.from('profiles').update(updatedData).eq('id', user.id);
+      setUser({ ...user, ...updatedData } as any);
+      setIsEditing(false);
+      showAlert('Éxito', 'Perfil actualizado correctamente', 'success');
+    } catch (error) {
+      console.error('handleSaveProfile:', error);
+    }
+  };
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.newPassword.length < 6) { showAlert('Error', 'La nueva contraseña debe tener al menos 6 caracteres.', 'error'); return; }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) { showAlert('Error', 'Las contraseñas no coinciden.', 'error'); return; }
+    if (!passwordForm.currentPassword) { showAlert('Error', 'Debes ingresar tu contraseña actual.', 'error'); return; }
+    setIsChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: passwordForm.newPassword });
+      if (error) throw new Error(error.message);
+      showAlert('Éxito', '✅ Tu contraseña se actualizó correctamente.', 'success');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setShowCurrentPwd(false); setShowNewPwd(false); setShowConfirmPwd(false);
+    } catch (error: any) {
+      showAlert('Error', 'Error: ' + error.message, 'error');
+    } finally { setIsChangingPassword(false); }
+  };
+
+  const handleManualErrorReport = () => {
+    const errorMsg = prompt('Describe brevemente el problema que encontraste:');
+    if (!errorMsg || errorMsg.trim().length < 5) return;
+
+    try {
+      // Registrar en Sentry/LogRocket manualmente
+      console.error('USER_REPORTED_ERROR:', errorMsg);
+      // Sentry.captureMessage(`User Report: ${errorMsg}`);
+      showAlert('Enviado', 'Gracias. Tu reporte ha sido enviado al equipo técnico.', 'success');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const [adminEditUser, setAdminEditUser] = useState<any>(null);
+  const [adminEditForm, setAdminEditForm] = useState({
+    name: '',
+    weight: 0,
+    height: 0,
+    newPassword: '',
+    plan_name: '',
+    classes_remaining: 0,
+    classes_per_month: 0,
+  });
+  const [isAdminSaving, setIsAdminSaving] = useState(false);
+
+  const handleAdminSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminEditUser) return;
+    setIsAdminSaving(true);
+    try {
+      await supabase.from('profiles').update({
+        name: adminEditForm.name,
+        weight: Number(adminEditForm.weight),
+        height: Number(adminEditForm.height),
+        plan_name: adminEditForm.plan_name,
+        classes_remaining: Number(adminEditForm.classes_remaining),
+        classes_per_month: Number(adminEditForm.classes_per_month),
+        ...(adminEditForm.plan_name && adminEditForm.plan_name !== 'Sin Plan' && { plan_status: 'active' }),
+      }).eq('id', adminEditUser.id);
+      showAlert('Éxito', 'Usuario actualizado correctamente', 'success');
+      setAdminEditUser(null);
+    } catch (error: any) {
+      showAlert('Error', error.message || 'Error al actualizar usuario', 'error');
+    } finally { setIsAdminSaving(false); }
+  };
+
+  const handleImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setter: (val: string) => void,
+    isProfilePic = false,
+    isBefore = false,
+    isAfter = false
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (!file.type.startsWith('image/')) { showAlert('Error', 'Por favor, selecciona una imagen.', 'error'); return; }
+    const compressedFile = await compressImage(file, 1024, 0.8);
+    const type = isProfilePic ? 'profile' : isBefore ? 'before' : 'after';
+    const path = `images/${user.id}/${type}_${Date.now()}_${compressedFile.name}`;
+    setUploadProgress({ type, progress: 10 });
+    try {
+      const { error: upErr } = await supabase.storage.from('gpte-videos').upload(path, compressedFile, { upsert: true });
+      if (upErr) throw new Error(upErr.message);
+      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
+      const downloadURL = urlData.publicUrl;
+      setter(downloadURL);
+      setUploadProgress(null);
+      const updatedData = { profile_pic: isProfilePic ? downloadURL : profilePic, before_pic: isBefore ? downloadURL : beforePic, after_pic: isAfter ? downloadURL : afterPic };
+      await supabase.from('profiles').update(updatedData).eq('id', user.id);
+      setUser({ ...user, ...updatedData } as any);
+    } catch (error: any) {
+      console.error('handleImageUpload:', error);
+      showAlert('Error', 'Error al subir la imagen: ' + error.message, 'error');
+      setUploadProgress(null);
+    }
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    show: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: 'spring',
+        stiffness: 100,
+      },
+    },
+  };
+
+  return (
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={containerVariants}
+      className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display p-4 pb-32"
+    >
+      <PageHeader
+        emoji="🥊"
+        title="Mi Perfil"
+        subtitle={user.role}
+        right={
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate(-1)}
+            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-primary transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </motion.button>
+        }
+      />
+
+      <Reveal>
+      <motion.div variants={itemVariants} className="flex flex-col items-center mb-12">
+        <div className="relative mb-6">
+          {user.role === 'student' ? (
+            <div className="w-64 h-64">
+              <EvolvingAvatar
+                gender={(user.gender as any) || 'male'}
+                level={
+                  (user.classes_per_month || 0) >= 4
+                    ? (user.lives || 0) <= 1
+                      ? 'thin'
+                      : (user.streak || 0) >= 5
+                        ? 'strong'
+                        : 'normal'
+                    : 'normal'
+                }
+              />
+            </div>
+          ) : (
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className="w-48 h-48 rounded-[2.5rem] border-[3px] border-primary/20 flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 text-6xl font-black text-primary overflow-hidden shadow-[0_8px_40px_-12px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.5)] relative group"
+            >
+              {profilePic ? (
+                <img
+                  src={profilePic}
+                  alt="Profile"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+              ) : (
+                <span className="bg-gradient-to-br from-primary to-primary-dark bg-clip-text text-transparent">{(user.name || 'U').charAt(0)}</span>
+              )}
+              <div className="absolute inset-0 bg-linear-to-bt from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </motion.div>
+          )}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadProgress?.type === 'profile'}
+            className="absolute -bottom-2 -right-2 bg-primary text-white p-3.5 rounded-2xl border-4 border-white dark:border-slate-950 shadow-2xl hover:bg-primary-dark transition-all disabled:opacity-50 z-10"
+          >
+            <Camera className="w-5 h-5" />
+          </motion.button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={(e) => handleImageUpload(e, setProfilePic, true)}
+          />
+        </div>
+        {uploadProgress?.type === 'profile' && (
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: '10rem' }}
+            className="bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mb-4 border border-slate-300 dark:border-slate-700"
+          >
+            <motion.div
+              className="bg-primary h-full transition-all duration-300"
+              style={{ width: `${uploadProgress.progress}%` }}
+            ></motion.div>
+          </motion.div>
+        )}
+        <AnimatePresence mode="wait">
+          {isEditing ? (
+            <motion.input
+              key="edit-name"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              type="text"
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-3 text-center text-2xl font-bold text-slate-900 dark:text-white mb-3 focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+            />
+          ) : (
+            <motion.h2
+              key="view-name"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="text-3xl font-black leading-tight tracking-tight text-center text-slate-900 dark:text-white uppercase"
+            >
+              {user.name === 'HONORARIOS' || user.name === 'honorarios'
+                ? 'Usuario'
+                : user.name || 'Usuario'}
+            </motion.h2>
+          )}
+        </AnimatePresence>
+        <div className="flex items-center gap-3 mt-3">
+          {user.role === 'student' && (
+            <span className="bg-primary/10 text-primary text-[11px] uppercase font-black px-4 py-1.5 rounded-xl tracking-[0.2em] border border-primary/20">
+              Nivel {user.license_level}
+            </span>
+          )}
+          {(user.role === 'admin' || user.email === 'hernandezkevin001998@gmail.com') && (
+            <span className="bg-accent-purple/10 text-accent-purple text-[11px] uppercase font-black px-4 py-1.5 rounded-xl tracking-[0.2em] border border-accent-purple/20 flex items-center gap-2">
+              <Shield className="w-3 h-3" /> Administrador
+            </span>
+          )}
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-bold tracking-tight uppercase">
+            {user.goal}
+          </p>
+        </div>
+      </motion.div>
+      </Reveal>
+
+      {user.role === 'student' && (
+        <Reveal>
+        <motion.section variants={itemVariants} className="mb-12">
+          <h3 className="text-xl font-black mb-6 flex items-center gap-4 text-slate-900 dark:text-white uppercase tracking-tight">
+            <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+              <Award className="w-6 h-6 text-primary" />
+            </div>
+            Logros y Estadísticas
+          </h3>
+          <motion.div variants={staggerContainer} className="grid grid-cols-2 gap-6 mb-6">
+            <motion.div
+              variants={staggerItem}
+              whileHover={{ y: -5 }}
+              className="glass-card p-6 rounded-[2.5rem] flex flex-col items-center justify-center text-center relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110"></div>
+              <Flame className="w-10 h-10 text-orange-500 mb-3" />
+              <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                {user.streak || 0}
+              </span>
+              <span className="text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] mt-2">
+                Días Seguidos
+              </span>
+            </motion.div>
+            <motion.div
+              variants={staggerItem}
+              whileHover={{ y: -5 }}
+              className="glass-card p-6 rounded-[2.5rem] flex flex-col items-center justify-center text-center relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110"></div>
+              <CalendarCheck className="w-10 h-10 text-blue-500 mb-3" />
+              <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                {attendanceCount}
+              </span>
+              <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mt-2">
+                Clases Asistidas
+              </span>
+            </motion.div>
+          </motion.div>
+          <motion.div whileHover={{ y: -5 }} className="glass-card rounded-[2.5rem] p-8">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+                  <TrendingUp className="w-6 h-6 text-emerald-500" />
+                </div>
+                <h4 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                  Adherencia Semanal
+                </h4>
+              </div>
+              <span
+                className={`${Math.min(100, Math.round(((user.streak || 0) / 7) * 100)) > 50 ? 'text-emerald-500' : 'text-orange-500'} font-black text-2xl`}
+              >
+                {Math.min(100, Math.round(((user.streak || 0) / 7) * 100))}%
+              </span>
+            </div>
+            <div className="w-full bg-slate-100 dark:bg-slate-800/50 rounded-full h-4 overflow-hidden border border-slate-200 dark:border-slate-700/50">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, Math.round(((user.streak || 0) / 7) * 100))}%` }}
+                transition={{ duration: 1, delay: 0.5 }}
+                className={`${Math.min(100, Math.round(((user.streak || 0) / 7) * 100)) > 50 ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]'} h-full rounded-full`}
+              />
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-5 text-center font-medium leading-relaxed">
+              {Math.min(100, Math.round(((user.streak || 0) / 7) * 100)) === 0
+                ? '¡Es hora de empezar a entrenar! Registra tu primera clase.'
+                : Math.min(100, Math.round(((user.streak || 0) / 7) * 100)) < 50
+                  ? '¡Sigue así! Estás construyendo el hábito.'
+                  : '¡Excelente trabajo! Has cumplido la mayoría de tus entrenamientos esta semana.'}
+            </p>
+          </motion.div>
+
+          <motion.div whileHover={{ y: -5 }} className="glass-card rounded-[2.5rem] p-8 mt-6">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
+                  <CalendarCheck className="w-6 h-6 text-blue-500" />
+                </div>
+                <h4 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                  Próximas Clases y Sincronización
+                </h4>
+              </div>
+            </div>
+
+            {upcomingBookings.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400 text-center font-medium leading-relaxed py-4 opacity-70">
+                No tienes reservas activas por delante. Cuando reserves, podrás sincronizarlas con
+                Google Calendar.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {upcomingBookings.map((b) => (
+                  <div
+                    key={b.id}
+                    className="flex justify-between items-center bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/50"
+                  >
+                    <div>
+                      <p className="font-black text-slate-900 dark:text-white">
+                        {b.date || 'Sin fecha'}
+                      </p>
+                      <p className="text-xs text-primary font-bold">{b.time || 'Sin hora'}</p>
+                    </div>
+                    <a
+                      href={generateGoogleCalendarUrl(b)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-colors flex items-center gap-2"
+                    >
+                      <CalendarCheck className="w-3.5 h-3.5" /> Google Calendar
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </motion.section>
+        </Reveal>
+      )}
+
+      <Reveal>
+      <motion.div variants={staggerContainer} className="grid grid-cols-3 gap-4 mb-6">
+        <motion.div
+          variants={staggerItem}
+          whileHover={{ scale: 1.02 }}
+          className="glass-card p-5 rounded-4xl flex flex-col items-center relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+          {isEditing ? (
+            <input
+              type="number"
+              value={editForm.weight || ''}
+              onChange={(e) => setEditForm({ ...editForm, weight: e.target.value === '' ? 0 : Number(e.target.value) })}
+              className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-primary font-black text-lg py-1"
+            />
+          ) : (
+            <span className="text-primary text-xl font-black tracking-tight">{user.weight}kg</span>
+          )}
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-black tracking-[0.2em] mt-2 text-center">
+            Peso
+          </span>
+        </motion.div>
+        <motion.div
+          variants={staggerItem}
+          whileHover={{ scale: 1.02 }}
+          className="glass-card p-5 rounded-4xl flex flex-col items-center relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+          {isEditing ? (
+            <input
+              type="number"
+              value={editForm.height || ''}
+              onChange={(e) => setEditForm({ ...editForm, height: e.target.value === '' ? 0 : Number(e.target.value) })}
+              className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-emerald-500 font-black text-lg py-1"
+            />
+          ) : (
+            <span className="text-emerald-500 text-xl font-black tracking-tight">
+              {user.height ? `${user.height}cm` : '—'}
+            </span>
+          )}
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-black tracking-[0.2em] mt-2 text-center">
+            Altura
+          </span>
+        </motion.div>
+        <motion.div
+          variants={staggerItem}
+          whileHover={{ scale: 1.02 }}
+          className="glass-card p-5 rounded-4xl flex flex-col items-center relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+          {isEditing ? (
+            <select
+              value={editForm.dominant_hand}
+              onChange={(e) => setEditForm({ ...editForm, dominant_hand: e.target.value })}
+              className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-primary font-black text-xs py-2"
+            >
+              <option value="Derecha">Derecha</option>
+              <option value="Izquierda">Izquierda</option>
+            </select>
+          ) : (
+            <span className="text-primary text-sm font-black tracking-tight text-center">
+              {user.dominant_hand || 'Derecha'}
+            </span>
+          )}
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-black tracking-[0.2em] mt-2 text-center">
+            Mano Dom.
+          </span>
+        </motion.div>
+      </motion.div>
+      </Reveal>
+
+      <Reveal>
+      <motion.div variants={itemVariants} className="mb-12">
+        <motion.div
+          whileHover={{ scale: 1.01 }}
+          className="glass-card p-6 rounded-4xl flex flex-col items-center relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+          <div className="flex flex-col items-center w-full">
+            <Target className="w-8 h-8 text-primary mb-3" />
+            {isEditing ? (
+              <div className="w-full space-y-6">
+                <div className="space-y-4 pt-4 border-t border-white/10">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    Mi Género
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => setEditForm({ ...editForm, gender: 'male' })}
+                      className={twMerge(
+                        'p-5 rounded-2xl border-2 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center gap-3',
+                        editForm.gender === 'male'
+                          ? 'bg-primary border-primary text-white shadow-xl shadow-primary/20'
+                          : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'
+                      )}
+                    >
+                      <User className="w-4 h-4" /> Masculino
+                    </button>
+                    <button
+                      onClick={() => setEditForm({ ...editForm, gender: 'female' })}
+                      className={twMerge(
+                        'p-5 rounded-2xl border-2 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center gap-3',
+                        editForm.gender === 'female'
+                          ? 'bg-primary border-primary text-white shadow-xl shadow-primary/20'
+                          : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'
+                      )}
+                    >
+                      <User className="w-4 h-4" /> Femenino
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-white/10">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    Mi Objetivo
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(
+                      [
+                        { id: 'bajar_peso', label: 'Bajar Peso', icon: TrendingUp },
+                        { id: 'mantener', label: 'Mantener', icon: Target },
+                        { id: 'aumentar', label: 'Masa Muscular', icon: Flame },
+                        { id: 'general', label: 'General', icon: Activity },
+                      ] as const
+                    ).map((goal) => (
+                      <button
+                        key={goal.id}
+                        onClick={() => setEditForm({ ...editForm, fitnessGoal: goal.id })}
+                        className={twMerge(
+                          'p-4 rounded-2xl border-2 transition-all font-black uppercase tracking-widest text-[9px] flex flex-col items-center gap-2',
+                          editForm.fitnessGoal === goal.id
+                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-xl shadow-emerald-500/20'
+                            : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'
+                        )}
+                      >
+                        <goal.icon className="w-5 h-5" />
+                        {goal.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <span className="text-primary text-xl font-black uppercase tracking-tight">
+                {user.fitnessGoal === 'bajar_peso'
+                  ? 'Bajar Peso'
+                  : user.fitnessGoal === 'mantener'
+                    ? 'Mantener'
+                    : user.fitnessGoal === 'aumentar'
+                      ? 'Aumentar Masa'
+                      : 'General'}
+              </span>
+            )}
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-black tracking-[0.2em] mt-3">
+              Mi Objetivo Fitness
+            </span>
+          </div>
+        </motion.div>
+      </motion.div>
+      </Reveal>
+
+      <Reveal>
+      <motion.section variants={itemVariants} className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+              <Bell className="w-6 h-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+              Notificaciones
+            </h3>
+          </div>
+          <AnimatePresence>
+            {notifications.length > 0 && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                className="bg-primary text-white text-[11px] font-black px-4 py-1.5 rounded-xl uppercase tracking-widest shadow-lg shadow-primary/20"
+              >
+                {notifications.length} nuevas
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
+        <div className="glass-card rounded-[2.5rem] p-6 max-h-[400px] overflow-y-auto hide-scrollbar">
+          {notifications.length === 0 ? (
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true }}
+              className="flex flex-col items-center justify-center py-12 opacity-40"
+            >
+              <MessageSquare className="w-12 h-12 mb-4" />
+              <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">
+                Bandeja de entrada vacía
+              </p>
+            </motion.div>
+          ) : (
+            <div className="space-y-4">
+              <AnimatePresence mode="popLayout">
+                {notifications.map((n) => (
+                  <motion.div
+                    key={n.id}
+                    layout
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className={`p-6 rounded-4xl border-2 flex gap-5 items-start transition-all hover:scale-[1.01] ${
+                      n.type === 'success'
+                        ? 'bg-emerald-500/5 border-emerald-500/20'
+                        : n.type === 'error'
+                          ? 'bg-red-500/5 border-red-500/20'
+                          : n.type === 'warning'
+                            ? 'bg-yellow-500/5 border-yellow-500/20'
+                            : 'bg-blue-500/5 border-blue-500/20'
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <p className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                        {n.title}
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium leading-relaxed">
+                        {n.message}
+                      </p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">
+                        {n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : 'Reciente'}
+                      </p>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => markNotificationAsRead(n.id)}
+                      className="p-3 bg-white/50 dark:bg-slate-800/50 rounded-2xl text-slate-400 hover:text-emerald-500 hover:border-emerald-500/50 transition-all border border-transparent"
+                    >
+                      <Check className="w-5 h-5" />
+                    </motion.button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      </motion.section>
+      </Reveal>
+
+      <Reveal>
+      <motion.section variants={itemVariants} className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+              <User className="w-6 h-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+              Datos Personales
+            </h3>
+          </div>
+          <AnimatePresence mode="wait">
+            {isEditing ? (
+              <motion.div
+                key="edit-actions"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex gap-3"
+              >
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsEditing(false)}
+                  className="w-11 h-11 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
+                >
+                  <X className="w-5 h-5" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleSaveProfile}
+                  className="w-11 h-11 flex items-center justify-center bg-primary text-white rounded-2xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+                >
+                  <Check className="w-5 h-5" />
+                </motion.button>
+              </motion.div>
+            ) : (
+              <motion.button
+                key="view-actions"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsEditing(true)}
+                className="w-11 h-11 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-md text-primary rounded-2xl hover:bg-primary/10 transition-all border border-slate-200 dark:border-slate-800 shadow-sm"
+              >
+                <Edit2 className="w-5 h-5" />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+        <div className="glass-card rounded-[2.5rem] p-8 space-y-2">
+          <div className="flex justify-between items-center py-5 border-b border-slate-200/50 dark:border-slate-800/50">
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-black uppercase tracking-widest">
+              Email
+            </p>
+            <p className="text-slate-900 dark:text-white text-base font-bold tracking-tight">
+              {user.email}
+            </p>
+          </div>
+          <div className="flex justify-between items-center py-5 border-b border-slate-200/50 dark:border-slate-800/50">
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-black uppercase tracking-widest">
+              Rol
+            </p>
+            <p className="text-slate-900 dark:text-white text-base font-bold tracking-tight capitalize">
+              {user.role}
+            </p>
+          </div>
+          {user.role === 'student' && (
+            <div className="flex justify-between items-center py-5">
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-black uppercase tracking-widest">
+                Vidas Restantes
+              </p>
+              <div className="flex items-center gap-2 bg-red-500/10 px-4 py-1.5 rounded-xl border border-red-500/20">
+                <Heart className="w-4 h-4 text-red-500 fill-red-500" />
+                <p className="text-red-500 text-base font-black">{user.lives}</p>
+              </div>
+            </div>
+          )}
+          {isEditing && (
+            <div className="pt-4 mt-6 border-t border-slate-200/50 dark:border-slate-800/50 space-y-3">
+              <p className="text-slate-900 dark:text-white text-sm font-bold uppercase tracking-widest">
+                Cambiar Contraseña
+              </p>
+              {/* Contraseña actual */}
+              <div className="relative">
+                <input
+                  type={showCurrentPwd ? 'text' : 'password'}
+                  placeholder="Contraseña actual"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) =>
+                    setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
+                  }
+                  className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 pr-10 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPwd((p) => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showCurrentPwd ? (
+                    <Lock className="w-4 h-4" />
+                  ) : (
+                    <Lock className="w-4 h-4 opacity-40" />
+                  )}
+                </button>
+              </div>
+              {/* Nueva contraseña */}
+              <div className="relative">
+                <input
+                  type={showNewPwd ? 'text' : 'password'}
+                  placeholder="Nueva contraseña (mín. 6 caracteres)"
+                  value={passwordForm.newPassword}
+                  onChange={(e) =>
+                    setPasswordForm({ ...passwordForm, newPassword: e.target.value })
+                  }
+                  className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 pr-10 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPwd((p) => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showNewPwd ? (
+                    <Lock className="w-4 h-4" />
+                  ) : (
+                    <Lock className="w-4 h-4 opacity-40" />
+                  )}
+                </button>
+              </div>
+              {/* Confirmar contraseña */}
+              <div className="relative">
+                <input
+                  type={showConfirmPwd ? 'text' : 'password'}
+                  placeholder="Confirmar nueva contraseña"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
+                  }
+                  className={`w-full bg-white/50 dark:bg-slate-800/50 border rounded-xl px-4 py-2 pr-10 text-sm font-bold focus:ring-2 outline-none transition-all ${
+                    passwordForm.confirmPassword &&
+                    passwordForm.newPassword !== passwordForm.confirmPassword
+                      ? 'border-red-400 focus:ring-red-400/50'
+                      : 'border-slate-200 dark:border-slate-700 focus:ring-primary/50'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPwd((p) => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showConfirmPwd ? (
+                    <Lock className="w-4 h-4" />
+                  ) : (
+                    <Lock className="w-4 h-4 opacity-40" />
+                  )}
+                </button>
+              </div>
+              {passwordForm.confirmPassword &&
+                passwordForm.newPassword !== passwordForm.confirmPassword && (
+                  <p className="text-xs text-red-500 font-bold">⚠ Las contraseñas no coinciden</p>
+                )}
+              <button
+                onClick={handleChangePassword}
+                disabled={
+                  isChangingPassword ||
+                  passwordForm.newPassword.length < 6 ||
+                  passwordForm.newPassword !== passwordForm.confirmPassword ||
+                  !passwordForm.currentPassword
+                }
+                className="w-full bg-primary text-white px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all disabled:opacity-50 btn-press"
+              >
+                {isChangingPassword ? 'Actualizando...' : '🔐 Actualizar Contraseña'}
+              </button>
+            </div>
+          )}
+        </div>
+      </motion.section>
+      </Reveal>
+
+      {/* Student: Navigate to License Approval Progress */}
+      {user.role !== 'admin' && (
+        <Reveal>
+        <motion.section variants={itemVariants} className="mb-12">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20">
+              <Shield className="w-6 h-6 text-amber-400" />
+            </div>
+            <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+              Proceso de Licencia
+            </h3>
+          </div>
+          <button
+            onClick={() => navigate('/aprobacion')}
+            className="w-full glass-card rounded-[2.5rem] p-6 flex items-center justify-between group hover:border-amber-500/30 transition-all border border-slate-200 dark:border-slate-800"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-2xl">
+                🥊
+              </div>
+              <div className="text-left">
+                <p className="font-black text-slate-900 dark:text-white">Mi Progreso de Licencia</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Video · Manillas · Contacto · Combo Presencial
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-amber-400 transition-colors" />
+          </button>
+        </motion.section>
+        </Reveal>
+      )}
+
+      {(user.role === 'admin' || user.email === 'hernandezkevin001998@gmail.com') && (
+        <Reveal>
+        <motion.div variants={itemVariants} className="space-y-16">
+          {/* Admin Dashboard Summary */}
+          <section>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+                <TrendingUp className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                  Panel de Control
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                  Resumen general de la plataforma
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Usuarios', value: allUsers.length, color: 'primary', icon: Users },
+                { label: 'Pagos Pendientes', value: pendingPayments.length, color: 'amber-500', icon: CreditCard },
+                { label: 'Planes Activos', value: plans.filter((p: any) => p.is_active).length, color: 'emerald-500', icon: Target },
+                { label: 'Notificaciones', value: notifications.length, color: 'blue-500', icon: Bell },
+              ].map((stat) => (
+                <motion.div
+                  key={stat.label}
+                  whileHover={{ y: -3 }}
+                  className="glass-card p-5 rounded-3xl flex flex-col items-center text-center border border-slate-200/50 dark:border-slate-700/50"
+                >
+                  <stat.icon className={`w-5 h-5 text-${stat.color} mb-2`} />
+                  <span className="text-2xl font-black text-slate-900 dark:text-white">{stat.value}</span>
+                  <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.15em] mt-1">{stat.label}</span>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          {/* Las aprobaciones de pagos se han movido a la página de Planes */}
+
+          {/* Student License Approvals Admin Panel */}
+          <section>
+            <button
+              onClick={() => toggleAdminSection('licencias')}
+              className="flex items-center justify-between w-full mb-6 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20">
+                  <Shield className="w-6 h-6 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                    Aprobaciones de Licencia
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                    Evaluar videos y documentos de estudiantes
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="bg-amber-500/10 text-amber-400 px-4 py-1.5 rounded-xl border border-amber-500/20 text-[11px] font-black tracking-widest uppercase">
+                  {
+                    pendingApprovals.filter(
+                      (a) =>
+                        a.step1_status === 'uploaded' ||
+                        a.step2_status === 'uploaded' ||
+                        a.step3_status === 'uploaded' ||
+                        a.step4_status === 'uploaded'
+                    ).length
+                  }{' '}
+                  pendientes
+                </span>
+                <ChevronRight
+                  className={`w-5 h-5 text-slate-400 transition-transform ${expandedAdminSections.has('licencias') ? 'rotate-90' : ''}`}
+                />
+              </div>
+            </button>
+            {expandedAdminSections.has('licencias') && (
+              <div className="glass-card rounded-[2.5rem] p-6 max-h-[600px] overflow-y-auto hide-scrollbar">
+                {pendingApprovals.length === 0 ? (
+                  <motion.div
+                    variants={fadeUp}
+                    initial="hidden"
+                    whileInView="show"
+                    viewport={{ once: true }}
+                    className="flex flex-col items-center justify-center py-12 opacity-40"
+                  >
+                    <Shield className="w-12 h-12 mb-4" />
+                    <p className="text-sm font-bold uppercase tracking-widest">
+                      No hay solicitudes
+                    </p>
+                  </motion.div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* ✅ Solo mostrar cuando el estudiante ya subió algo que requiera aprobación */}
+                    {pendingApprovals
+                      .filter(
+                        (a) =>
+                          a.step1_status === 'uploaded' ||
+                          a.step2_status === 'uploaded' ||
+                          a.step3_status === 'uploaded' ||
+                          a.step4_status === 'uploaded'
+                      )
+                      .map((approval) => {
+                        const stepLabels = [
+                          'Video de Presentación',
+                          'Manillas',
+                          'Contacto',
+                          'Combo Presencial',
+                        ];
+                        const stepsData = [
+                          {
+                            key: 'step1',
+                            status: approval.step1_status,
+                            videoUrl: approval.step1_video_url,
+                          },
+                          { key: 'step2', status: approval.step2_status },
+                          { key: 'step3', status: approval.step3_status },
+                          { key: 'step4', status: approval.step4_status },
+                        ];
+                        return (
+                          <div
+                            key={approval.id}
+                            className="bg-white/40 dark:bg-slate-800/40 p-6 rounded-4xl border border-slate-200/50 dark:border-slate-700/50"
+                          >
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <p className="font-black text-slate-900 dark:text-white text-lg">
+                                  {approval.user_name || approval.id}
+                                </p>
+                                <p className="text-xs text-primary font-bold">
+                                  {approval.user_email}
+                                </p>
+                              </div>
+                              <div className="flex gap-1">
+                                {stepsData.map((s, i) => (
+                                  <div
+                                    key={i}
+                                    className={`w-4 h-4 rounded-full border ${
+                                      s.status === 'approved'
+                                        ? 'bg-emerald-500 border-emerald-500'
+                                        : s.status === 'uploaded' || s.status === 'pending'
+                                          ? 'bg-amber-500 border-amber-500'
+                                          : s.status === 'rejected'
+                                            ? 'bg-red-500 border-red-500'
+                                            : 'bg-slate-700 border-slate-600'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              {stepsData.map((step, i) => {
+                                const stepNum = i + 1;
+                                return (
+                                  <div
+                                    key={step.key}
+                                    className={`p-3 rounded-xl border text-sm flex items-center justify-between gap-2 ${
+                                      step.status === 'approved'
+                                        ? 'border-emerald-500/20 bg-emerald-500/5'
+                                        : step.status === 'uploaded'
+                                          ? 'border-amber-500/30 bg-amber-500/10'
+                                          : step.status === 'rejected'
+                                            ? 'border-red-500/20 bg-red-500/5'
+                                            : 'border-slate-700/50 bg-slate-900/30 opacity-40'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">
+                                        P{stepNum}
+                                      </span>
+                                      <span className="font-bold text-white text-xs truncate">
+                                        {stepLabels[i]}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {(step as any).videoUrl && (
+                                        <a
+                                          href={(step as any).videoUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg text-[9px] font-black uppercase border border-blue-500/20"
+                                        >
+                                          📹 Ver
+                                        </a>
+                                      )}
+                                      {(step.status === 'uploaded' || step.status === 'pending') &&
+                                        step.status !== 'approved' &&
+                                        step.status !== 'locked' && (
+                                          <>
+                                            <button
+                                              onClick={() =>
+                                                handleApproveStep(approval.id, stepNum)
+                                              }
+                                              className="px-2 py-1 bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase"
+                                            >
+                                              ✅
+                                            </button>
+                                            {stepNum === 1 && (
+                                              <button
+                                                onClick={() =>
+                                                  handleRejectStep(approval.id, stepNum)
+                                                }
+                                                className="px-2 py-1 bg-red-500/10 text-red-400 rounded-lg text-[9px] font-black uppercase border border-red-500/20"
+                                              >
+                                                ❌
+                                              </button>
+                                            )}
+                                          </>
+                                        )}
+                                      <span
+                                        className={`text-[9px] font-black uppercase ${
+                                          step.status === 'approved'
+                                            ? 'text-emerald-400'
+                                            : step.status === 'uploaded'
+                                              ? 'text-amber-400'
+                                              : step.status === 'rejected'
+                                                ? 'text-red-400'
+                                                : 'text-slate-600'
+                                        }`}
+                                      >
+                                        {step.status === 'approved'
+                                          ? '✅'
+                                          : step.status === 'uploaded'
+                                            ? '⏳'
+                                            : step.status === 'rejected'
+                                              ? '❌'
+                                              : step.status === 'pending'
+                                                ? '⌛'
+                                                : '🔒'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Section: Combo Evaluations (Presencial — via combo_progress) */}
+          <section className="mb-12">
+            <button
+              onClick={() => toggleAdminSection('tecnicas')}
+              className="flex items-center justify-between w-full mb-8 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20">
+                  <Video className="w-6 h-6 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                    Evaluación de Combos (Presencial)
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                    Combo progress registrado desde Saberes
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="bg-indigo-500/10 text-indigo-400 px-4 py-1.5 rounded-xl border border-indigo-500/20 text-[11px] font-black tracking-widest uppercase">
+                  {allComboEvals.filter((e: any) => e.status === 'pending').length} Pendientes
+                </span>
+                <ChevronRight
+                  className={`w-5 h-5 text-slate-400 transition-transform ${expandedAdminSections.has('tecnicas') ? 'rotate-90' : ''}`}
+                />
+              </div>
+            </button>
+
+            {expandedAdminSections.has('tecnicas') && (
+              <div className="space-y-6">
+                {allComboEvals.length === 0 ? (
+                  <motion.div
+                      variants={fadeUp}
+                      initial="hidden"
+                      whileInView="show"
+                      viewport={{ once: true }}
+                      className="text-center py-12 glass-card rounded-[2.5rem] border-dashed border-slate-700/50 flex flex-col items-center gap-4"
+                    >
+                      <Video className="w-12 h-12 text-slate-500 opacity-40" />
+                      <p className="text-slate-500 text-xs font-black uppercase tracking-[0.2em] opacity-40">
+                        No hay evaluaciones de combo registradas
+                      </p>
+                      <p className="text-slate-600 text-[10px] font-bold uppercase tracking-wider">
+                        Las evaluaciones se registran desde el módulo Saberes
+                      </p>
+                    </motion.div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {allComboEvals.map((ev: any) => (
+                      <div
+                        key={ev.id}
+                        className="glass-card rounded-2xl p-5 border border-slate-200/50 dark:border-slate-700/50"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-sm text-slate-900 dark:text-white">{ev.user_name}</p>
+                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                                ev.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                                ev.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                                'bg-yellow-500/20 text-yellow-400'
+                              }`}>
+                                {ev.status === 'approved' ? 'Aprobado' : ev.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
+                              </span>
+                            </div>
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                              {ev.video_approved && <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold">&#10003; Video</span>}
+                              {ev.manillas_approved && <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold">&#10003; Manillas</span>}
+                              {ev.contacto_approved && <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold">&#10003; Contacto</span>}
+                              {ev.desarrollo_approved && <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold">&#10003; Desarrollo</span>}
+                            </div>
+                          </div>
+                          <div className="text-right text-[10px] text-slate-500 font-bold uppercase">
+                            {ev.created_at ? new Date(ev.created_at).toLocaleDateString() : ''}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Section: Gestionar Combos (CRUD) */}
+          <section className="mb-12">
+            <button
+              onClick={() => toggleAdminSection('combos')}
+              className="flex items-center justify-between w-full mb-8 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-orange-500/10 rounded-2xl border border-orange-500/20">
+                  <Target className="w-6 h-6 text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                    Gestionar Combos
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                    Agregar, editar o eliminar combos de boxeo
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="bg-orange-500/10 text-orange-400 px-4 py-1.5 rounded-xl border border-orange-500/20 text-[11px] font-black tracking-widest uppercase">
+                  {combos.length} Combos
+                </span>
+                <ChevronRight
+                  className={`w-5 h-5 text-slate-400 transition-transform ${expandedAdminSections.has('combos') ? 'rotate-90' : ''}`}
+                />
+              </div>
+            </button>
+
+            {expandedAdminSections.has('combos') && (
+              <div className="space-y-6">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => { setEditingCombo(null); setComboForm({ name: '', level: 1 }); setComboFormOpen(true); }}
+                  className="w-full bg-orange-500/10 border-2 border-dashed border-orange-500/30 text-orange-500 font-black py-4 rounded-2xl text-sm uppercase tracking-[0.15em] hover:bg-orange-500/20 transition-all"
+                >
+                  + Agregar Combo
+                </motion.button>
+
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map((lvl) => {
+                  const levelCombos = combos.filter((c: any) => c.level === lvl);
+                  if (levelCombos.length === 0) return null;
+                  const levelNames: Record<number, string> = {
+                    1: 'Humano', 2: 'Discipulo de Roshi', 3: 'Guerrero Z', 4: 'Sayayin de Elite',
+                    5: 'Super Sayayin', 6: 'SSJ 2', 7: 'SSJ 3', 8: 'SSJ Dios',
+                    9: 'SSJ Blue', 10: 'Ultra Instinto S', 11: 'Ultra Instinto D', 12: 'Dios de la Destruccion'
+                  };
+                  return (
+                    <div key={lvl}>
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-3">
+                        Nivel {lvl} — {levelNames[lvl] || ''}
+                      </p>
+                      <div className="space-y-2">
+                        {levelCombos.map((c: any) => (
+                          <div key={c.id} className="glass-card rounded-2xl p-4 border border-slate-200/50 dark:border-slate-700/50 flex items-center justify-between group hover:border-orange-500/20 transition-all">
+                            <p className="font-bold text-sm text-slate-900 dark:text-white font-mono">{c.name}</p>
+                            <div className="flex gap-2">
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => { setEditingCombo(c); setComboForm({ name: c.name, level: c.level }); setComboFormOpen(true); }}
+                                className="p-2 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 transition-all border border-blue-500/10"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setComboToDelete(c)}
+                                className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-all border border-red-500/10"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </motion.button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* Modal: Agregar/Editar Combo */}
+          <Modal isOpen={comboFormOpen} onClose={() => { setComboFormOpen(false); setEditingCombo(null); }} title={editingCombo ? 'Editar Combo' : 'Agregar Combo'}>
+            <div className="space-y-5">
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Nombre del Combo</label>
+                <input
+                  type="text"
+                  value={comboForm.name}
+                  onChange={(e) => setComboForm({ ...comboForm, name: e.target.value })}
+                  placeholder="Ej: 1-2-3-Cintura-5-6"
+                  className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Nivel (1-12)</label>
+                <select
+                  value={comboForm.level}
+                  onChange={(e) => setComboForm({ ...comboForm, level: Number(e.target.value) })}
+                  className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                >
+                  {[1,2,3,4,5,6,7,8,9,10,11,12].map((l) => (
+                    <option key={l} value={l}>Nivel {l}</option>
+                  ))}
+                </select>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSaveCombo}
+                disabled={savingCombo || !comboForm.name.trim()}
+                className="w-full bg-orange-500 text-white font-black py-4 rounded-2xl text-sm uppercase tracking-[0.15em] shadow-xl shadow-orange-500/20 disabled:opacity-40"
+              >
+                {savingCombo ? 'Guardando...' : editingCombo ? 'Actualizar Combo' : 'Agregar Combo'}
+              </motion.button>
+            </div>
+          </Modal>
+
+          {/* Modal: Confirmar Eliminar Combo */}
+          <Modal isOpen={!!comboToDelete} onClose={() => setComboToDelete(null)} title="Eliminar Combo">
+            <div className="text-center space-y-6">
+              <Trash2 className="w-16 h-16 text-red-500 mx-auto" />
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                ¿Eliminar <span className="font-black text-slate-900 dark:text-white font-mono">{comboToDelete?.name}</span> del nivel {comboToDelete?.level}?
+              </p>
+              <div className="flex gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setComboToDelete(null)}
+                  className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black py-3.5 rounded-2xl text-sm uppercase tracking-widest"
+                >
+                  Cancelar
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDeleteCombo}
+                  disabled={savingCombo}
+                  className="flex-1 bg-red-500 text-white font-black py-3.5 rounded-2xl text-sm uppercase tracking-widest shadow-xl shadow-red-500/20 disabled:opacity-40"
+                >
+                  {savingCombo ? '...' : 'Eliminar'}
+                </motion.button>
+              </div>
+            </div>
+          </Modal>
+
+          <section>
+            <button
+              onClick={() => toggleAdminSection('usuarios')}
+              className="flex items-center justify-between w-full mb-6 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+                  <Users className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                    Usuarios Registrados
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                    Gestionar perfiles, planes y permisos
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-xl border border-primary/20 text-[11px] font-black tracking-widest uppercase">
+                  {allUsers.length} Total
+                </span>
+                <ChevronRight
+                  className={`w-5 h-5 text-slate-400 transition-transform ${expandedAdminSections.has('usuarios') ? 'rotate-90' : ''}`}
+                />
+              </div>
+            </button>
+            {expandedAdminSections.has('usuarios') && (
+              <>
+                <motion.div
+                  whileHover={{ y: -5 }}
+                  className="glass-card rounded-[2.5rem] p-6 max-h-[400px] overflow-y-auto hide-scrollbar"
+                >
+                  {allUsers.length === 0 ? (
+                    <motion.div
+                      variants={fadeUp}
+                      initial="hidden"
+                      whileInView="show"
+                      viewport={{ once: true }}
+                      className="flex flex-col items-center justify-center py-12 opacity-40 text-slate-400"
+                    >
+                      <Users className="w-12 h-12 mb-4" />
+                      <p className="text-sm font-bold uppercase tracking-widest">
+                        No hay usuarios registrados
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {allUsers.map((u) => (
+                        <div
+                          key={u.id}
+                          className="bg-white/40 dark:bg-slate-800/40 p-5 rounded-4xl border border-slate-200/50 dark:border-slate-700/50 flex justify-between items-center group hover:border-primary/30 transition-all"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-primary font-black text-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+                              {u.profile_pic ? (
+                                <img
+                                  src={u.profile_pic}
+                                  alt={u.name}
+                                  className="w-full h-full object-cover rounded-2xl transition-transform duration-300 group-hover:scale-110"
+                                />
+                              ) : (
+                                u.name.charAt(0)
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                                {u.name}
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                {u.email}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`text-[9px] uppercase font-black px-3 py-1 rounded-lg tracking-[0.15em] border ${u.role === 'admin' ? 'bg-accent-purple/10 text-accent-purple border-accent-purple/20' : 'bg-primary/10 text-primary border-primary/20'}`}
+                            >
+                              {u.role}
+                            </span>
+                            {u.id !== user.id && u.email !== 'hernandezkevin001998@gmail.com' && (
+                              <div className="flex gap-2">
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => {
+                                    setAdminEditUser(u);
+                                    setAdminEditForm({
+                                      name: u.name || '',
+                                      weight: u.weight || 0,
+                                      height: u.height || 0,
+                                      newPassword: '',
+                                      plan_name: u.plan_name || '',
+                                      classes_remaining: u.classes_remaining || 0,
+                                      classes_per_month: u.classes_per_month || 0,
+                                    });
+                                  }}
+                                  className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 transition-all border border-blue-500/10"
+                                  title="Editar usuario"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </motion.button>
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => setUserToDelete({ id: u.id, name: u.name })}
+                                  className="p-2.5 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-all border border-red-500/10"
+                                  title="Eliminar usuario"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </motion.button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+                <div className="mt-6 p-6 bg-blue-500/5 rounded-4xl border border-blue-500/10 flex items-start gap-4">
+                  <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed italic">
+                    Por seguridad de Firebase, las contraseñas y correos solo pueden ser modificados
+                    por los propios usuarios desde su cuenta.
+                  </p>
+                </div>
+              </>
+            )}
+          </section>
+
+          <section className="mb-12">
+            <button
+              onClick={() => toggleAdminSection('estudiantes')}
+              className="flex items-center justify-between w-full mb-8 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+                  <UserPlus className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                    Crear Estudiante
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                    Registrar un nuevo usuario en la plataforma
+                  </p>
+                </div>
+              </div>
+              <ChevronRight
+                className={`w-5 h-5 text-slate-400 transition-transform ${expandedAdminSections.has('estudiantes') ? 'rotate-90' : ''}`}
+              />
+            </button>
+            {expandedAdminSections.has('estudiantes') && (
+              <motion.div whileHover={{ y: -5 }} className="glass-card rounded-[2.5rem] p-8">
+                <div className="relative">
+                  <motion.button
+                    style={{ display: !showCreateUser ? 'flex' : 'none' }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowCreateUser(true)}
+                    className="w-full bg-primary/10 text-primary font-black py-5 rounded-4xl hover:bg-primary/20 transition-all border border-primary/30 items-center justify-center gap-4 uppercase tracking-[0.2em]"
+                  >
+                    <UserPlus className="w-6 h-6" />
+                    <span>Nuevo Estudiante</span>
+                  </motion.button>
+                  <motion.form
+                    style={{ display: showCreateUser ? 'block' : 'none' }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: showCreateUser ? 1 : 0, y: showCreateUser ? 0 : 20 }}
+                    onSubmit={handleCreateUser}
+                    className="space-y-6"
+                  >
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4">
+                        Correo Electrónico
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="ejemplo@correo.com"
+                        value={newUser.email}
+                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                        className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4">
+                        Contraseña Temporal
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="Mínimo 6 caracteres"
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                        required
+                      />
+                    </div>
+                    <div className="flex gap-4 pt-4">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="button"
+                        onClick={() => setShowCreateUser(false)}
+                        className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 py-5 rounded-3xl text-sm font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                      >
+                        Cancelar
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="submit"
+                        className="flex-1 bg-primary text-white py-5 rounded-3xl text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-xl shadow-primary/20"
+                      >
+                        Crear Cuenta
+                      </motion.button>
+                    </div>
+                  </motion.form>
+                </div>
+              </motion.div>
+            )}
+          </section>
+
+          {/* PANEL DE CONTROL DE SECCIONES */}
+          <section className="mb-12">
+            <button
+              onClick={() => toggleAdminSection('secciones')}
+              className="flex items-center justify-between w-full mb-8 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+                  <Settings className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                    Control de Secciones
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                    Activar o desactivar módulos globales
+                  </p>
+                </div>
+              </div>
+              <ChevronRight
+                className={`w-5 h-5 text-slate-400 transition-transform ${expandedAdminSections.has('secciones') ? 'rotate-90' : ''}`}
+              />
+            </button>
+
+            {expandedAdminSections.has('secciones') && (
+              <motion.div whileHover={{ y: -5 }} className="glass-card rounded-[2.5rem] p-8">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6 leading-relaxed">
+                  Activa o desactiva secciones para todos los usuarios. Los cambios son inmediatos.
+                </p>
+                <div className="grid grid-cols-1 gap-4">
+                  {(
+                    [
+                      { key: 'workouts_unlocked', label: 'Entrenamientos', emoji: '💪' },
+                      { key: 'technique_unlocked', label: 'Técnica / Saberes', emoji: '🥊' },
+                      { key: 'nutrition_unlocked', label: 'Nutrición', emoji: '🥗' },
+                      { key: 'challenge_unlocked', label: 'Reto del Día', emoji: '🏆' },
+                    ] as const
+                  ).map(({ key, label, emoji }) => {
+                    const isOn = appSettings[key];
+                    const isSpecificToggling = togglingSection === key;
+                    return (
+                      <motion.button
+                        key={key}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.98 }}
+                        disabled={isSpecificToggling}
+                        onClick={async () => {
+                          setTogglingSection(key);
+                          try {
+                            const { data } = await supabase.from('settings').select('*').eq('id', 'global').single();
+                            const currentVal = data && data.data ? data.data[key] : false;
+                            const updatedData = {
+                              ...(data && data.data ? data.data : {}),
+                              [key]: !currentVal
+                            };
+                            await supabase.from('settings').upsert({ id: 'global', data: updatedData });
+                            setAppSettings(updatedData);
+                          } catch (e) {
+                            console.error('Error toggling section:', e);
+                          } finally { setTogglingSection(null); }
+                        }}
+                        className={`w-full flex items-center justify-between p-5 rounded-3xl border-2 transition-all ${
+                          isOn
+                            ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-red-500/10 border-red-500/30 text-red-500'
+                        } ${isSpecificToggling ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <span className="text-2xl">{emoji}</span>
+                          <span className="font-black uppercase tracking-tight text-base">
+                            {label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-lg ${
+                              isOn
+                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-red-500/20 text-red-500'
+                            }`}
+                          >
+                            {isSpecificToggling ? '...' : isOn ? 'ABIERTO' : 'CERRADO'}
+                          </span>
+                          {isOn ? (
+                            <ToggleRight className="w-8 h-8 text-emerald-500" />
+                          ) : (
+                            <ToggleLeft className="w-8 h-8 text-red-400" />
+                          )}
+                        </div>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </section>
+
+          {/* La gestión de precios de planes se ha movido a la página de Planes */}
+        </motion.div>
+        </Reveal>
+      )}
+
+      {user.role === 'student' && (
+        <Reveal>
+        <motion.section variants={itemVariants} className="mb-12">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+              <CreditCard className="w-6 h-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+              Plan Actual
+            </h3>
+          </div>
+          <motion.div
+            whileHover={{ y: -5 }}
+            className="glass-card rounded-[2.5rem] p-8 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110"></div>
+            <div className="flex justify-between items-center mb-6 relative z-10">
+              <div>
+                <p className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                  {user.plan_name || 'Sin Plan Activo'}
+                </p>
+                {user.plan_status === 'active' && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">
+                      {user.classes_remaining ?? 0} clases restantes este mes
+                    </p>
+                  </div>
+                )}
+              </div>
+              <span
+                className={`text-[11px] font-black px-4 py-1.5 rounded-xl uppercase tracking-widest border shadow-lg ${
+                  user.plan_status === 'active'
+                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-emerald-500/10'
+                    : user.plan_status === 'pending_payment'
+                      ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 shadow-yellow-500/10'
+                      : user.plan_status === 'pending_verification'
+                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 shadow-amber-500/10'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                {user.plan_status === 'active'
+                  ? 'Activo'
+                  : user.plan_status === 'pending_payment'
+                    ? 'Pendiente de Pago'
+                    : user.plan_status === 'pending_verification'
+                      ? 'En Revisión'
+                      : 'Inactivo'}
+              </span>
+            </div>
+            {user.plan_start_date && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium relative z-10">
+                Miembro desde el{' '}
+                <span className="text-slate-900 dark:text-white font-bold">
+                  {user.plan_start_date?.toDate
+                    ? user.plan_start_date.toDate().toLocaleDateString()
+                    : new Date(user.plan_start_date).toLocaleDateString()}
+                </span>
+              </p>
+            )}
+            {!user.plan_id && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate('/plans')}
+                className="mt-8 w-full bg-primary text-white font-black py-4 rounded-2xl text-sm uppercase tracking-[0.2em] transition-all shadow-xl shadow-primary/20"
+              >
+                Ver Planes Disponibles
+              </motion.button>
+            )}
+          </motion.div>
+        </motion.section>
+      </Reveal>
+      )}
+
+      <Reveal>
+      <motion.section variants={itemVariants} className="mb-12">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+            <Settings className="w-6 h-6 text-primary" />
+          </div>
+          <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+            Ajustes
+          </h3>
+        </div>
+
+        <div className="space-y-6">
+
+
+          <motion.div
+            whileHover={{ x: 5 }}
+            className="glass-card rounded-4xl p-6 border border-slate-200 dark:border-slate-700/50"
+          >
+            <p className="text-sm font-black text-slate-900 dark:text-white mb-6 uppercase tracking-widest">
+              Soporte y Ayuda
+            </p>
+            <motion.a
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              href="https://wa.me/573022028477"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-3 bg-[#25D366] text-white p-4 rounded-2xl hover:bg-[#25D366]/90 transition-all shadow-lg shadow-[#25D366]/20"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span className="text-sm font-black uppercase tracking-widest">WhatsApp Soporte</span>
+            </motion.a>
+            <p className="text-[10px] text-slate-500 mt-4 text-center uppercase tracking-widest font-bold">
+              ¿Tienes dudas o inquietudes? Escríbenos directamente.
+            </p>
+          </motion.div>
+
+          {user.email === 'hernandezkevin001998@gmail.com' && user.role !== 'admin' && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={async () => {
+                try {
+                  await supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id);
+                  setUser({ ...user, role: 'admin' } as any);
+                  showAlert('Éxito', '¡Ahora eres administrador! Recarga la página si es necesario.', 'success');
+                } catch (err) {
+                  console.error('Error claiming admin:', err);
+                }
+              }}
+              className="w-full flex items-center justify-center p-5 bg-primary text-white rounded-4xl hover:bg-primary-dark transition-all shadow-xl shadow-primary/20"
+            >
+              <div className="flex items-center gap-3">
+                <Shield className="w-6 h-6" />
+                <span className="text-sm font-black uppercase tracking-widest">
+                  Reclamar Permisos de Admin
+                </span>
+              </div>
+            </motion.button>
+          )}
+
+          <motion.button
+            whileHover={{ scale: 1.02, backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleLogout}
+            className="w-full flex items-center justify-between p-6 glass-card rounded-4xl border border-red-500/20 text-red-500 transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-red-500/10 rounded-xl group-hover:bg-red-500 group-hover:text-white transition-colors">
+                <LogOut className="w-5 h-5" />
+              </div>
+              <span className="text-sm font-black uppercase tracking-widest">Cerrar Sesión</span>
+            </div>
+            <ChevronRight className="w-5 h-5 opacity-50 group-hover:translate-x-1 transition-transform" />
+          </motion.button>
+        </div>
+      </motion.section>
+      </Reveal>
+
+      {/* Alert Modal */}
+      <Modal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+      >
+        <div className="flex flex-col items-center text-center p-4">
+          {alertModal.type === 'success' && (
+            <CheckCircle2 className="w-16 h-16 text-emerald-500 mb-4" />
+          )}
+          {alertModal.type === 'error' && <AlertCircle className="w-16 h-16 text-red-500 mb-4" />}
+          {alertModal.type === 'info' && <Info className="w-16 h-16 text-blue-500 mb-4" />}
+          <p className="text-slate-300">{alertModal.message}</p>
+          <button
+            onClick={() => setAlertModal({ ...alertModal, isOpen: false })}
+            className="mt-6 w-full bg-slate-800 text-white font-bold py-3 rounded-xl hover:bg-slate-700 transition-colors"
+          >
+            Entendido
+          </button>
+        </div>
+      </Modal>
+
+      {/* Edit User Modal (Admin) */}
+      <Modal
+        isOpen={!!adminEditUser}
+        onClose={() => setAdminEditUser(null)}
+        title={`Editar a ${adminEditUser?.name}`}
+      >
+        <form onSubmit={handleAdminSaveUser} className="p-4 space-y-4">
+          <div>
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1 block">
+              Nombre
+            </label>
+            <input
+              type="text"
+              value={adminEditForm.name}
+              onChange={(e) => setAdminEditForm({ ...adminEditForm, name: e.target.value })}
+              className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+            />
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1 block">
+                Peso (kg)
+              </label>
+              <input
+                type="number"
+                value={adminEditForm.weight}
+                onChange={(e) =>
+                  setAdminEditForm({ ...adminEditForm, weight: Number(e.target.value) })
+                }
+                className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1 block">
+                Altura (cm)
+              </label>
+              <input
+                type="number"
+                value={adminEditForm.height}
+                onChange={(e) =>
+                  setAdminEditForm({ ...adminEditForm, height: Number(e.target.value) })
+                }
+                className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+              />
+            </div>
+          </div>
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1 block">
+              Plan Actual
+            </label>
+            <select
+              value={adminEditForm.plan_name}
+              onChange={(e) => setAdminEditForm({ ...adminEditForm, plan_name: e.target.value })}
+              className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none mb-4"
+            >
+              <option value="">Sin Plan</option>
+              <option value="Suscripción Mensual">Suscripción Mensual</option>
+              <option value="Clase Individual">Clase Individual</option>
+              <option value="Plan Básico">Plan Básico</option>
+              <option value="Plan Avanzado">Plan Avanzado</option>
+              <option value="Plan Personalizado">Plan Personalizado</option>
+            </select>
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label
+                className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1 block hover:text-primary transition-colors cursor-help"
+                title={`Muestra el límite preestablecido de clases que proporciona el plan.\nClases consumidas: ${Math.max(0, adminEditForm.classes_per_month - adminEditForm.classes_remaining)}`}
+              >
+                Clases Totales (Base)
+              </label>
+              <input
+                type="number"
+                value={adminEditForm.classes_per_month}
+                onChange={(e) =>
+                  setAdminEditForm({ ...adminEditForm, classes_per_month: Number(e.target.value) })
+                }
+                className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-1 block">
+                Clases Restantes
+              </label>
+              <input
+                type="number"
+                value={adminEditForm.classes_remaining}
+                onChange={(e) =>
+                  setAdminEditForm({ ...adminEditForm, classes_remaining: Number(e.target.value) })
+                }
+                className="w-full bg-slate-100 dark:bg-slate-800/50 border border-emerald-500/30 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-emerald-500/50 outline-none"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mb-4 bg-primary/10 p-2 rounded-lg">
+            <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+              Consumidas:
+            </span>
+            <span className="text-xs font-bold text-slate-900 dark:text-white">
+              {Math.max(0, adminEditForm.classes_per_month - adminEditForm.classes_remaining)}{' '}
+              clases de {adminEditForm.classes_per_month}
+            </span>
+          </div>
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1 block">
+              Nueva Contraseña (Opcional)
+            </label>
+            <input
+              type="password"
+              placeholder="Dejar en blanco para no cambiar"
+              value={adminEditForm.newPassword}
+              onChange={(e) => setAdminEditForm({ ...adminEditForm, newPassword: e.target.value })}
+              className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isAdminSaving}
+            className="w-full bg-primary text-white font-black py-4 rounded-xl mt-4 hover:bg-primary-dark transition-colors btn-press"
+          >
+            {isAdminSaving ? 'Guardando...' : 'Guardar Cambios'}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-8 h-8 text-red-500" />
+            </div>
+            <h3 className="text-xl font-bold text-white text-center mb-2">¿Eliminar Usuario?</h3>
+            <p className="text-slate-400 text-center text-sm mb-6">
+              Estás a punto de eliminar a{' '}
+              <span className="text-white font-bold">{userToDelete.name}</span>. Esta acción no se
+              puede deshacer. Por seguridad, ingresa tu contraseña de administrador:
+            </p>
+            <input
+              type="password"
+              placeholder="Contraseña de admin"
+              value={deleteAdminPassword}
+              onChange={(e) => setDeleteAdminPassword(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm font-bold text-white mb-6 focus:ring-2 focus:ring-red-500/50 outline-none"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setUserToDelete(null);
+                  setDeleteAdminPassword('');
+                }}
+                className="flex-1 py-3 rounded-xl bg-slate-800 text-white font-bold text-sm hover:bg-slate-700 transition-colors"
+                disabled={isDeletingUser}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                disabled={isDeletingUser || !deleteAdminPassword}
+                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20 disabled:opacity-50"
+              >
+                {isDeletingUser ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}

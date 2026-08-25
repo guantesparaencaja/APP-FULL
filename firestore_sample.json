@@ -1,0 +1,22 @@
+{
+  "userId": "user_123456789",
+  "timestamp": "2026-03-15T20:19:05.000Z",
+  "durationSeconds": 1800,
+  "exercises": [
+    {
+      "id": "ex_001",
+      "title": "Pushups",
+      "sets": 3,
+      "reps": 15,
+      "durationSeconds": 300
+    },
+    {
+      "id": "ex_002",
+      "title": "Squats",
+      "sets": 3,
+      "reps": 20,
+      "durationSeconds": 300
+    }
+  ],
+  "caloriesEstimate": 180
+}

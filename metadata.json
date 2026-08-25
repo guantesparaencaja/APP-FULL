@@ -1,0 +1,5 @@
+{
+  "name": "GUANTES - Entrenamiento de Boxeo",
+  "description": "Aplicación móvil de entrenamiento de boxeo con sistema de gamificación tipo Duolingo.",
+  "requestFramePermissions": ["camera"]
+}

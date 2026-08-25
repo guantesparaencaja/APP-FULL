@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Lateral Raise",
+    "muscle": "Shoulders",
+    "equipment": "Dumbbell",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/03341201-Dumbbell-Lateral-Raise_shoulder-FIX_.mp4"
+  },
+  {
+    "name": "Seated Shoulder Press",
+    "muscle": "Shoulders",
+    "equipment": "Dumbbell",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/04051201-Dumbbell-Seated-Shoulder-Press_Shoulders-FIX_.mp4"
+  },
+  {
+    "name": "Bar Lateral Pulldown",
+    "muscle": "Back",
+    "equipment": "Cable",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/01501201-Cable-Bar-Lateral-Pulldown_Back.mp4"
+  },
+  {
+    "name": "Cable One Arm Lateral Raise",
+    "muscle": "Shoulders",
+    "equipment": "Cable",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/01921201-Cable-One-Arm-Lateral-Raise_Shoulders.mp4"
+  },
+  {
+    "name": "Push-up",
+    "muscle": "Chest",
+    "equipment": "Bodyweight",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/06621201-Push-up-m_Chest.mp4"
+  },
+  {
+    "name": "Full Squat",
+    "muscle": "Thighs",
+    "equipment": "Barbell",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/00431201-Barbell-Full-Squat_Thighs.mp4"
+  },
+  {
+    "name": "Romanian Deadlift",
+    "muscle": "Hips",
+    "equipment": "Barbell",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/00851201-Barbell-Romanian-Deadlift_Hips.mp4"
+  },
+  {
+    "name": "Incline Bench Press",
+    "muscle": "Chest",
+    "equipment": "Dumbbell",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/03141201-Dumbbell-Incline-Bench-Press_Chest.mp4"
+  },
+  {
+    "name": "Hanging Straight Leg Raise",
+    "muscle": "Hips",
+    "equipment": "Bodyweight",
+    "video_url": "https://apilyfta.com/static/GymvisualMP4/25301201-Hanging-Straight-Leg-Raise-(female)_Hips.mp4"
+  }
+]

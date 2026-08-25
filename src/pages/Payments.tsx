@@ -1,0 +1,528 @@
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useStore } from '../store/useStore';
+import {
+  ArrowLeft,
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  CreditCard,
+  Image as ImageIcon,
+  Loader2,
+  QrCode,
+  Copy,
+} from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { trackEvent } from '../lib/analytics';
+import { motion, AnimatePresence } from 'motion/react';
+import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
+
+export function Payments() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const user = useStore((state) => state.user);
+  const [bookingId, setBookingId] = useState<string | null>(location.state?.bookingId || null);
+  const [planId, setPlanId] = useState<string | null>(location.state?.planId || null);
+  const [planName, setPlanName] = useState<string | null>(location.state?.planName || null);
+  const [classesPerMonth, setClassesPerMonth] = useState<number | null>(
+    location.state?.classesPerMonth || null
+  );
+  const [booking, setBooking] = useState<any>(null);
+  const [pendingBookings, setPendingBookings] = useState<any[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    if (bookingId) {
+      supabase.from('bookings').select('*').eq('id', bookingId).single()
+        .then(({ data }) => { if (data) setBooking(data); });
+    } else if (!planId && user?.id) {
+      supabase.from('bookings')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'pending_payment')
+        .then(({ data }) => {
+          if (data) {
+            setPendingBookings(data);
+            if (data.length === 1) setBookingId(data[0].id);
+          }
+        });
+    }
+  }, [bookingId, planId, user?.id]);
+
+  const applyFile = (selectedFile: File) => {
+    // Validation
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'application/pdf'];
+    if (!validTypes.includes(selectedFile.type)) {
+      setError('Solo se permiten imágenes JPG, PNG, WEBP o PDF.');
+      return;
+    }
+
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError('El archivo es demasiado grande (máximo 10MB).');
+      return;
+    }
+
+    // Revoke previous URL if any
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
+    setFile(selectedFile);
+    setError(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      applyFile(e.target.files[0]);
+    }
+  };
+
+  // Cleanup object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    // We could add a temporary state for "Copied!" feedback
+  };
+
+  const handleUpload = async () => {
+    if (!file || (!bookingId && !planId) || !user) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const extension = file.name.split('.').pop() || 'jpg';
+      const path = `pagos/${user.id}/comprobante_${Date.now()}.${extension}`;
+
+      const { error: upErr } = await supabase.storage.from('gpte-videos').upload(path, file, { upsert: true });
+      if (upErr) throw new Error(upErr.message);
+      setProgress(100);
+
+      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
+      const downloadURL = urlData.publicUrl;
+
+      if (planId) {
+        await supabase.from('payments').insert({
+          user_id: user.id,
+          plan_id: planId,
+          plan_name: planName,
+          classes_per_month: classesPerMonth || user.classes_per_month || 0,
+          amount: 0,
+          receipt_url: downloadURL,
+          status: 'submitted',
+          created_at: new Date().toISOString(),
+        });
+        await supabase.from('profiles').update({ plan_status: 'pending_verification' }).eq('id', user.id);
+      } else if (bookingId) {
+        await supabase.from('bookings').update({
+          payment_proof_url: downloadURL,
+          payment_status: 'submitted',
+          payment_submitted_at: new Date().toISOString(),
+        }).eq('id', bookingId);
+        await supabase.from('payments').insert({
+          user_id: user.id,
+          booking_id: bookingId,
+          plan_name: `Clase Individual del ${booking?.date || 'día'}`,
+          plan_id: 'single_class',
+          classes_per_month: 1,
+          receipt_url: downloadURL,
+          status: 'submitted',
+          created_at: new Date().toISOString(),
+          notes: 'single_class',
+        });
+      }
+
+      trackEvent('payment_submitted', { plan: planId ? 'plan' : 'class' });
+
+      await supabase.from('notifications').insert({
+        user_id: 'admin',
+        title: 'Nuevo Comprobante de Pago',
+        body: `Nuevo comprobante de ${user.name} para ${planId ? 'el plan ' + planName : 'la clase del ' + booking?.date}`,
+        type: 'payment_submitted',
+        read: false,
+        created_at: new Date().toISOString(),
+      });
+
+      setSuccess(true);
+      setUploading(false);
+      setTimeout(() => navigate(planId ? '/payment-review' : '/calendar'), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message);
+      setUploading(false);
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display p-4 pb-32">
+      <header className="flex items-center justify-between mb-8">
+        <button aria-label="Volver"
+          onClick={() => navigate(-1)}
+          className="text-primary p-2 hover:bg-primary/10 rounded-full transition-colors"
+        >
+          <ArrowLeft className="w-8 h-8" />
+        </button>
+        <h1 className="text-2xl font-black uppercase tracking-tight italic">Confirmar Pago</h1>
+        <div className="w-12"></div>
+      </header>
+
+      <div className="max-w-md mx-auto w-full">
+        <AnimatePresence mode="wait">
+          {success ? (
+            <motion.div
+              key="success"
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+              className="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-3xl text-center flex flex-col items-center gap-4"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.1 }}
+                className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-500/40"
+              >
+                <CheckCircle className="w-12 h-12" />
+              </motion.div>
+              <h2 className="text-2xl font-black text-emerald-500 uppercase">¡Enviado con éxito!</h2>
+              <p className="text-slate-400 font-medium">
+                Tu comprobante ha sido recibido. El profesor confirmará tu {planId ? 'plan' : 'clase'}{' '}
+                en breve.
+                {bookingId && 'Si no hay respuesta en 3 horas, se confirmará automáticamente.'}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
+                Redirigiendo al {planId ? 'perfil' : 'calendario'}...
+              </p>
+            </motion.div>
+          ) : !bookingId && pendingBookings.length > 0 ? (
+            <motion.div
+              key="pending"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="bg-slate-800/50 rounded-3xl border border-slate-700 p-6 shadow-2xl"
+            >
+              <h2 className="text-xl font-black text-white uppercase italic mb-4">
+                Selecciona una Reserva
+              </h2>
+              <motion.div
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+                className="space-y-3"
+              >
+                {pendingBookings.map((b) => (
+                  <motion.button
+                    key={b.id}
+                    variants={staggerItem}
+                    onClick={() => setBookingId(b.id)}
+                    whileHover={{ x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full bg-slate-900/80 border border-slate-800 p-4 rounded-2xl text-left hover:border-primary transition-all btn-press"
+                  >
+                    <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest italic">
+                      Clase del {b.date}
+                    </p>
+                    <p className="text-sm font-black text-white uppercase italic">{b.time}</p>
+                  </motion.button>
+                ))}
+              </motion.div>
+            </motion.div>
+          ) : !bookingId && !planId ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="bg-slate-800/50 rounded-3xl border border-slate-700 p-8 text-center flex flex-col items-center gap-4"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.1 }}
+                className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center text-slate-500 dark:text-slate-400"
+              >
+                <AlertCircle className="w-8 h-8" />
+              </motion.div>
+              <h2 className="text-xl font-black text-white uppercase italic">
+                No hay reservas pendientes
+              </h2>
+              <p className="text-slate-400 text-sm">
+                Primero debes reservar una clase en el calendario.
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate('/calendar')}
+                className="mt-4 bg-primary text-white font-bold py-3 px-8 rounded-xl btn-press"
+              >
+                Ir al Calendario
+              </motion.button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="bg-slate-800/50 rounded-3xl border border-slate-700 p-6 shadow-2xl"
+            >
+              <div className="flex items-center gap-4 mb-6 p-4 bg-slate-900/80 rounded-2xl border border-slate-800">
+                <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
+                  <CreditCard className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest italic">
+                    {planId ? 'Plan Seleccionado' : 'Reserva Seleccionada'}
+                  </p>
+                  <p className="text-sm font-black text-white uppercase italic">
+                    {planId
+                      ? planName
+                      : booking
+                        ? `${booking.date} • ${booking.time}`
+                        : 'Cargando...'}
+                  </p>
+                </div>
+              </div>
+
+              <motion.div
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+                className="space-y-6"
+              >
+                <motion.div variants={staggerItem} className="bg-white p-6 rounded-3xl flex flex-col items-center gap-4 mb-2 shadow-xl border border-slate-200">
+                  <img
+                    src="/qr-nequi.jpg"
+                    alt="QR Nequi y Bre.b"
+                    className="w-56 h-56 object-contain rounded-2xl shadow-xl border border-slate-200"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      // Fallback a imagen de firebase si la local no existe temporalmente
+                      (e.target as HTMLImageElement).src =
+                        'https://firebasestorage.googleapis.com/v0/b/gpte007.firebasestorage.app/o/qr-pago.jpg?alt=media';
+                    }}
+                  />
+
+                  <div className="w-full space-y-3">
+                    <div className="text-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest mb-1">
+                        Beneficiario
+                      </p>
+                      <p className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
+                        Kevin Hernandez
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest mb-0.5">
+                            Número Nequi
+                          </p>
+                          <p className="text-lg font-black text-slate-900 tracking-wider">
+                            3022028477
+                          </p>
+                        </div>
+                        <button aria-label="Copiar"
+                          onClick={() => copyToClipboard('3022028477')}
+                          className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center hover:bg-primary hover:text-white transition-all active:scale-90"
+                        >
+                          <Copy className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest mb-0.5">
+                            Clave Bre.b
+                          </p>
+                          <p className="text-lg font-black text-slate-900 tracking-wider">
+                            1036681812
+                          </p>
+                        </div>
+                        <button aria-label="Copiar"
+                          onClick={() => copyToClipboard('1036681812')}
+                          className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center hover:bg-primary hover:text-white transition-all active:scale-90"
+                        >
+                          <Copy className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div variants={staggerItem}>
+                  <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-widest italic">
+                    Instrucciones de Pago
+                  </label>
+                  <motion.div
+                    variants={staggerContainer}
+                    initial="hidden"
+                    animate="show"
+                    className="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 text-sm space-y-3"
+                  >
+                    <motion.p variants={staggerItem} className="flex items-center gap-3 text-slate-300 font-bold">
+                      <span className="w-6 h-6 bg-primary/20 text-primary rounded-lg flex items-center justify-center text-[10px] font-black italic">
+                        1
+                      </span>
+                      Escanea el QR o copia el número Nequi.
+                    </motion.p>
+                    <motion.p variants={staggerItem} className="flex items-center gap-3 text-slate-300 font-bold">
+                      <span className="w-6 h-6 bg-primary/20 text-primary rounded-lg flex items-center justify-center text-[10px] font-black italic">
+                        2
+                      </span>
+                      Realiza la transferencia por el valor del plan/clase.
+                    </motion.p>
+                    <motion.p variants={staggerItem} className="flex items-center gap-3 text-slate-300 font-bold">
+                      <span className="w-6 h-6 bg-primary/20 text-primary rounded-lg flex items-center justify-center text-[10px] font-black italic">
+                        3
+                      </span>
+                      Sube el comprobante aquí abajo para validar.
+                    </motion.p>
+                  </motion.div>
+                </motion.div>
+
+                <motion.div variants={staggerItem} className="relative">
+                  <input
+                    type="file"
+                    id="payment-file"
+                    accept="image/*,application/pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <motion.label
+                    htmlFor="payment-file"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragging(false);
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        applyFile(e.dataTransfer.files[0]);
+                      }
+                    }}
+                    animate={dragging ? { scale: 1.03 } : { scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                    className={`w-full aspect-video rounded-2xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-3 cursor-pointer overflow-hidden relative
+                      ${
+                        file
+                          ? 'border-primary bg-primary/5'
+                          : dragging
+                            ? 'border-primary bg-primary/10'
+                            : 'border-slate-700 bg-slate-900/50 hover:border-slate-500 hover:bg-slate-800'
+                      }
+                    `}
+                  >
+                    {file ? (
+                      <>
+                        {file.type === 'application/pdf' ? (
+                          <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center text-red-500 border border-red-500/30">
+                                <span className="font-black text-xl">PDF</span>
+                              </div>
+                              <span className="text-xs font-bold text-slate-400">{file.name}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            src={previewUrl || ''}
+                            alt="Preview"
+                            className="absolute inset-0 w-full h-full object-cover opacity-40"
+                          />
+                        )}
+                        <div className="relative z-10 flex flex-col items-center gap-2">
+                          <ImageIcon className="w-10 h-10 text-primary" />
+                          <span className="text-sm font-bold text-white">{file.name}</span>
+                          <span className="text-[10px] text-primary uppercase font-black">
+                            Click para cambiar
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-10 h-10 text-slate-500" />
+                        <span className="text-sm font-bold text-slate-400">
+                          Seleccionar Comprobante
+                        </span>
+                        <span className="text-[10px] text-slate-600 uppercase font-black">
+                          JPG, PNG, WEBP, PDF (Máx 10MB)
+                        </span>
+                      </>
+                    )}
+                  </motion.label>
+                </motion.div>
+
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      key={error}
+                      variants={fadeUp}
+                      initial="hidden"
+                      animate="show"
+                      exit={{ opacity: 0, y: -8 }}
+                      className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 text-sm"
+                    >
+                      <AlertCircle className="w-5 h-5 shrink-0" />
+                      {error}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <motion.button
+                  onClick={handleUpload}
+                  disabled={!file || uploading}
+                  variants={staggerItem}
+                  whileHover={{ scale: !file || uploading ? 1 : 1.02 }}
+                  whileTap={{ scale: !file || uploading ? 1 : 0.97 }}
+                  className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-xl btn-press
+                    ${
+                      !file || uploading
+                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                        : 'bg-primary text-white shadow-primary/20'
+                    }
+                  `}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      Subiendo ({Math.round(progress)}%)
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-6 h-6" />
+                      Confirmar Envío
+                    </>
+                  )}
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,55 @@
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
+import { supabase } from './supabase';
+
+export async function initializePushNotifications(userId: string) {
+  // Push notifications are only supported on native platforms
+  if (Capacitor.getPlatform() === 'web') {
+    console.info('Push notifications are not supported on web platform.');
+    return;
+  }
+
+  try {
+    // Request permission to use push notifications
+    let permStatus = await PushNotifications.checkPermissions();
+
+    if (permStatus.receive === 'prompt') {
+      permStatus = await PushNotifications.requestPermissions();
+    }
+
+    if (permStatus.receive !== 'granted') {
+      console.warn('User denied push notification permissions!');
+      return;
+    }
+
+    // On success, we should be able to receive notifications
+    await PushNotifications.register();
+
+    // On success, we should be able to receive notifications
+    PushNotifications.addListener('registration', async (token) => {
+      // Save token to Supabase
+      try {
+        await supabase.from('profiles').update({
+          fcm_token: token.value,
+        }).eq('id', userId);
+      } catch (err) {
+        console.error('Error saving FCM token:', err);
+      }
+    });
+
+    // Some issue with our setup and push will not work
+    PushNotifications.addListener('registrationError', (error: any) => {
+      console.error('Error on registration: ' + JSON.stringify(error));
+    });
+
+    // Show us the notification payload if the app is open on our device
+    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    });
+
+    // Method called when tapping on a notification
+    PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+    });
+  } catch (err) {
+    console.error('Error initializing push notifications:', err);
+  }
+}

@@ -1,0 +1,261 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "teacher", "admin"] },
+        "plan": { "type": "string", "enum": ["free", "personal", "premium"] },
+        "license_level": { "type": "number" },
+        "xp": { "type": "number" },
+        "lives": { "type": "number" },
+        "streak": { "type": "number" },
+        "progreso_total": { "type": "number" },
+        "vendaje_progreso": { "type": "number" },
+        "fecha_registro": { "type": "string", "format": "date-time" },
+        "water_intake": {
+          "type": "object",
+          "properties": {
+            "date": { "type": "string" },
+            "count": { "type": "number" }
+          }
+        },
+        "assessment_completed": { "type": "boolean" },
+        "assessment_updated_at": { "type": "string" },
+        "fcm_token": { "type": "string" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "A payment record.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "metodo": { "type": "string", "enum": ["nequi", "bre-b"] },
+        "comprobante_url": { "type": "string" },
+        "estado": { "type": "string", "enum": ["pendiente", "aprobado", "rechazado"] },
+        "fecha": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "metodo", "comprobante_url", "estado", "fecha"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "A scheduled class.",
+      "type": "object",
+      "properties": {
+        "fecha": { "type": "string" },
+        "hora": { "type": "string" },
+        "cupos": { "type": "number" },
+        "usuarios_inscritos": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["fecha", "hora", "cupos"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "A tutorial or skill video.",
+      "type": "object",
+      "properties": {
+        "tipo": { "type": "string", "enum": ["vendaje", "combo", "tecnica"] },
+        "nivel": { "type": "string", "enum": ["basico", "intermedio", "avanzado"] },
+        "url": { "type": "string" },
+        "activo": { "type": "boolean" }
+      },
+      "required": ["tipo", "nivel", "url", "activo"]
+    },
+    "VideoProgress": {
+      "title": "VideoProgress",
+      "description": "User progress on a specific video.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "video_id": { "type": "string" },
+        "progreso": { "type": "number" },
+        "completado": { "type": "boolean" }
+      },
+      "required": ["user_id", "video_id", "progreso", "completado"]
+    },
+    "Evaluation": {
+      "title": "Evaluation",
+      "description": "User technical evaluations (Manillas, Contacto, Combo)",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "manillas": { "type": "string", "enum": ["pendiente", "aprobado", "rechazado", "bloqueado"] },
+        "contacto": { "type": "string", "enum": ["pendiente", "aprobado", "rechazado", "bloqueado"] },
+        "combo": { "type": "string", "enum": ["pendiente", "aprobado", "rechazado", "bloqueado"] },
+        "feedback_manillas": { "type": "string" },
+        "feedback_contacto": { "type": "string" },
+        "feedback_combo": { "type": "string" },
+        "fecha": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id"]
+    },
+    "Meal": {
+      "title": "Meal",
+      "description": "A recipe or meal entry.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "ingredients": { "type": "string" },
+        "instructions": { "type": "string" },
+        "image_url": { "type": "string" },
+        "video_url": { "type": "string" },
+        "created_by": { "type": "string" }
+      },
+      "required": ["name", "category", "ingredients", "instructions"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A class booking.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "class_id": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["user_id", "class_id", "date"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A community post.",
+      "type": "object",
+      "properties": {
+        "author_id": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["author_id", "content", "createdAt"]
+    },
+    "Challenge": {
+      "title": "Challenge",
+      "description": "Daily challenge video.",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["url", "createdAt"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global application settings.",
+      "type": "object",
+      "properties": {
+        "workouts_unlocked": { "type": "boolean" },
+        "nutrition_unlocked": { "type": "boolean" },
+        "technique_unlocked": { "type": "boolean" },
+        "challenge_unlocked": { "type": "boolean" }
+      }
+    },
+    "WorkoutVideo": {
+      "title": "WorkoutVideo",
+      "description": "A workout video or exercise detail.",
+      "type": "object",
+      "properties": {
+        "category_id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "instructions": { "type": "string" },
+        "common_errors": { "type": "string" },
+        "video_url": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["principiante", "intermedio", "avanzado"] }
+      },
+      "required": ["category_id", "title", "description"]
+    },
+    "CustomRoutine": {
+      "title": "CustomRoutine",
+      "description": "A user's custom workout routine.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "name": { "type": "string" },
+        "exercises": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["user_id", "name", "exercises", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "An in-app notification for the user.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "title", "message", "type", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "meals": {
+      "schema": "Meal",
+      "description": "Meal recipes."
+    },
+    "bookings": {
+      "schema": "Booking",
+      "description": "Class bookings."
+    },
+    "posts": {
+      "schema": "Post",
+      "description": "Community posts."
+    },
+    "challenges": {
+      "schema": "Challenge",
+      "description": "Daily challenges."
+    },
+    "settings": {
+      "schema": "AppSettings",
+      "description": "Global settings."
+    },
+    "workout_videos": {
+      "schema": "WorkoutVideo",
+      "description": "Workout videos and exercises."
+    },
+    "custom_routines": {
+      "schema": "CustomRoutine",
+      "description": "User custom routines."
+    },
+    "payments": {
+      "schema": "Payment",
+      "description": "Payment records."
+    },
+    "classes": {
+      "schema": "Class",
+      "description": "Scheduled classes."
+    },
+    "videos": {
+      "schema": "Video",
+      "description": "Tutorial and skill videos."
+    },
+    "video_progress": {
+      "schema": "VideoProgress",
+      "description": "User video progress."
+    },
+    "evaluations": {
+      "schema": "Evaluation",
+      "description": "Skill evaluations."
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "User notifications."
+    }
+  }
+}

@@ -1,0 +1,52 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) && 
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher']) ||
+         request.auth.token.email == "guantesparaencajar@gmail.com" ||
+         request.auth.token.email == "hernandezkevin001998@gmail.com");
+    }
+
+    // Contenido de entrenamiento: todos leen, SOLO admin escribe
+    match /entrenos/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /workouts/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /community/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /combos/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Comprobantes de pago: el usuario sube a su propia carpeta; solo admin borra
+    match /pagos/{uid}/{fileName} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isAuthenticated() && request.auth.uid == uid &&
+        request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isAdmin();
+    }
+
+    // Default rule — solo admin escribe, autenticados leen
+    match /{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

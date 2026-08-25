@@ -1,0 +1,150 @@
+/**
+ * resendEmailService.ts — Cliente frontend para emails via Resend
+ * 
+ * Llama a /api/send-email (Vercel serverless) que usa Resend server-side.
+ * Si el endpoint falla, encola en Firestore para reintento.
+ * 
+ * Reemplaza completamente a n8nEmailService.ts
+ */
+
+import { supabase } from './supabase';
+
+type EmailType =
+  | 'welcome'
+  | 'booking-confirm'
+  | 'class-cancel'
+  | 'birthday'
+  | 'late-cancel';
+
+interface EmailPayload {
+  type: EmailType;
+  to: string;
+  nombre: string;
+  clase?: string;
+  fecha?: string;
+  hora?: string;
+  tipo?: string;
+  motivo?: string;
+}
+
+/** Fallback: guarda en Supabase si Resend falla */
+async function queueEmail(payload: EmailPayload): Promise<void> {
+  try {
+    await supabase.from('email_queue').insert({
+      ...payload,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      retry_count: 0,
+    });
+  } catch (err) {
+    console.warn('[Email] No se pudo encolar:', err);
+  }
+}
+
+/** Envía via /api/send-email (Vercel serverless → Resend) */
+async function send(payload: EmailPayload): Promise<boolean> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    const accessToken = session?.session?.access_token || '';
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.warn(`[Email] API error ${res.status}:`, err);
+      await queueEmail(payload);
+      return false;
+    }
+
+    const data = await res.json();
+    return true;
+  } catch (err) {
+    console.warn('[Email] Error de red:', err);
+    await queueEmail(payload);
+    return false;
+  }
+}
+
+// ─── API PÚBLICA ──────────────────────────────────────────────────────────────
+
+export const emailService = {
+
+  /**
+   * ✉️ Bienvenida al registrarse
+   */
+  welcome: (nombre: string, to: string) =>
+    send({ type: 'welcome', to, nombre }),
+
+  /**
+   * 📅 Confirmación de reserva de clase
+   */
+  bookingConfirm: (data: {
+    nombre: string;
+    to: string;
+    clase: string;
+    fecha: string;
+    hora: string;
+    tipo?: string;
+  }) =>
+    send({
+      type: 'booking-confirm',
+      to: data.to,
+      nombre: data.nombre,
+      clase: data.clase,
+      fecha: data.fecha,
+      hora: data.hora,
+      tipo: data.tipo,
+    }),
+
+  /**
+   * ❌ Cancelación de clase (admin cancela, notifica a inscritos)
+   */
+  classCancel: (data: {
+    nombre: string;
+    to: string;
+    clase: string;
+    fecha: string;
+    hora: string;
+    motivo?: string;
+  }) =>
+    send({
+      type: 'class-cancel',
+      to: data.to,
+      nombre: data.nombre,
+      clase: data.clase,
+      fecha: data.fecha,
+      hora: data.hora,
+      motivo: data.motivo,
+    }),
+
+  /**
+   * 🎂 Feliz cumpleaños
+   */
+  birthday: (nombre: string, to: string) =>
+    send({ type: 'birthday', to, nombre }),
+
+  /**
+   * ⚠️ Cancelación tardía (menos de 2h antes)
+   */
+  lateCancel: (data: {
+    nombre: string;
+    to: string;
+    clase: string;
+    fecha: string;
+    hora: string;
+  }) =>
+    send({
+      type: 'late-cancel',
+      to: data.to,
+      nombre: data.nombre,
+      clase: data.clase,
+      fecha: data.fecha,
+      hora: data.hora,
+    }),
+};
