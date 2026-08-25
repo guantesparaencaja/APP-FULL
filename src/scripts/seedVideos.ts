@@ -404,9 +404,25 @@ export const LYFTA_BOXEO_VIDEOS = [
 const CATEGORIA_ORDER = ['Peso Corporal', 'Boxeo', 'Fuerza', 'Movilidad'];
 
 // ─── seedBoxeoVideos: actualiza URLs en BoxeoModule (silencioso) ──────────────
+
+/** Mapeo manual: nombre en LYFTA_BOXEO_VIDEOS → nombre en SEED_VIDEOS (BoxeoModule).
+ *  Solo los 9 casos que nunca coinciden por texto normalizado. */
+const MANUAL_LYFTA_TO_SEED: Record<string, string> = {
+  'Combinación 1-2':       'Combinación 1-2 (Jab-Cross)',
+  '1-2 Cuerpo y Cabeza':   '1-2 al Cuerpo y Cabeza',
+  '1-2-3-2':               '1-2-3-2 (Jab-Cross-Hook-Cross)',
+  'Distancia al Saco':     'Distancia Correcta al Saco',
+  'Round Básico 3 min':    'Round Básico de 3 Minutos',
+  'Sombra con Pesas':      'Sombra con Pesas Ligeras',
+  'Saltar Cuerda':         'Saltar Cuerda Básico',
+  'Activación de Caderas': 'Activación de Caderas para Footwork',
+  'Estiramiento Post':     'Estiramiento Post-Entrenamiento',
+};
+
 function normalizeForMatch(s: string): string {
-  return s.toLowerCase()
-    .replace(/\s*[-–—]\s*(jab|cross|hook|uppercut|cuerpo|cabeza|izquierdo|derecho|para footwork|post-entrenamiento|básico|con pesas ligeras|de boxeo|al saco|de 3 minutos)\w*/gi, '')
+  return s.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
     .replace(/[()]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -417,15 +433,38 @@ export async function seedBoxeoVideos(): Promise<{ added: number; skipped: numbe
   const { data: existing } = await supabase.from('boxeo_videos').select('id, nombre, url_directa');
   const byName = new Map((existing || []).map((d: any) => [(d.nombre || '').toLowerCase(), d]));
 
-  for (const v of LYFTA_BOXEO_VIDEOS) {
-    const key = v.nombre.toLowerCase();
-    const matchKey = normalizeForMatch(v.nombre);
+  // Pre-computed normalized index for fuzzy fallback
+  const byNormalized = new Map<string, typeof byName extends Map<string, infer V> ? V : never>();
+  for (const [dbKey, doc] of byName) {
+    byNormalized.set(normalizeForMatch(dbKey), doc);
+  }
 
-    // Try exact match first, then fuzzy (normalized substring)
-    let existingDoc = byName.get(key);
+  for (const v of LYFTA_BOXEO_VIDEOS) {
+    let existingDoc: any = null;
+
+    // Strategy 1: manual mapping (SEED_VIDEOS name → DB lookup)
+    const manualSeedName = MANUAL_LYFTA_TO_SEED[v.nombre];
+    if (manualSeedName) {
+      existingDoc = byName.get(manualSeedName.toLowerCase());
+    }
+
+    // Strategy 2: exact lowercase match
     if (!existingDoc) {
+      existingDoc = byName.get(v.nombre.toLowerCase());
+    }
+
+    // Strategy 3: normalized match (accents stripped, whitespace trimmed)
+    if (!existingDoc) {
+      const normLyfta = normalizeForMatch(v.nombre);
+      existingDoc = byNormalized.get(normLyfta);
+    }
+
+    // Strategy 4: bidirectional substring containment
+    if (!existingDoc) {
+      const normLyfta = normalizeForMatch(v.nombre);
       for (const [dbKey, doc] of byName) {
-        if (normalizeForMatch(dbKey) === matchKey || dbKey.includes(matchKey) || matchKey.includes(dbKey)) {
+        const normDb = normalizeForMatch(dbKey);
+        if (normDb.includes(normLyfta) || normLyfta.includes(normDb)) {
           existingDoc = doc;
           break;
         }
@@ -439,6 +478,8 @@ export async function seedBoxeoVideos(): Promise<{ added: number; skipped: numbe
       } else {
         skipped++;
       }
+    } else {
+      console.warn(`[seedBoxeoVideos] ⚠️ Sin URL — "${v.nombre}" no matcheó ningún video en DB tras 4 estrategias`);
     }
   }
   return { added, skipped };
