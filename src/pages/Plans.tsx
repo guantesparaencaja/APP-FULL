@@ -35,9 +35,50 @@ interface Plan {
   description: string;
   price_personalizada: number;
   price_decisao: number;
+  per_class_personalizada: number;
+  per_class_decisao: number;
   icon: string;
   classes_per_month: number;
+  includes_app: boolean;
 }
+
+const PLANS_DATA: Plan[] = [
+  {
+    id: 'individual', name: 'Clase Individual',
+    description: 'Una clase particular de boxeo personalizada.',
+    price_personalizada: 40000, price_decisao: 45000,
+    per_class_personalizada: 40000, per_class_decisao: 45000,
+    icon: 'Zap', classes_per_month: 1, includes_app: false,
+  },
+  {
+    id: 'plan-4', name: 'Plan 4 Clases',
+    description: '4 clases mensuales. Incluye acceso a la App de Boxeo.',
+    price_personalizada: 128000, price_decisao: 144000,
+    per_class_personalizada: 32000, per_class_decisao: 36000,
+    icon: 'Star', classes_per_month: 4, includes_app: true,
+  },
+  {
+    id: 'plan-8', name: 'Plan 8 Clases',
+    description: '8 clases mensuales. Incluye acceso a la App de Boxeo.',
+    price_personalizada: 256000, price_decisao: 288000,
+    per_class_personalizada: 32000, per_class_decisao: 36000,
+    icon: 'Trophy', classes_per_month: 8, includes_app: true,
+  },
+  {
+    id: 'plan-12', name: 'Plan 12 Clases',
+    description: '12 clases mensuales. Incluye acceso a la App de Boxeo.',
+    price_personalizada: 384000, price_decisao: 432000,
+    per_class_personalizada: 32000, per_class_decisao: 36000,
+    icon: 'Flame', classes_per_month: 12, includes_app: true,
+  },
+  {
+    id: 'plan-16', name: 'Plan 16 Clases',
+    description: '16 clases mensuales. El mejor valor. Incluye App de Boxeo.',
+    price_personalizada: 448000, price_decisao: 504000,
+    per_class_personalizada: 28000, per_class_decisao: 31500,
+    icon: 'Timer', classes_per_month: 16, includes_app: true,
+  },
+];
 
 interface PaymentMethod {
   id: string;
@@ -54,12 +95,11 @@ interface Availability {
 }
 
 export function Plans() {
-  const { data: plansData, loading: plansLoading } = useRealtimeCollection<Plan>('plans');
   const { data: methodsData, loading: methodsLoading } =
     useRealtimeCollection<PaymentMethod>('payment_methods');
   const { data: availabilitiesData } = useRealtimeCollection<Availability>('availabilities');
 
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans] = useState<Plan[]>(PLANS_DATA);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const { data: bookingsData } = useRealtimeCollection<{
@@ -75,13 +115,7 @@ export function Plans() {
   // Wizard State
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const allowedClasses = selectedPlan
-    ? selectedPlan.classes_per_month ||
-      (selectedPlan.name.toLowerCase().includes('individual') ||
-      selectedPlan.name.toLowerCase().includes('personalizad')
-        ? 1
-        : 4)
-    : 1;
+  const allowedClasses = selectedPlan?.classes_per_month || 1;
   const [selectedDateMode, setSelectedDateMode] = useState<'personalizada' | 'decisao'>('decisao');
   const [selectedClasses, setSelectedClasses] = useState<{ date: Date; avail: Availability }[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -90,12 +124,6 @@ export function Plans() {
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (plansData.length > 0) {
-      setPlans([...plansData].sort((a, b) => parseInt(a.id) - parseInt(b.id)));
-    }
-  }, [plansData]);
 
   useEffect(() => {
     if (methodsData.length > 0) {
@@ -273,7 +301,7 @@ export function Plans() {
     domingo: 'Domingo',
   };
 
-  if (plansLoading) {
+  if (methodsLoading) {
     return (
       <div className="min-h-screen bg-background-light dark:bg-background-dark px-6 py-8">
         <div className="max-w-5xl mx-auto space-y-12">
@@ -353,7 +381,7 @@ export function Plans() {
                       ],
                       transition: { boxShadow: { duration: 3.5, repeat: Infinity, ease: 'easeInOut' } },
                     }}
-                    className="glass-card rounded-[3rem] p-8 flex flex-col gap-8 transition-all duration-500 border-white/20 dark:border-slate-800/50 shadow-2xl relative overflow-hidden group"
+                    className="glass-card rounded-[3rem] p-8 flex flex-col gap-6 transition-all duration-500 border-white/20 dark:border-slate-800/50 shadow-2xl relative overflow-hidden group"
                   >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform duration-700 group-hover:scale-150" />
 
@@ -366,40 +394,87 @@ export function Plans() {
                           {plan.name}
                         </h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 uppercase tracking-widest">
-                          {plan.classes_per_month} Clases / Mes
+                          {plan.classes_per_month} {plan.classes_per_month === 1 ? 'Clase' : 'Clases'} / Mes
                         </p>
                       </div>
                     </div>
 
+                    {plan.includes_app && (
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 relative z-10">
+                        <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">
+                          📱 Incluye App de Boxeo
+                        </span>
+                      </div>
+                    )}
+                    {!plan.includes_app && (
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-500/10 border border-slate-500/20 relative z-10">
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                          Solo Clase Individual
+                        </span>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4 relative z-10">
-                      {/* Personalizada Box */}
                       <button
                         onClick={() => handleSelectPlan(plan, 'personalizada')}
                         className="bg-white/30 dark:bg-slate-900/40 p-5 rounded-3xl border border-white/20 dark:border-slate-800/50 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/30 transition-all text-left group/btn btn-press"
                       >
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2 opacity-80 group-hover/btn:text-primary transition-colors">
-                          Personalizada
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1 opacity-80 group-hover/btn:text-primary transition-colors">
+                          Casa del Estudiante
                         </span>
                         <span className="text-xl md:text-2xl font-black text-primary tracking-tighter">
                           ${plan.price_personalizada.toLocaleString()}
                         </span>
+                        <span className="text-[10px] font-bold text-slate-400 block mt-1">
+                          ${plan.per_class_personalizada.toLocaleString()} / clase
+                        </span>
                       </button>
 
-                      {/* Decisao Box */}
                       <button
                         onClick={() => handleSelectPlan(plan, 'decisao')}
                         className="bg-white/30 dark:bg-slate-900/40 p-5 rounded-3xl border border-white/20 dark:border-slate-800/50 hover:bg-accent-purple/5 dark:hover:bg-accent-purple/10 hover:border-accent-purple/30 transition-all text-left group/btn btn-press"
                       >
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2 opacity-80 group-hover/btn:text-accent-purple transition-colors">
-                          Sede Decisao
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1 opacity-80 group-hover/btn:text-accent-purple transition-colors">
+                          Club de Boxeo
                         </span>
                         <span className="text-xl md:text-2xl font-black text-accent-purple tracking-tighter">
                           ${plan.price_decisao.toLocaleString()}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 block mt-1">
+                          ${plan.per_class_decisao.toLocaleString()} / clase
                         </span>
                       </button>
                     </div>
                   </motion.div>
                 ))}
+              </div>
+
+              {/* Info sections */}
+              <div className="space-y-4 mt-8">
+                <div className="glass-card p-6 rounded-2xl border-white/10">
+                  <h4 className="font-black text-sm text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                    📱 App de Boxeo
+                  </h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    A partir de <b className="text-white">4 clases reservadas o tomadas</b>, el estudiante obtiene acceso a la App de Boxeo con planes de entrenamiento personalizados, técnicas en video, seguimiento de progreso, nutrición y más. <b className="text-white">"Tu entrenador siempre contigo"</b>.
+                  </p>
+                </div>
+                <div className="glass-card p-6 rounded-2xl border-white/10">
+                  <h4 className="font-black text-sm text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                    🥊 Regla de Aprendizaje
+                  </h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    A partir de 4 clases tomadas, <b className="text-white">una (1) de las clases debe realizarse obligatoriamente en el Club de Boxeo</b> para mejorar el proceso de aprendizaje.
+                  </p>
+                </div>
+                <div className="glass-card p-6 rounded-2xl border-white/10">
+                  <h4 className="font-black text-sm text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                    🏠 Clases en Casa
+                  </h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Las clases a domicilio se pueden realizar siempre y cuando el hogar del estudiante esté a <b className="text-white">no más de 3 kilómetros</b> de la ubicación del hogar del profesor.
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}

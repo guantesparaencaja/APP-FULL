@@ -351,6 +351,19 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     </div>
   );
 
+  if (!loading && videos.length === 0) return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+      <div className="text-center space-y-4 max-w-sm">
+        <Loader2 className="w-12 h-12 text-primary mx-auto animate-pulse" />
+        <p className="text-slate-300 text-sm font-bold">Biblioteca en preparación</p>
+        <p className="text-slate-500 text-xs">Los videos de boxeo se están cargando. Vuelve en unos minutos.</p>
+        <button onClick={() => { setLoading(true); seedRunRef.current = false; }} className="text-xs font-black uppercase tracking-widest text-primary hover:underline">
+          Reintentar
+        </button>
+      </div>
+    </div>
+  );
+
   // ─── Video player con VideoPlayerModal compacto ───────────────────────────
   if (selectedVideo) {
     const driveUrl = selectedVideo.url_directa || (selectedVideo.drive_file_id ? `https://drive.google.com/uc?id=${selectedVideo.drive_file_id}` : '');
