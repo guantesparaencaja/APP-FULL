@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
+import { BoxerAnimatedHero } from '../components/BoxerAnimatedHero';
 
 interface BoxeoVideo {
   id: string;
@@ -499,36 +500,38 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
         </header>
       )}
 
-      {/* Hero */}
+      {/* Hero with animated boxer */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-        className="mx-4 mb-6 rounded-3xl relative overflow-hidden border border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-br from-red-600/30 via-slate-900 to-slate-950" />
-        <div className="absolute -top-20 -right-20 w-60 h-60 bg-red-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-primary/20 rounded-full blur-3xl" />
-        <div className="relative z-10 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <span className="px-3 py-1 bg-white/10 backdrop-blur-sm text-white text-[10px] font-black rounded-lg uppercase tracking-widest border border-white/10">
-              Modulo de Aprendizaje
-            </span>
-            <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-white/10">
-              <Trophy className="w-4 h-4 text-amber-400" />
-              <span className="text-[10px] font-black text-white">Nivel {user?.license_level || 1}</span>
-            </div>
-          </div>
-          <h2 className="text-3xl font-black italic text-white leading-tight mb-2">Domina el Arte<br/>de la Noble Ciencia</h2>
-          <p className="text-white/50 text-sm">Desde tecnica basica hasta sparring profesional</p>
-          <div className="mt-5 flex items-center gap-4">
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Progreso Total</span>
-                <span className="text-[11px] font-black text-primary">{totalWatched}/{totalVisible}</span>
-              </div>
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <motion.div className="h-full bg-gradient-to-r from-primary to-red-500 rounded-full"
-                  initial={{ width: 0 }} animate={{ width: `${overallProgress}%` }} transition={{ duration: 1, delay: 0.3 }} />
+        className="mx-4 mb-6 rounded-3xl overflow-hidden border border-white/5">
+        <div className="relative">
+          <BoxerAnimatedHero height="280px" />
+          <div className="absolute inset-0 z-10 p-6 flex flex-col justify-between pointer-events-none">
+            <div className="flex items-center justify-between">
+              <span className="px-3 py-1 bg-white/10 backdrop-blur-sm text-white text-[10px] font-black rounded-lg uppercase tracking-widest border border-white/10">
+                Modulo de Aprendizaje
+              </span>
+              <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-white/10">
+                <Trophy className="w-4 h-4 text-amber-400" />
+                <span className="text-[10px] font-black text-white">Nivel {user?.license_level || 1}</span>
               </div>
             </div>
-            <span className="text-2xl font-black text-white">{overallProgress}%</span>
+            <div>
+              <h2 className="text-3xl font-black italic text-white leading-tight mb-2">Domina el Arte<br/>de la Noble Ciencia</h2>
+              <p className="text-white/50 text-sm">Desde tecnica basica hasta sparring profesional</p>
+              <div className="mt-4 flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Progreso Total</span>
+                    <span className="text-[11px] font-black text-primary">{totalWatched}/{totalVisible}</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <motion.div className="h-full bg-gradient-to-r from-primary to-red-500 rounded-full"
+                      initial={{ width: 0 }} animate={{ width: `${overallProgress}%` }} transition={{ duration: 1, delay: 0.3 }} />
+                  </div>
+                </div>
+                <span className="text-2xl font-black text-white">{overallProgress}%</span>
+              </div>
+            </div>
           </div>
         </div>
       </motion.div>
