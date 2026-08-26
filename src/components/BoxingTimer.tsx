@@ -15,39 +15,85 @@ interface BoxingTimerProps {
 const COMBO_CALLER_STORAGE_KEY = 'gpte_combo_caller_enabled';
 
 const DEFAULT_COMBO_POOL = [
-  '1-2', '1-2-3', '1-2-1', '1-1-2',
-  '1-2-3-2', '1-2-1-2', '1-2-3-4', '1-2-3-2-1',
-  '1-2-3-4-3-2', '1-2-3-2-3-4', '1-2-1-2-3-4', '1-2-3-4-5-6',
-  '1-2-3-4-3-2-1-2', '1-2-3-2-1-2-3-4',
+  '1 2 / 2 1 / 5 6 -- 3 4 4 3',
+  '2 1 / 5 6 - 4 3 P 2 1 2',
+  'DJ 2 / - P 1 2 3 / 3',
+  '6 3 2 / - PE 5 3 2 P',
+  '2 PI 1 PD 1 / 2 / PA 3 2 1 4',
+  '6 3 / 5 3 2 - 2 1 P',
+  '6 3 / 5 3 2 - 2 DR P',
+  'DUP 2 / 1 0 - / 3 2 2 1 PA',
+  '1 1 8 1 1 2 / 9 3 - 5 6 PA 1',
+  '2 2 7 2 2 1 / 1 0 4 - 5 6 PA 2',
+  '7 8 - / PE 5 6 4 3 / PA',
+  '8 7 - / PE 6 5 4 3 / PA',
 ];
 
 /** Max combo length allowed per round bracket (progressive difficulty) */
 function getMaxComboHits(round: number, totalRounds: number): number {
   const progress = round / totalRounds;
-  if (progress <= 0.25) return 3;
-  if (progress <= 0.5) return 4;
-  if (progress <= 0.75) return 6;
-  return 8;
+  if (progress <= 0.25) return 5;
+  if (progress <= 0.5) return 7;
+  if (progress <= 0.75) return 10;
+  return 14;
+}
+
+/** Tokenize a combo string into individual tokens (handles multi-char tokens) */
+function tokenizeCombo(combo: string): string[] {
+  const TOKENS = ['DCR', 'DUPR', 'DUP', 'PDE', 'DJ', 'DR', 'DG', 'PA', 'PI', 'PD', 'PC', 'PE', '10', '--'];
+  const tokens: string[] = [];
+  let i = 0;
+  const s = combo.replace(/\s+/g, '');
+  while (i < s.length) {
+    let matched = false;
+    for (const t of TOKENS) {
+      if (s.substring(i, i + t.length) === t) {
+        tokens.push(t);
+        i += t.length;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      tokens.push(s[i]);
+      i++;
+    }
+  }
+  return tokens;
 }
 
 /** Translate numeric combo notation into spoken Spanish words */
 export function traducirCombo(combo: string): string {
   const MAP: Record<string, string> = {
     '1': 'Jab',
-    '2': 'Cross',
-    '3': 'Gancho izquierdo',
-    '4': 'Gancho derecho',
+    '2': 'Recto',
+    '3': 'Gancho',
+    '4': 'Croche',
     '5': 'Uppercut izquierdo',
     '6': 'Uppercut derecho',
+    '7': 'Jab al cuerpo',
+    '8': 'Recto al cuerpo',
+    '9': 'Gancho al cuerpo',
+    '10': 'Croche al cuerpo',
     'DJ': 'Doble jab',
-    'PA': 'Paso lateral',
-    'Pivote': 'Pivote',
-    'Cintura': 'Cintura',
+    'DR': 'Doble recto',
+    'DG': 'Doble gancho',
+    'DCR': 'Doble croche',
+    'DUP': 'Doble uppercut izquierdo',
+    'DUPR': 'Doble uppercut derecho',
+    'PA': 'Paso atrás',
+    'PI': 'Paso izquierda',
+    'PD': 'Paso derecha',
+    'PDE': 'Paso adelante',
+    'PC': 'Paso cruzado',
+    'PE': 'Péndulo',
+    'P': 'Pivote',
+    '/': 'Cabeceo',
+    '-': 'Rolly',
+    '--': 'Doble roly',
   };
-  return combo
-    .split('-')
-    .map((token) => MAP[token.trim()] || token.trim())
-    .join(', ');
+  const tokens = tokenizeCombo(combo);
+  return tokens.map((t) => MAP[t] || t).join(', ');
 }
 
 function randomInterval(min: number, max: number): number {
@@ -198,7 +244,7 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
     const pool = (comboPool && comboPool.length > 0) ? comboPool : DEFAULT_COMBO_POOL;
     const maxHits = getMaxComboHits(currentRoundRef.current, roundsCount);
     const eligible = pool.filter((c) => {
-      const hits = c.split('-').length;
+      const hits = tokenizeCombo(c).length;
       return hits <= maxHits;
     });
     if (eligible.length === 0) return pool[Math.floor(Math.random() * pool.length)];
