@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { PlayCircle, CheckCircle, Lock, ArrowLeft, Upload, Check, Video, Plus, X, Edit2, Trash2, Play, Loader2, Award, Shield, AlertTriangle, ChevronRight, User, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { uploadVideoToDrive, deleteVideoFromDrive, getDriveEmbedUrl, isDriveUrl } from '../lib/driveService';
+import { getDriveEmbedUrl, isDriveUrl } from '../lib/driveService';
 import { supabase } from '../lib/supabase';
 import { sendPushNotification } from '../lib/fcmService';
 import { InteractiveLesson } from '../components/InteractiveLesson';
@@ -299,20 +299,19 @@ export function Saberes() {
       video.preload = 'metadata';
       video.onloadedmetadata = async () => {
         window.URL.revokeObjectURL(video.src);
-        // Admin puede subir hasta 5 minutos (300s)
         if (video.duration > 300) {
           alert('El video no puede durar más de 5 minutos (300 segundos).');
         } else {
           setTutorialUploadProgress(0);
           try {
-            const url = await uploadVideoToDrive({
-              video: file,
-              name: `tutorial_${Date.now()}_${file.name}`,
-              onProgress: (pct) => setTutorialUploadProgress(pct)
-            });
-            setNewTutorial(prev => ({ ...prev, video_url: url }));
+            const ext = file.name.split('.').pop();
+            const storagePath = `tutorials/${Date.now()}.${ext}`;
+            const { error } = await supabase.storage.from('gpte-videos').upload(storagePath, file, { upsert: true });
+            if (error) throw error;
+            const { data } = supabase.storage.from('gpte-videos').getPublicUrl(storagePath);
+            setNewTutorial(prev => ({ ...prev, video_url: data.publicUrl }));
           } catch (err: any) {
-            alert('Error en Drive: ' + err.message);
+            alert('Error al subir: ' + err.message);
           } finally {
             setTutorialUploadProgress(null);
             if (tutorialFileInputRef.current) tutorialFileInputRef.current.value = '';
@@ -390,10 +389,27 @@ export function Saberes() {
     setUploadProgress(0);
     try {
       if (isAdmin && editingCombo) {
-        const url = await uploadVideoToDrive({ video: file, name: `ref_${editingCombo.id}_${Date.now()}.mp4`, onProgress: (pct) => setUploadProgress(pct) });
-        await supabase.from('combos').update({ video_url: url }).eq('id', editingCombo.id);
+        const ext = file.name.split('.').pop();
+        const storagePath = `combo_videos/admin_${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from('gpte-videos').upload(storagePath, file, { upsert: true });
+        if (error) throw error;
+        const { data } = supabase.storage.from('gpte-videos').getPublicUrl(storagePath);
+        await supabase.from('combos').update({ video_url: data.publicUrl }).eq('id', editingCombo.id);
         setEditingCombo(null);
-        alert('Video de referencia subido correctamente.');
+        alert('Video de referencia actualizado correctamente.');
+      } else {
+        const ext = file.name.split('.').pop();
+        const storagePath = `combo_videos/${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from('gpte-videos').upload(storagePath, file, { upsert: true });
+        if (error) throw error;
+        const { data } = supabase.storage.from('gpte-videos').getPublicUrl(storagePath);
+        const comboId = videoPreview?.comboId;
+        if (comboId) {
+          await supabase.from('combo_progress').insert({
+            combo_id: comboId, user_id: user?.id || '', user_name: user?.name || '', video_url: data.publicUrl, status: 'pending', created_at: new Date().toISOString(),
+          });
+        }
+        alert('Video enviado para revisión.');
       }
     } catch (err: any) { alert('Error al subir: ' + (err?.message || 'Intenta de nuevo')); } finally {
       setUploadProgress(null); setUploadingComboId(null);
@@ -440,13 +456,9 @@ export function Saberes() {
   };
 
   const handleDeleteCombo = (id: string) => {
-    const combo = combos.find(c => c.id === id);
     setConfirmDialog({ isOpen: true, title: 'Eliminar Combo', message: '¿Estás seguro?',
       onConfirm: async () => {
         try {
-          if (combo?.video_url) {
-            await deleteVideoFromDrive(combo.video_url);
-          }
           await supabase.from('combos').delete().eq('id', id);
         } catch (err) { console.error(err); }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
@@ -457,9 +469,6 @@ export function Saberes() {
   const handleDeleteComboVideo = async (combo: Combo) => {
     if (!confirm('¿Eliminar el video explicativo de este combo?')) return;
     try {
-      if (combo.video_url) {
-        await deleteVideoFromDrive(combo.video_url);
-      }
       await supabase.from('combos').update({ video_url: '' }).eq('id', combo.id);
       alert('✅ Video explicativo eliminado.');
     } catch (err) {

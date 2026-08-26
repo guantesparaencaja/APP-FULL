@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import {
-  ArrowLeft, Play, Trash2, Plus, ChevronRight, EyeOff,
-  Upload, X, Check, Loader2, Edit2, Lock, AlertTriangle
+import { ArrowLeft, Play, Trash2, Plus, ChevronRight, EyeOff,
+  X, Check, Loader2, Edit2, Lock, AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
-import { uploadVideoToDrive, deleteVideoFromDrive } from '../lib/driveService';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -109,10 +107,6 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const defaultForm = { nombre: '', subcategoria: 'Tecnica-Basica', nivel: 'Principiante', duracion_seg: 45, descripcion: '', puntos_clave: '', errores_comunes: '', url_directa: '', drive_file_id: '' };
   const [addForm, setAddForm] = useState(defaultForm);
-  const [uploading, setUploading] = useState(false);
-  const [uploadPct, setUploadPct] = useState(0);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const videoFileRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -208,54 +202,6 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     if (undoTimer.current) clearTimeout(undoTimer.current);
   };
 
-  // ── Admin: Select file for review ──────────────────────────────────────────
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('video/')) { alert('Solo archivos de video.'); return; }
-
-    const tempVideo = document.createElement('video');
-    tempVideo.preload = 'metadata';
-    tempVideo.onloadedmetadata = () => {
-      URL.revokeObjectURL(tempVideo.src);
-      if (tempVideo.duration > 300) {
-        alert('El video no puede durar más de 5 minutos (300 segundos).');
-        if (videoFileRef.current) videoFileRef.current.value = '';
-        return;
-      }
-      setAddForm(f => ({ ...f, duracion_seg: Math.round(tempVideo.duration) }));
-      setSelectedFile(file);
-    };
-    tempVideo.src = URL.createObjectURL(file);
-  };
-
-  const handleConfirmUpload = async () => {
-    if (!selectedFile) return;
-    
-    setUploading(true);
-    setUploadPct(0);
-    try {
-      const url = await uploadVideoToDrive({
-        video: selectedFile,
-        name: `boxeo_${Date.now()}_${selectedFile.name}`,
-        onProgress: (pct) => setUploadPct(pct)
-      });
-      setAddForm(f => ({ ...f, url_directa: url }));
-      setSelectedFile(null);
-    } catch (err: any) {
-      alert('Error en Drive: ' + err.message);
-    } finally {
-      setUploading(false);
-      if (videoFileRef.current) videoFileRef.current.value = '';
-    }
-  };
-
-  const handleCancelFile = () => {
-    setSelectedFile(null);
-    if (videoFileRef.current) videoFileRef.current.value = '';
-  };
-
-  // ── Admin: Add or Edit video ────────────────────────────────────────────────
   const handleAddVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.nombre || !addForm.subcategoria) return;
@@ -271,7 +217,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
       } else {
         await supabase.from('boxeo_videos').insert({ ...data, activo: true, orden: 999, created_at: new Date().toISOString() });
       }
-      setShowAddModal(false); setEditingVideoId(null); setAddForm(defaultForm); setSelectedFile(null);
+      setShowAddModal(false); setEditingVideoId(null); setAddForm(defaultForm);
     } catch (err: any) { alert('Error: ' + err.message); }
   };
 
@@ -298,9 +244,6 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
 
   const handleDelete = async (v: BoxeoVideo) => {
     if (!confirm('¿Eliminar este video permanentemente?')) return;
-    if (v.url_directa) {
-      await deleteVideoFromDrive(v.url_directa);
-    }
     await supabase.from('boxeo_videos').delete().eq('id', v.id);
   };
 
@@ -427,38 +370,9 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                   <textarea placeholder="Puntos clave (uno por línea)" value={addForm.puntos_clave} onChange={e => setAddForm(f => ({...f, puntos_clave: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm resize-none h-20" />
                   <textarea placeholder="Errores comunes (uno por línea)" value={addForm.errores_comunes} onChange={e => setAddForm(f => ({...f, errores_comunes: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm resize-none h-20" />
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Video (Drive URL o subir archivo — máx 5 min)</label>
-                      <input type="url" placeholder="https://drive.google.com/uc?id=..." value={addForm.url_directa} onChange={e => setAddForm(f => ({...f, url_directa: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm" />
-                      {!addForm.url_directa && !selectedFile && (
-                      <label className="cursor-pointer bg-slate-800 border border-slate-700 p-4 rounded-xl flex flex-col items-center justify-center hover:bg-slate-700 transition-colors">
-                        <Upload className="w-8 h-8 text-slate-400 mb-2" />
-                        <span className="text-sm font-bold text-slate-300">Seleccionar Video</span>
-                        <input type="file" accept="video/*" ref={videoFileRef} onChange={handleFileSelect} className="hidden" />
-                      </label>
-                    )}
-                    {selectedFile && !uploading && (
-                      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col gap-3">
-                        <p className="text-sm text-slate-300 font-bold truncate">🎥 {selectedFile.name}</p>
-                        <video 
-                          src={URL.createObjectURL(selectedFile)} 
-                          controls 
-                          className="w-full h-40 object-contain bg-black rounded-lg" 
-                        />
-                        <div className="flex gap-2">
-                          <button type="button" onClick={handleCancelFile} className="flex-1 py-2 rounded-lg border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-700">Elegir Otro</button>
-                          <button aria-label="Subir" type="button" onClick={handleConfirmUpload} className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 flex justify-center items-center gap-1"><Upload className="w-3 h-3"/> Subir Video</button>
-                        </div>
-                      </div>
-                    )}
-                    {uploading && (
-                      <div className="bg-slate-800 p-4 flex flex-col items-center justify-center rounded-xl border border-primary/50">
-                        <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-                        <span className="text-sm font-bold text-slate-300">Subiendo... {uploadPct}%</span>
-                        <div className="w-full bg-slate-700 h-2 rounded-full mt-2 overflow-hidden">
-                          <div className="bg-primary h-full transition-all" style={{ width: `${uploadPct}%` }}></div>
-                        </div>
-                      </div>
-                    )}
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">URL del video (Google Drive)</label>
+                      <input type="url" placeholder="https://drive.google.com/file/d/..." value={addForm.url_directa} onChange={e => setAddForm(f => ({...f, url_directa: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm" />
+                      <p className="text-[10px] text-slate-500">Sube el video a la carpeta de Drive y pega el enlace aquí.</p>
                     </div>
                   <button type="submit" className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest">{editingVideoId ? 'Actualizar Video' : 'Guardar Video'}</button>
                 </form>

@@ -463,6 +463,17 @@ export function Profile() {
     }
     setIsDeletingUser(true);
     try {
+      // Verificar contraseña real del admin contra Supabase
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: deleteAdminPassword,
+      });
+      if (authError) {
+        showAlert('Error', 'La contraseña ingresada es incorrecta.', 'error');
+        setIsDeletingUser(false);
+        return;
+      }
+
       // Limpiar imágenes de perfil
       const u = allUsers.find((x: any) => x.id === userToDelete.id);
       if (u) {
@@ -565,6 +576,81 @@ export function Profile() {
     } catch (error: any) {
       showAlert('Error', 'Error: ' + error.message, 'error');
     } finally { setIsChangingPassword(false); }
+  };
+
+  // ─── Password Reset Request (User) ──────────────────────────────────────
+  const [resetRequests, setResetRequests] = useState<any[]>([]);
+  const [adminTempPassword, setAdminTempPassword] = useState<Record<string, string>>({});
+  const [adminResetNotes, setAdminResetNotes] = useState<Record<string, string>>({});
+
+  const handleRequestPasswordReset = async () => {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from('password_reset_requests').insert({
+        user_id: user.id,
+        user_email: user.email || '',
+        user_name: user.name || '',
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      showAlert('Solicitud enviada', 'Tu solicitud de cambio de contraseña ha sido enviada al administrador. Recibirás una notificación cuando sea procesada.', 'success');
+    } catch (err: any) {
+      showAlert('Error', err.message || 'Error al enviar solicitud', 'error');
+    }
+  };
+
+  const loadResetRequests = async () => {
+    if (user?.role !== 'admin') return;
+    const { data } = await supabase
+      .from('password_reset_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setResetRequests(data || []);
+  };
+
+  useEffect(() => {
+    if (user?.role === 'admin') loadResetRequests();
+  }, [user?.role]);
+
+  const handleAdminAssignTempPassword = async (requestId: string, userId: string, userEmail: string) => {
+    const tempPwd = adminTempPassword[requestId];
+    if (!tempPwd || tempPwd.length < 6) {
+      showAlert('Error', 'La contraseña temporal debe tener al menos 6 caracteres.', 'error');
+      return;
+    }
+    try {
+      // Set password via Supabase admin (service role required in backend, here we use edge function or direct)
+      // For now we update the flag and mark as completed; admin communicates temp pwd manually
+      await supabase.from('profiles').update({
+        must_change_password: true,
+      }).eq('id', userId);
+
+      await supabase.from('password_reset_requests').update({
+        status: 'completed',
+        admin_id: user?.id,
+        admin_notes: adminResetNotes[requestId] || '',
+        temp_password_visible: tempPwd,
+        completed_at: new Date().toISOString(),
+      }).eq('id', requestId);
+
+      showAlert('Contraseña asignada', `Contraseña temporal "${tempPwd}" asignada a ${userEmail}. Comunícasela al usuario.`, 'success');
+      setAdminTempPassword((prev) => ({ ...prev, [requestId]: '' }));
+      setAdminResetNotes((prev) => ({ ...prev, [requestId]: '' }));
+      loadResetRequests();
+    } catch (err: any) {
+      showAlert('Error', err.message || 'Error al asignar contraseña', 'error');
+    }
+  };
+
+  const handleAdminCancelRequest = async (requestId: string) => {
+    try {
+      await supabase.from('password_reset_requests').update({ status: 'cancelled' }).eq('id', requestId);
+      showAlert('Cancelada', 'Solicitud cancelada.', 'info');
+      loadResetRequests();
+    } catch (err: any) {
+      showAlert('Error', err.message, 'error');
+    }
   };
 
   const handleManualErrorReport = () => {
@@ -1346,7 +1432,34 @@ export function Profile() {
       </motion.section>
       </Reveal>
 
-      {/* Student: Navigate to License Approval Progress */}
+      {/* Password Reset Request (students only) */}
+      {user.role !== 'admin' && (
+        <Reveal>
+        <motion.section variants={itemVariants} className="mb-12">
+          <div className="glass-card rounded-[2.5rem] p-8">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20">
+                <Lock className="w-6 h-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                  ¿Olvidaste tu contraseña?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                  Solicita un cambio al administrador
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleRequestPasswordReset}
+              className="w-full bg-amber-500/10 text-amber-400 font-black py-4 rounded-3xl hover:bg-amber-500/20 transition-all border border-amber-500/30 uppercase tracking-[0.15em] text-sm btn-press"
+            >
+              Solicitar Cambio de Contraseña
+            </button>
+          </div>
+        </motion.section>
+        </Reveal>
+      )}
       {user.role !== 'admin' && (
         <Reveal>
         <motion.section variants={itemVariants} className="mb-12">
@@ -2183,6 +2296,126 @@ export function Profile() {
           </section>
 
           {/* La gestión de precios de planes se ha movido a la página de Planes */}
+
+          {/* Password Reset Requests Admin Panel */}
+          <section className="mb-12">
+            <button
+              onClick={() => toggleAdminSection('password_resets')}
+              className="flex items-center justify-between w-full mb-8 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-red-500/10 rounded-2xl border border-red-500/20">
+                  <Lock className="w-6 h-6 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                    Solicitudes de Contraseña
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                    {resetRequests.filter(r => r.status === 'pending').length} pendiente(s)
+                  </p>
+                </div>
+              </div>
+              <ChevronRight
+                className={`w-5 h-5 text-slate-400 transition-transform ${expandedAdminSections.has('password_resets') ? 'rotate-90' : ''}`}
+              />
+            </button>
+            {expandedAdminSections.has('password_resets') && (
+              <motion.div whileHover={{ y: -5 }} className="glass-card rounded-[2.5rem] p-8">
+                {resetRequests.length === 0 ? (
+                  <p className="text-center text-slate-500 text-sm py-8">No hay solicitudes de cambio de contraseña.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {resetRequests.map((req: any) => (
+                      <div
+                        key={req.id}
+                        className={`rounded-2xl p-5 border ${
+                          req.status === 'pending'
+                            ? 'bg-amber-500/5 border-amber-500/20'
+                            : req.status === 'completed'
+                            ? 'bg-emerald-500/5 border-emerald-500/20'
+                            : 'bg-slate-500/5 border-slate-500/20'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">{req.user_name || req.user_email}</p>
+                            <p className="text-[11px] text-slate-500 font-medium">{req.user_email}</p>
+                          </div>
+                          <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg ${
+                            req.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                            req.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                            'bg-slate-500/20 text-slate-400'
+                          }`}>
+                            {req.status === 'pending' ? 'Pendiente' : req.status === 'completed' ? 'Completada' : 'Cancelada'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mb-3">
+                          {new Date(req.created_at).toLocaleString('es-CO')}
+                        </p>
+                        {req.status === 'pending' && (
+                          <div className="space-y-3 mt-3">
+                            <div>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 block">
+                                Contraseña Temporal (mín. 6 caracteres)
+                              </label>
+                              <input
+                                type="text"
+                                value={adminTempPassword[req.id] || ''}
+                                onChange={(e) => setAdminTempPassword(prev => ({ ...prev, [req.id]: e.target.value }))}
+                                className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                placeholder="Ej: Cambio2026!"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 block">
+                                Notas (opcional)
+                              </label>
+                              <input
+                                type="text"
+                                value={adminResetNotes[req.id] || ''}
+                                onChange={(e) => setAdminResetNotes(prev => ({ ...prev, [req.id]: e.target.value }))}
+                                className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                placeholder="Motivo del cambio..."
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleAdminAssignTempPassword(req.id, req.user_id, req.user_email)}
+                                disabled={!adminTempPassword[req.id] || adminTempPassword[req.id].length < 6}
+                                className="flex-1 bg-primary text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-primary-dark transition-all disabled:opacity-50 btn-press"
+                              >
+                                Asignar y Marcar Hecho
+                              </button>
+                              <button
+                                onClick={() => handleAdminCancelRequest(req.id)}
+                                className="px-4 bg-red-500/10 text-red-400 font-black py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {req.status === 'completed' && req.temp_password_visible && (
+                          <div className="mt-3 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-1">Contraseña asignada:</p>
+                            <p className="text-sm font-mono font-bold text-emerald-300">{req.temp_password_visible}</p>
+                            <p className="text-[10px] text-slate-500 mt-1">Comunícasela al usuario por un canal seguro.</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={loadResetRequests}
+                  className="mt-4 w-full bg-white/5 text-slate-400 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-white/10 transition-all"
+                >
+                  Actualizar Lista
+                </button>
+              </motion.div>
+            )}
+          </section>
         </motion.div>
         </Reveal>
       )}

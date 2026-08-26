@@ -77,7 +77,7 @@ export function Store() {
         return;
       }
       setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      setCart((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+      setCart((prev) => prev.filter((item) => item.product.id !== deleteTarget.id));
     } catch (err: any) {
       alert('No se pudo eliminar: ' + (err?.message || 'error inesperado'));
     } finally {

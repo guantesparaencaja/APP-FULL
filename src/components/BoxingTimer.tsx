@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, SkipForward, Bell } from 'lucide-react';
+import { Play, Pause, RotateCcw, SkipForward, Bell, Swords } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface BoxingTimerProps {
@@ -8,6 +8,50 @@ interface BoxingTimerProps {
   roundsCount: number;
   onRoundEnd?: (round: number) => void;
   onSessionEnd?: () => void;
+  comboCallerEnabled?: boolean;
+  comboPool?: string[];
+}
+
+const COMBO_CALLER_STORAGE_KEY = 'gpte_combo_caller_enabled';
+
+const DEFAULT_COMBO_POOL = [
+  '1-2', '1-2-3', '1-2-1', '1-1-2',
+  '1-2-3-2', '1-2-1-2', '1-2-3-4', '1-2-3-2-1',
+  '1-2-3-4-3-2', '1-2-3-2-3-4', '1-2-1-2-3-4', '1-2-3-4-5-6',
+  '1-2-3-4-3-2-1-2', '1-2-3-2-1-2-3-4',
+];
+
+/** Max combo length allowed per round bracket (progressive difficulty) */
+function getMaxComboHits(round: number, totalRounds: number): number {
+  const progress = round / totalRounds;
+  if (progress <= 0.25) return 3;
+  if (progress <= 0.5) return 4;
+  if (progress <= 0.75) return 6;
+  return 8;
+}
+
+/** Translate numeric combo notation into spoken Spanish words */
+export function traducirCombo(combo: string): string {
+  const MAP: Record<string, string> = {
+    '1': 'Jab',
+    '2': 'Cross',
+    '3': 'Gancho izquierdo',
+    '4': 'Gancho derecho',
+    '5': 'Uppercut izquierdo',
+    '6': 'Uppercut derecho',
+    'DJ': 'Doble jab',
+    'PA': 'Paso lateral',
+    'Pivote': 'Pivote',
+    'Cintura': 'Cintura',
+  };
+  return combo
+    .split('-')
+    .map((token) => MAP[token.trim()] || token.trim())
+    .join(', ');
+}
+
+function randomInterval(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 export const BoxingTimer: React.FC<BoxingTimerProps> = ({
@@ -16,12 +60,24 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
   roundsCount,
   onRoundEnd,
   onSessionEnd,
+  comboCallerEnabled,
+  comboPool,
 }) => {
   const [currentRound, setCurrentRound] = useState(1);
   const [isResting, setIsResting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(roundDurationSec);
   const [isActive, setIsActive] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [comboCallerOn, setComboCallerOn] = useState(() => {
+    if (comboCallerEnabled === false) return false;
+    if (comboCallerEnabled === true) return true;
+    try {
+      return localStorage.getItem(COMBO_CALLER_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [lastCombo, setLastCombo] = useState<string | null>(null);
 
   const motivationPhrases = [
     '¡Vamos, con fuerza!',
@@ -53,6 +109,9 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
       const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -76,10 +135,31 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
   const playBell = useCallback(() => {
     const audio = new Audio('/assets/sounds/campana.mp3');
     audio.play().catch(() => {
-      // Fallback to beep if file missing or blocked
       playBeep(1000, 0.8);
     });
   }, [playBeep]);
+
+  const heavyHaptic = useCallback(async () => {
+    try {
+      if ((window as any).Capacitor?.isNativePlatform?.()) {
+        const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
+        await Haptics.impact({ style: ImpactStyle.Heavy });
+      }
+    } catch (e) {
+      console.warn('haptic:heavy-failed', e);
+    }
+  }, []);
+
+  const lightHaptic = useCallback(async () => {
+    try {
+      if ((window as any).Capacitor?.isNativePlatform?.()) {
+        const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
+        await Haptics.impact({ style: ImpactStyle.Light });
+      }
+    } catch (e) {
+      console.warn('haptic:light-failed', e);
+    }
+  }, []);
 
   const speakRef = useRef(speak);
   speakRef.current = speak;
@@ -87,86 +167,251 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
   const motivationRef = useRef(motivationPhrases);
   motivationRef.current = motivationPhrases;
 
-  const lastTickRef = useRef<number>(0);
-  const tickAccumulatorRef = useRef<number>(0);
+  const startedAtMsRef = useRef<number>(0);
+  const durationTargetRef = useRef<number>(roundDurationSec);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentRoundRef = useRef<number>(1);
+  const isRestingRef = useRef<boolean>(false);
+  const isActiveRef = useRef<boolean>(false);
+  const spokenTenRef = useRef<boolean>(false);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastComboRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    let rafId: number;
+  currentRoundRef.current = currentRound;
+  isRestingRef.current = isResting;
+  isActiveRef.current = isActive;
 
-    if (isActive && timeLeft > 0) {
-      lastTickRef.current = Date.now();
-      tickAccumulatorRef.current = 0;
+  // Persist combo caller preference
+  const toggleComboCaller = useCallback(() => {
+    setComboCallerOn((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(COMBO_CALLER_STORAGE_KEY, String(next));
+      } catch { /* noop */ }
+      return next;
+    });
+  }, []);
 
-      const tick = () => {
-        const now = Date.now();
-        const elapsed = now - lastTickRef.current;
-        lastTickRef.current = now;
-        tickAccumulatorRef.current += elapsed;
+  // Pick a combo from the pool filtered by max hits for current round
+  const pickCombo = useCallback((): string => {
+    const pool = (comboPool && comboPool.length > 0) ? comboPool : DEFAULT_COMBO_POOL;
+    const maxHits = getMaxComboHits(currentRoundRef.current, roundsCount);
+    const eligible = pool.filter((c) => {
+      const hits = c.split('-').length;
+      return hits <= maxHits;
+    });
+    if (eligible.length === 0) return pool[Math.floor(Math.random() * pool.length)];
+    return eligible[Math.floor(Math.random() * eligible.length)];
+  }, [comboPool, roundsCount]);
 
-        if (tickAccumulatorRef.current >= 1000) {
-          const ticks = Math.floor(tickAccumulatorRef.current / 1000);
-          tickAccumulatorRef.current -= ticks * 1000;
+  // Schedule next combo call (12-18 seconds from now)
+  const scheduleNextCombo = useCallback(() => {
+    if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
+    if (!isActiveRef.current || isRestingRef.current || !comboCallerOn) return;
+    comboTimerRef.current = setTimeout(() => {
+      if (!isActiveRef.current || isRestingRef.current) return;
+      const combo = pickCombo();
+      lastComboRef.current = combo;
+      setLastCombo(combo);
+      speak(traducirCombo(combo));
+      lightHaptic();
+      scheduleNextCombo();
+    }, randomInterval(12, 18) * 1000);
+  }, [comboCallerOn, pickCombo, speak, lightHaptic]);
 
-          setTimeLeft((prev) => {
-            const next = Math.max(0, prev - ticks);
-            if (!isResting) {
-              if (next === 10 && prev > 10) {
-                speakRef.current('¡Últimos diez segundos, ráfaga final!');
-              } else if (next > 10 && next % 30 === 0 && next !== roundDurationSec) {
-                const phrase = motivationRef.current[Math.floor(Math.random() * motivationRef.current.length)];
-                speakRef.current(phrase);
-              }
-            }
-            return next;
-          });
-        }
-
-        rafId = requestAnimationFrame(tick);
-      };
-
-      rafId = requestAnimationFrame(tick);
+  // Cancel combo timer
+  const cancelComboTimer = useCallback(() => {
+    if (comboTimerRef.current) {
+      clearTimeout(comboTimerRef.current);
+      comboTimerRef.current = null;
     }
+  }, []);
 
-    return () => cancelAnimationFrame(rafId);
-  }, [isActive, timeLeft > 0, isResting, roundDurationSec]);
+  const requestWakeLock = useCallback(async () => {
+    try {
+      if ('wakeLock' in navigator && isActive) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+      }
+    } catch (e) {
+      console.warn('wakeLock:request-failed', e);
+    }
+  }, [isActive]);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      if (wakeLockRef.current) {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+    } catch (e) {
+      console.warn('wakeLock:release-failed', e);
+    }
+  }, []);
+
+  const startTick = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      if (!isActiveRef.current) return;
+      const elapsed = Math.floor((Date.now() - startedAtMsRef.current) / 1000);
+      const remaining = Math.max(0, durationTargetRef.current - elapsed);
+      setTimeLeft(remaining);
+    }, 250);
+  }, []);
+
+  const stopTick = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   // Handle round/rest transitions when time hits 0
   useEffect(() => {
     if (!isActive || timeLeft > 0) return;
 
     if (!isResting) {
+      cancelComboTimer();
       playBell();
+      heavyHaptic();
       if (currentRound < roundsCount) {
         speak('¡Tiempo! Descansa y respira.');
         setIsResting(true);
+        durationTargetRef.current = restDurationSec;
+        startedAtMsRef.current = Date.now();
         setTimeLeft(restDurationSec);
         onRoundEnd?.(currentRound);
       } else {
         setIsActive(false);
+        stopTick();
+        releaseWakeLock();
         setIsFinished(true);
         speak('¡Sesión terminada, excelente entrenamiento!');
         onSessionEnd?.();
       }
     } else {
       playBell();
+      heavyHaptic();
       speak(`¡Round ${currentRound + 1}, a pelear!`);
       setIsResting(false);
       setCurrentRound((prev) => prev + 1);
+      durationTargetRef.current = roundDurationSec;
+      startedAtMsRef.current = Date.now();
       setTimeLeft(roundDurationSec);
     }
-  }, [isActive, timeLeft, isResting, currentRound, roundsCount, roundDurationSec, restDurationSec, onRoundEnd, onSessionEnd, playBell, speak]);
+  }, [isActive, timeLeft, isResting, currentRound, roundsCount, roundDurationSec, restDurationSec, onRoundEnd, onSessionEnd, playBell, speak, heavyHaptic, stopTick, releaseWakeLock, cancelComboTimer]);
 
-  const toggleTimer = () => setIsActive(!isActive);
+  // Speak/haptic effect — fires AFTER state updates, outside setState
+  useEffect(() => {
+    if (!isActive || isResting || isFinished) return;
+    if (timeLeft === 0) return;
+
+    if (timeLeft === 10 && !spokenTenRef.current) {
+      spokenTenRef.current = true;
+      speak('¡Últimos diez segundos, ráfaga final!');
+      lightHaptic();
+    } else if (timeLeft > 10 && timeLeft % 30 === 0 && timeLeft !== roundDurationSec) {
+      if (!comboCallerOn) {
+        const phrase = motivationRef.current[Math.floor(Math.random() * motivationRef.current.length)];
+        speak(phrase);
+      }
+    }
+  }, [timeLeft, isActive, isResting, isFinished, roundDurationSec, speak, lightHaptic, comboCallerOn]);
+
+  // Start combo caller schedule when round becomes active
+  useEffect(() => {
+    if (isActive && !isResting && !isFinished && comboCallerOn) {
+      scheduleNextCombo();
+    } else {
+      cancelComboTimer();
+    }
+    return () => cancelComboTimer();
+  }, [isActive, isResting, isFinished, comboCallerOn, scheduleNextCombo, cancelComboTimer]);
+
+  // Reset spokenTenRef when entering a new round
+  useEffect(() => {
+    spokenTenRef.current = false;
+  }, [currentRound, isResting]);
+
+  // Visibility change listener — recalculate on tab focus
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && isActiveRef.current) {
+        const elapsed = Math.floor((Date.now() - startedAtMsRef.current) / 1000);
+        const remaining = Math.max(0, durationTargetRef.current - elapsed);
+        setTimeLeft(remaining);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  // Wake lock management
+  useEffect(() => {
+    if (isActive) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  }, [isActive, requestWakeLock, releaseWakeLock]);
+
+  // Re-acquire wake lock when page becomes visible again
+  useEffect(() => {
+    const handleWakeLockVisibility = () => {
+      if (document.visibilityState === 'visible' && isActiveRef.current && !wakeLockRef.current) {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleWakeLockVisibility);
+    return () => document.removeEventListener('visibilitychange', handleWakeLockVisibility);
+  }, [requestWakeLock]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopTick();
+      releaseWakeLock();
+      cancelComboTimer();
+    };
+  }, [stopTick, releaseWakeLock, cancelComboTimer]);
+
+  const toggleTimer = () => {
+    if (isActive) {
+      stopTick();
+      cancelComboTimer();
+      releaseWakeLock();
+      setIsActive(false);
+    } else {
+      setIsActive(true);
+      durationTargetRef.current = isResting ? restDurationSec : (currentRound === 1 && !isResting ? roundDurationSec : durationTargetRef.current);
+      startedAtMsRef.current = Date.now() - ((durationTargetRef.current - timeLeft) * 1000);
+      startTick();
+      requestWakeLock();
+    }
+  };
 
   const resetTimer = () => {
+    stopTick();
+    cancelComboTimer();
+    releaseWakeLock();
     setIsActive(false);
     setIsResting(false);
     setCurrentRound(1);
     setTimeLeft(roundDurationSec);
     setIsFinished(false);
+    setLastCombo(null);
+    durationTargetRef.current = roundDurationSec;
+    startedAtMsRef.current = 0;
+    currentRoundRef.current = 1;
+    isRestingRef.current = false;
+    isActiveRef.current = false;
+    spokenTenRef.current = false;
+    lastComboRef.current = null;
   };
 
   const skipStep = () => {
+    durationTargetRef.current = 0;
+    startedAtMsRef.current = Date.now();
     setTimeLeft(0);
   };
 
@@ -175,6 +420,8 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const showComboCaller = comboCallerEnabled !== false;
 
   return (
     <div
@@ -206,7 +453,7 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
         </div>
       </div>
 
-      <div className="flex flex-col items-center mb-10">
+      <div className="flex flex-col items-center mb-6">
         <motion.div
           key={timeLeft}
           initial={{ scale: 0.9, opacity: 0.5 }}
@@ -219,7 +466,24 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
         </motion.div>
       </div>
 
-      <div className="flex items-center justify-center gap-6">
+      {/* Combo Caller display */}
+      {showComboCaller && !isResting && !isFinished && lastCombo && isActive && (
+        <motion.div
+          key={lastCombo + currentRound}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className="flex items-center justify-center gap-2 mb-6"
+        >
+          <Swords className="w-4 h-4 text-primary" />
+          <span className="text-sm font-black uppercase tracking-widest text-primary">
+            {traducirCombo(lastCombo)}
+          </span>
+          <span className="text-[10px] text-slate-500 ml-1">({lastCombo})</span>
+        </motion.div>
+      )}
+
+      <div className="flex items-center justify-center gap-6 mb-6">
         <button
           onClick={resetTimer}
           className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 transition-all"
@@ -247,6 +511,23 @@ export const BoxingTimer: React.FC<BoxingTimerProps> = ({
           <SkipForward className="w-6 h-6" />
         </button>
       </div>
+
+      {/* Combo Caller toggle */}
+      {showComboCaller && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={toggleComboCaller}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all ${
+              comboCallerOn
+                ? 'bg-primary/20 text-primary border-primary/30'
+                : 'bg-white/5 text-slate-500 border-white/10'
+            }`}
+          >
+            <Swords className="w-3 h-3" />
+            Modo Combos
+          </button>
+        </div>
+      )}
 
       {isFinished && (
         <motion.div

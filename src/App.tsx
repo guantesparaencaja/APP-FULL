@@ -39,6 +39,7 @@ const Chat                 = lazy(() => import('./pages/Chat').then(m => ({ defa
 const Recipes              = lazy(() => import('./pages/Recipes').then(m => ({ default: m.Recipes })));
 const WorkoutPlans         = lazy(() => import('./pages/WorkoutPlans').then(m => ({ default: m.WorkoutPlans })));
 const Boxing               = lazy(() => import('./pages/Boxing').then(m => ({ default: m.Boxing })));
+const ResetPassword        = lazy(() => import('./pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
 
 // ── Pantalla de carga entre páginas ───────────────────────────────────────
 function LoadingFallback() {
@@ -368,6 +369,7 @@ export default function App() {
               <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
               <Route element={<Layout />}>
                 <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />

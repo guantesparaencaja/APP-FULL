@@ -278,7 +278,7 @@ export function Calendar() {
       const timeStr = `${selectedTime.start_time} - ${selectedTime.end_time}`;
       const status = isManualPayment ? 'pending_payment' : 'active';
 
-      await supabase.from('bookings').insert({
+      const { error: insertError } = await supabase.from('bookings').insert({
         user_id: String(targetUser.id),
         user_name: targetUser.name,
         user_email: targetUser.email || '',
@@ -288,6 +288,8 @@ export function Calendar() {
         status,
         created_at: new Date().toISOString(),
       });
+
+      if (insertError) throw insertError;
 
       if (status === 'active') {
         const newRemaining = Math.max(0, (targetUser.classes_remaining || 0) - 1);

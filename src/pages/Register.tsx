@@ -14,6 +14,7 @@ import {
   Ruler,
   Eye,
   EyeOff,
+  Loader2,
 } from 'lucide-react';
 import { signUp } from '../lib/authService';
 import { sendEmail } from '../lib/email';
@@ -36,6 +37,7 @@ export function Register() {
     fitness_goal: 'Recomposición corporal y pérdida de grasa',
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
@@ -49,6 +51,7 @@ export function Register() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (step < 3) {
       if (step === 1 && formData.password !== formData.confirmPassword) {
         setError('Las contraseñas no coinciden.');
@@ -59,9 +62,13 @@ export function Register() {
       return;
     }
 
+    setLoading(true);
     try {
       if (formData.password !== formData.confirmPassword) {
         throw new Error('Las contraseñas no coinciden.');
+      }
+      if (formData.password.length < 6) {
+        throw new Error('La contraseña debe tener al menos 6 caracteres.');
       }
 
       // Registro vía Supabase (authService automáticamente crea el perfil)
@@ -74,10 +81,13 @@ export function Register() {
 
       // Actualizar el perfil con los datos físicos adicionales
       const { supabase } = await import('../lib/supabase');
+      const weight = parseFloat(formData.weight) || 0;
+      const height = parseFloat(formData.height) || 0;
+      const age = parseInt(formData.age) || 0;
       await supabase.from('profiles').update({
-        weight: parseFloat(formData.weight),
-        height: parseFloat(formData.height),
-        age: parseInt(formData.age),
+        weight,
+        height,
+        age,
         dominant_hand: formData.dominant_hand,
         goal: formData.fitness_goal,
         fitness_goal: formData.fitness_goal,
@@ -154,6 +164,8 @@ export function Register() {
       else if (err.message.includes('Password should be at least')) errorMsg = 'La contraseña es muy corta.';
       else if (err.message.includes('Invalid email format')) errorMsg = 'El formato del correo es inválido.';
       setError(errorMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -486,12 +498,26 @@ export function Register() {
 
                 <motion.button
                   type="submit"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="mt-6 w-full bg-primary text-white font-bold py-4 rounded-lg shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 neon-glow btn-press"
+                  disabled={loading}
+                  whileHover={loading ? {} : { scale: 1.02 }}
+                  whileTap={loading ? {} : { scale: 0.97 }}
+                  className={`mt-6 w-full font-bold py-4 rounded-lg shadow-lg transition-all flex items-center justify-center gap-2 neon-glow btn-press ${
+                    loading
+                      ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                      : 'bg-primary text-white hover:bg-primary/90'
+                  }`}
                 >
-                  <span>FINALIZAR REGISTRO</span>
-                  <UserPlus className="w-5 h-5" />
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>REGISTRANDO...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>FINALIZAR REGISTRO</span>
+                      <UserPlus className="w-5 h-5" />
+                    </>
+                  )}
                 </motion.button>
               </motion.div>
             </motion.div>

@@ -18,7 +18,6 @@ import {
   RefreshCw,
   ChevronRight,
   Video,
-  Upload,
   Trash2,
   Lock,
   CheckCircle2,
@@ -34,7 +33,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LazyVideoWrapper } from '../components/LazyVideoWrapper';
 import { generateLocalWorkout } from '../services/geminiService';
 import { EvolvingAvatar } from '../components/EvolvingAvatar';
-import { uploadVideoToDrive } from '../lib/driveService';
 import { MonthChallenge } from '../components/MonthChallenge';
 import { Reveal } from '../components/Reveal';
 import { PageHeader } from '../components/PageHeader';
@@ -139,7 +137,6 @@ export function Home() {
   } | null>(null);
   const [isChallengeCompleted, setIsChallengeCompleted] = useState(false);
   const [checkedTasks, setCheckedTasks] = useState<Set<number>>(new Set());
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [appSettings, setAppSettings] = useState({
     workouts_unlocked: false,
     nutrition_unlocked: false,
@@ -310,6 +307,8 @@ export function Home() {
     });
   }, [user?.fitnessGoal, user?.id]);
 
+  const [challengeVideoUrl, setChallengeVideoUrl] = useState('');
+
   if (!user) return null;
 
   const handleWaterClick = async (index: number) => {
@@ -343,18 +342,15 @@ export function Home() {
   const isChallengeUnlocked = isSpecialUser || appSettings.challenge_unlocked || hasFullAccess;
   const isWorkoutsUnlocked = isSpecialUser || appSettings.workouts_unlocked || hasFullAccess;
 
-  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 200 * 1024 * 1024) { showAlert('Error', 'El video es demasiado grande. Máximo 200MB.', 'error'); e.target.value = ''; return; }
-    setUploadProgress(0);
+  const handleChallengeVideoUrl = async () => {
+    if (!challengeVideoUrl.trim()) { showAlert('Error', 'Ingresa una URL de video.', 'error'); return; }
     try {
-      const downloadURL = await uploadVideoToDrive({ video: file, name: `reto_${Date.now()}_${file.name}`, onProgress: (p) => setUploadProgress(p) });
-      await supabase.from('challenges').insert({ url: downloadURL, title: 'Nuevo Reto de Video', objetivo: 'general', categoria: 'Boxeo', dificultad: 'intermedio', created_at: new Date().toISOString(), created_by: user.id });
-      showAlert('Éxito', 'Video subido correctamente.', 'success');
+      await supabase.from('challenges').insert({ url: challengeVideoUrl, title: 'Nuevo Reto de Video', objetivo: 'general', categoria: 'Boxeo', dificultad: 'intermedio', created_at: new Date().toISOString(), created_by: user.id });
+      showAlert('Éxito', 'Video publicado correctamente.', 'success');
+      setChallengeVideoUrl('');
     } catch (error: any) {
-      showAlert('Error', 'Error al subir el video: ' + (error.message || 'Error desconocido'), 'error');
-    } finally { setUploadProgress(null); if (e.target) e.target.value = ''; }
+      showAlert('Error', 'Error al publicar el video: ' + (error.message || 'Error desconocido'), 'error');
+    }
   };
 
   const handleChallengeSubmit = async (e: React.FormEvent) => {
@@ -462,15 +458,21 @@ export function Home() {
                 >
                   <Plus className="w-4 h-4" /> Crear Reto
                 </button>
-                <label className="cursor-pointer p-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2 text-xs font-bold btn-press">
-                  <Upload className="w-4 h-4" /> Subir Video
+                <div className="flex items-center gap-2">
                   <input
-                    type="file"
-                    accept="video/*"
-                    className="hidden"
-                    onChange={handleVideoUpload}
+                    type="url"
+                    value={challengeVideoUrl}
+                    onChange={(e) => setChallengeVideoUrl(e.target.value)}
+                    placeholder="URL del video..."
+                    className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:border-primary outline-none w-48"
                   />
-                </label>
+                  <button
+                    onClick={handleChallengeVideoUrl}
+                    className="p-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 text-xs font-bold btn-press"
+                  >
+                    Publicar
+                  </button>
+                </div>
                 {currentChallenge && (
                   <button aria-label="Eliminar"
                     onClick={handleDeleteChallenge}
@@ -482,21 +484,6 @@ export function Home() {
               </div>
             )}
           </div>
-
-          {uploadProgress !== null && (
-            <div className="mb-4">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-primary font-medium">Subiendo video...</span>
-                <span>{Math.round(uploadProgress)}%</span>
-              </div>
-              <div className="w-full bg-slate-700 rounded-full h-1.5">
-                <div
-                  className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
 
           {currentChallenge ? (
             <div className="space-y-6">
@@ -1184,29 +1171,17 @@ export function Home() {
         title="Crear Nuevo Reto"
       >
         <div className="space-y-8 p-2">
-          {/* Opción A: Video Upload */}
           <div className="space-y-4">
             <h4 className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
-              <Video className="w-4 h-4" /> Opción A: Subir Video
+              <Video className="w-4 h-4" /> URL del Video
             </h4>
-            <div className="bg-slate-50 dark:bg-slate-900/50 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center gap-4 transition-all hover:border-primary/50">
-              <Upload className="w-10 h-10 text-slate-300" />
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleVideoUpload}
-                disabled={uploadProgress !== null}
-                className="text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer w-full"
-              />
-              {uploadProgress !== null && (
-                <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-2">
-                  <div
-                    className="bg-primary h-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
-                  ></div>
-                </div>
-              )}
-            </div>
+            <input
+              type="url"
+              value={challengeVideoUrl}
+              onChange={(e) => setChallengeVideoUrl(e.target.value)}
+              placeholder="https://drive.google.com/..."
+              className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-sm text-slate-900 dark:text-white focus:border-primary outline-none font-medium"
+            />
           </div>
 
           <div className="relative">

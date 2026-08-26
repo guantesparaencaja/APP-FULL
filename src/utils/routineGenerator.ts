@@ -22,6 +22,27 @@ export interface GeneratedRoutine {
   exercises: GeneratedExercise[];
   totalEstimatedMinutes: number;
   toolsUsed: string[];
+  toolsRelaxed?: boolean;
+  relaxedCount?: number;
+}
+
+// ─── Warmup pool: Movilidad entries from LYFTA_LIBRARY (categoria 'Movilidad') ──
+// Selected for dynamic warmup suitability (objetivo Calentamiento/Movilidad, no Recuperación).
+// Each video is ~35-45s; the warmup slot is 5-10 min so the user follows along cycling through.
+const WARMUP_MOVILIDAD: { id: string; title: string; videoUrl: string; durationSec: number }[] = [
+  { id: 'warmup_cat_camel', title: 'Cat-Camel — Movilidad Lumbar', videoUrl: 'https://apilyfta.com/static/GymvisualMP4/12891201-Cat-Camel-Stretch_Back.mp4', durationSec: 40 },
+  { id: 'warmup_neck', title: 'Estiramiento de Cuello', videoUrl: 'https://apilyfta.com/static/GymvisualMP4/12711201-Neck-Side-Stretch_Neck.mp4', durationSec: 35 },
+  { id: 'warmup_hip_flexor', title: 'Estiramiento de Flexor de Cadera', videoUrl: 'https://apilyfta.com/static/GymvisualMP4/13541201-Hip-Flexion-Stretch_Hips.mp4', durationSec: 40 },
+  { id: 'warmup_wrist', title: 'Rotaciones de Muñeca', videoUrl: 'https://apilyfta.com/static/GymvisualMP4/13191201-Wrist-circles_Forearm.mp4', durationSec: 35 },
+];
+
+/** Fisher-Yates (Knuth) unbiased shuffle. Mutates and returns the array. */
+function fisherYates<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 export const generateAutomaticRoutine = (
@@ -31,35 +52,48 @@ export const generateAutomaticRoutine = (
   const allExercises = getYoutubeExercises();
   const stretchingPool = getStretchingVideos();
 
-  // Filter main exercises
-  const filteredMain = allExercises.filter(
+  // Filter main exercises by muscleGroup + selectedTools
+  let filteredMain = allExercises.filter(
     (ex) => !ex.isStretching && ex.muscleGroup === muscleGroup && selectedTools.includes(ex.tool)
   );
 
-  // Select 4-6 exercises
-  const selectedMain = filteredMain.sort(() => 0.5 - Math.random()).slice(0, 6);
+  // Fallback: if no exercises match (e.g. user has no compatible equipment for that muscle group),
+  // relax the tool filter — "Sin equipo" exercises are always available.
+  let toolsRelaxed = false;
+  let relaxedCount = 0;
+  if (filteredMain.length === 0) {
+    const allForGroup = allExercises.filter(
+      (ex) => !ex.isStretching && ex.muscleGroup === muscleGroup
+    );
+    relaxedCount = allForGroup.length;
+    filteredMain = allForGroup;
+    toolsRelaxed = true;
+    console.warn(
+      `[routineGenerator] filteredMain vacío para muscleGroup="${muscleGroup}" ` +
+      `con tools=[${selectedTools.join(', ')}]. Relajando filtro de herramientas: ` +
+      `${relaxedCount} ejercicios disponibles sin filtro de equipo.`
+    );
+  }
 
-  // If we don't have enough, maybe relax tool constraints or just take what we have
-  // For this implementation, we'll stick to the filtered list.
+  // Fisher-Yates shuffle, then pick up to 6
+  const selectedMain = fisherYates([...filteredMain]).slice(0, 6);
 
   const routineExercises: GeneratedExercise[] = [];
 
-  // 1. Warm up (5 min) - We'll add a generic entry or a mobility video
+  // 1. Warm up (5-10 min) — pick one Movilidad entry as dynamic warmup
+  const warmupDurationSec = 5 * 60; // 5 min base
+  const warmup = WARMUP_MOVILIDAD[Math.floor(Math.random() * WARMUP_MOVILIDAD.length)];
   routineExercises.push({
-    id: 'warmup_generic',
-    title: 'Calentamiento Dinámico',
-    videoUrl: stretchingPool.length > 0 ? stretchingPool[0].videoUrl : '',
+    id: warmup.id,
+    title: `Calentamiento: ${warmup.title}`,
+    videoUrl: warmup.videoUrl,
     series: 1,
     reps: '5 min',
-    estSec: 300,
+    estSec: warmupDurationSec,
     muscles: [muscleGroup],
   });
 
   // 2. Main Exercises (45-50 min)
-  // 4-6 exercises, 3-4 series each.
-  // Let's say each set takes 60s + 60s rest = 120s per set.
-  // 4 sets * 120s = 480s (8 min) per exercise.
-  // 6 exercises * 8 min = 48 min. Perfect.
   selectedMain.forEach((ex) => {
     routineExercises.push({
       id: ex.id,
@@ -67,13 +101,13 @@ export const generateAutomaticRoutine = (
       videoUrl: ex.videoUrl,
       series: 4,
       reps: 12,
-      estSec: 480, // 8 minutes total for 4 sets with rest
+      estSec: 480,
       muscles: [ex.muscleGroup],
     });
   });
 
   // 3. Stretching (5-7 min)
-  const selectedStretches = stretchingPool.sort(() => 0.5 - Math.random()).slice(0, 2);
+  const selectedStretches = fisherYates([...stretchingPool]).slice(0, 2);
   selectedStretches.forEach((ex) => {
     routineExercises.push({
       id: ex.id,
@@ -94,5 +128,7 @@ export const generateAutomaticRoutine = (
     exercises: routineExercises,
     totalEstimatedMinutes: Math.ceil(totalSec / 60),
     toolsUsed: selectedTools,
+    toolsRelaxed,
+    relaxedCount,
   };
 };

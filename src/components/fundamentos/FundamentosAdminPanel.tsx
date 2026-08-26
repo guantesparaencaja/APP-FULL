@@ -1,7 +1,6 @@
-import React, { useState, useRef } from 'react';
-import { Upload, X, Plus, Trash2, Edit2, Play, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Plus, Trash2, Edit2, Play, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { uploadVideoToDrive, deleteVideoFromDrive } from '../../lib/driveService';
 import { FundamentosVideo, FundamentosModule } from '../../types/fundamentos.types';
 import { useStore } from '../../store/useStore';
 
@@ -34,11 +33,8 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
     duration: 30,
   });
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'module' | 'video'; id: string; title: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedModule = modules.find(m => m.id === selectedModuleId);
   const moduleVideos = existingVideos.filter(v => v.moduleId === selectedModuleId);
@@ -70,21 +66,15 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
   const handleDeleteModule = async (moduleId: string) => {
     setIsDeleting(moduleId);
     try {
-      // 1. Obtener todos los videos de este módulo
       const { data: videosData } = await supabase
         .from('fundamentos_videos')
         .select('*')
         .eq('moduleId', moduleId);
 
-      // 2. Eliminar videos en Drive y Firestore
       for (const video of (videosData || [])) {
-        if (video.videoUrl) {
-          await deleteVideoFromDrive(video.videoUrl).catch(console.warn);
-        }
         await supabase.from('fundamentos_videos').delete().eq('id', video.id);
       }
 
-      // 3. Eliminar el módulo
       await supabase.from('fundamentos_v4_modules').delete().eq('id', moduleId);
       setConfirmDelete(null);
       alert('✅ Módulo y sus videos eliminados correctamente');
@@ -97,38 +87,10 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
   };
 
   // ─── Videos ───────────────────────────────────────────────────────────────
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    if (file.size > 500 * 1024 * 1024) {
-      alert('Archivo demasiado grande (máx 500MB)');
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      setUploadProgress(0);
-      const driveUrl = await uploadVideoToDrive({
-        video: file,
-        name: `fundamentos_${Date.now()}_${file.name}`,
-        onProgress: (p) => setUploadProgress(p),
-      });
-      setVideoFormData(prev => ({ ...prev, videoUrl: driveUrl }));
-      alert('✅ Video subido a Drive');
-    } catch (err) {
-      console.error(err);
-      alert('❌ Error al subir el video');
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(null);
-    }
-  };
-
   const handleSaveVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!videoFormData.videoUrl || !selectedModuleId || !user) {
-      alert('Debes subir un video primero');
+      alert('Debes ingresar una URL de video');
       return;
     }
 
@@ -165,7 +127,6 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
     setIsDeleting(video.id);
     try {
       await supabase.from('fundamentos_videos').delete().eq('id', video.id);
-      if (video.videoUrl) await deleteVideoFromDrive(video.videoUrl).catch(console.warn);
       setConfirmDelete(null);
       alert('✅ Video eliminado');
     } catch (err) {
@@ -453,34 +414,17 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
                     />
                   </div>
 
-                  {/* Subir Video */}
-                  <div className="p-6 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center gap-4">
-                    {uploadProgress !== null ? (
-                      <div className="w-full space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-[10px] font-black text-primary uppercase">Subiendo a Drive...</span>
-                          <span className="text-lg font-black text-white">{uploadProgress}%</span>
-                        </div>
-                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                          <div className="bg-primary h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload className={`w-10 h-10 ${videoFormData.videoUrl ? 'text-emerald-500' : 'text-slate-700'}`} />
-                        <p className="text-xs font-black text-white italic">
-                          {videoFormData.videoUrl ? '✅ VIDEO LISTO' : 'SUBIR VIDEO'}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                        >
-                          {videoFormData.videoUrl ? 'Cambiar Video' : 'Seleccionar'}
-                        </button>
-                        <input type="file" ref={fileInputRef} className="hidden" accept="video/*" onChange={handleFileUpload} />
-                      </>
-                    )}
+                  {/* URL del Video */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">URL del Video *</label>
+                    <input
+                      type="url"
+                      required
+                      value={videoFormData.videoUrl}
+                      onChange={e => setVideoFormData({ ...videoFormData, videoUrl: e.target.value })}
+                      placeholder="https://drive.google.com/..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white outline-none focus:border-primary transition-all"
+                    />
                   </div>
                 </div>
               </div>
@@ -495,7 +439,7 @@ export function FundamentosAdminPanel({ onClose, existingVideos, modules }: Prop
                 </button>
                 <button
                   type="submit"
-                  disabled={isUploading || !videoFormData.videoUrl}
+                  disabled={!videoFormData.videoUrl}
                   className="px-12 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl disabled:opacity-50 hover:bg-primary/90 transition-all"
                 >
                   {editingVideoId ? 'Guardar Cambios' : 'Publicar Video'}

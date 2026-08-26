@@ -43,10 +43,23 @@ export function Login() {
     setLoading(true);
     setError('');
     try {
-      await signIn(email, password);
+      const authUser = await signIn(email, password);
       trackEvent('login', { method: 'password' });
-      // App.tsx onAuthStateChange se dispara y carga el perfil → navega automáticamente
-      navigate('/');
+
+      // Check if must_change_password flag is set
+      const { supabase } = await import('../lib/supabase');
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('must_change_password')
+        .eq('id', authUser.id)
+        .single();
+
+      if (profile?.must_change_password) {
+        navigate('/reset-password');
+      } else {
+        // App.tsx onAuthStateChange se dispara y carga el perfil → navega automáticamente
+        navigate('/');
+      }
     } catch (err: any) {
       console.error('[Login] Error:', err);
       const msg = err.message || '';

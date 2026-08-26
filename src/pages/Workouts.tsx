@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import {
-  Dumbbell, Play, Clock, ArrowLeft, Upload, Home, X, Plus, Trash2,
+  Dumbbell, Play, Clock, ArrowLeft, Home, X, Plus, Trash2,
   Video, Search, RefreshCw, ChevronRight, AlertCircle, Loader2,
   Settings, Info, CheckSquare, Target, Filter, Download, Shield,
   SlidersHorizontal, ChevronDown, BarChart2, Heart, LayoutGrid, List,
@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Reveal } from '../components/Reveal';
 import { PageHeader } from '../components/PageHeader';
 import { staggerContainer, staggerItem, liftCard, scaleIn } from '../lib/animations';
-import { uploadVideoToDrive, hardDeleteVideo, approveVideoWithAudit } from '../lib/driveService';
+import { hardDeleteVideo, approveVideoWithAudit } from '../lib/driveService';
 import { supabase } from '../lib/supabase';
 import { getYouTubeEmbedUrl } from '../services/geminiService';
 import { Modal } from '../components/Modal';
@@ -72,7 +72,6 @@ export function Workouts() {
     tipo: 'boxeo', objetivo: 'General', video_url: '',
   });
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [overallProgress, setOverallProgress] = useState(0);
 
@@ -279,7 +278,6 @@ export function Workouts() {
       tipo: 'boxeo', objetivo: 'General', video_url: '',
     });
     setCoverFile(null);
-    setVideoFile(null);
   };
 
   const handleFileUpload = async (file: File, path: string): Promise<string> => {
@@ -296,7 +294,7 @@ export function Workouts() {
     const missing = [];
     if (!uploadForm.title) missing.push('Título');
     if (!uploadForm.categoryId) missing.push('Categoría');
-    if (!videoFile && !editingVideo?.video_url && !uploadForm.video_url) missing.push('Video');
+    if (!uploadForm.video_url && !editingVideo?.video_url) missing.push('Video');
     if (missing.length) { alert(`Completa: ${missing.join(', ')}`); return; }
 
     setIsUploading(true);
@@ -310,14 +308,6 @@ export function Workouts() {
       }
 
       let currentVideoUrl = uploadForm.video_url || editingVideo?.video_url || '';
-      if (videoFile) {
-        setOverallProgress(50);
-        currentVideoUrl = await uploadVideoToDrive({
-          video: videoFile,
-          name: `workout_${Date.now()}_${videoFile.name}`,
-          onProgress: (p) => setOverallProgress(50 + p / 2),
-        });
-      }
 
       let finalCategoryId = uploadForm.categoryId;
       const existingCat = categories.find((c) => c.id === finalCategoryId || c.name.toLowerCase() === finalCategoryId.toLowerCase());
@@ -564,10 +554,6 @@ export function Workouts() {
               onChange={(e) => setUploadForm({ ...uploadForm, video_url: e.target.value })}
               placeholder="https://apilyfta.com/... o YouTube..."
               className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:border-primary outline-none"
-            />
-            <input type="file" accept="video/*"
-              onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-              className="text-xs file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 w-full text-slate-500"
             />
           </div>
           {isUploading && (

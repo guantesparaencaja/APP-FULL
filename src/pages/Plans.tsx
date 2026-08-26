@@ -278,6 +278,7 @@ export function Plans() {
 
   const simulateAdminApproval = async () => {
     if (!user || !selectedPlan) return;
+    // Solo admins pueden usar esta función (ahora no está en UI, solo disponible para debug)
     try {
       await supabase.from('profiles').update({ plan_status: 'active' }).eq('id', user.id);
       setCurrentStep(5);

@@ -82,13 +82,18 @@ export function WorkoutPlans() {
   // ─── Load plans ────────────────────────────────────────────────────────────
   const loadPlans = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const isAdmin = user?.role === 'admin';
+    let query = supabase
       .from('workout_plans')
       .select('*')
       .order('created_at', { ascending: false });
+    if (!isAdmin) {
+      query = query.eq('is_published', true);
+    }
+    const { data } = await query;
     setPlans(data || []);
     setLoading(false);
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
 

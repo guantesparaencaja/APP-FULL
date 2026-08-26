@@ -11,7 +11,9 @@ export function PaymentReview() {
 
   if (!user) return null;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const { supabase } = await import('../lib/supabase');
+    await supabase.auth.signOut();
     setUser(null);
     navigate('/login');
   };

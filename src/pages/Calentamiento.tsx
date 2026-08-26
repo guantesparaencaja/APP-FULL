@@ -6,7 +6,6 @@ import {
   CheckCircle,
   Loader2,
   Video,
-  Upload,
   Settings,
   AlertCircle,
   ShieldCheck,
@@ -14,7 +13,6 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
-import { uploadVideoToDrive } from '../lib/driveService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Reveal } from '../components/Reveal';
 import { PageHeader } from '../components/PageHeader';
@@ -41,9 +39,6 @@ export const Calentamiento: React.FC = () => {
     videoUrl: '',
   });
 
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -67,22 +62,14 @@ export const Calentamiento: React.FC = () => {
     if (!user) return;
     setSaving(true); setSaveError(null);
     try {
-      let finalUrl = editForm.videoUrl;
-      if (videoFile) {
-        setUploading(true);
-        finalUrl = await uploadVideoToDrive({
-          video: videoFile,
-          name: `calentamiento_${user.id}_${videoFile.name}`,
-          onProgress: (p) => setUploadProgress(p),
-        });
-      }
-      if (!finalUrl && !videoFile) throw new Error('Debes subir un video para guardar la configuración.');
+      const finalUrl = editForm.videoUrl;
+      if (!finalUrl) throw new Error('Debes ingresar una URL de video para guardar la configuración.');
       await supabase.from('configuracion').upsert({ id: 'calentamiento', tipo: 'storage', videoUrl: finalUrl, titulo: editForm.titulo, descripcion: editForm.descripcion, duracion: editForm.duracion, updated_at: new Date().toISOString(), updated_by: user.email });
-      setVideoFile(null); setUploadProgress(0); setUploading(false); setSaveSuccess(true);
+      setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
       setSaveError('Error: ' + (err.message || 'Error al procesar el video'));
-    } finally { setSaving(false); setUploading(false); }
+    } finally { setSaving(false); }
   };
 
   const handleDeleteVideo = async () => {
@@ -227,69 +214,17 @@ export const Calentamiento: React.FC = () => {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-6">
-                  {/* Selector de Video */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                      Archivo de Video (MP4)
+                      URL del Video
                     </label>
                     <input
-                      type="file"
-                      id="video-upload-admin"
-                      accept="video/*"
-                      onChange={(e) => e.target.files?.[0] && setVideoFile(e.target.files[0])}
-                      className="hidden"
+                      type="url"
+                      value={editForm.videoUrl}
+                      onChange={(e) => setEditForm({ ...editForm, videoUrl: e.target.value })}
+                      placeholder="https://drive.google.com/..."
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-sm focus:border-primary outline-none text-slate-900 dark:text-white font-medium"
                     />
-                    <label
-                      htmlFor="video-upload-admin"
-                      className={`w-full aspect-video rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-4 cursor-pointer relative overflow-hidden
-                        ${videoFile ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 hover:border-primary/50'}
-                      `}
-                    >
-                      {videoFile ? (
-                        <div className="text-center animate-in zoom-in-95">
-                          <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                            <Video className="w-8 h-8 text-primary" />
-                          </div>
-                          <p className="text-sm font-black text-slate-800 dark:text-white px-4 truncate max-w-[200px]">
-                            {videoFile.name}
-                          </p>
-                          <p className="text-[10px] font-black text-slate-500 uppercase mt-1">
-                            {(videoFile.size / 1024 / 1024).toFixed(1)} MB
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-center group-hover:scale-105 transition-transform flex flex-col items-center">
-                          {videoConfig?.videoUrl ? (
-                            <div className="relative">
-                              <Video className="w-10 h-10 text-primary mx-auto mb-3 opacity-50" />
-                              <div className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full">
-                                <CheckCircle className="w-3 h-3" />
-                              </div>
-                            </div>
-                          ) : (
-                            <Upload className="w-10 h-10 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-                          )}
-                          <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                            {videoConfig?.videoUrl ? 'Cambiar Video Actual' : 'Seleccionar Video'}
-                          </p>
-                        </div>
-                      )}
-
-                      {uploading && (
-                        <div className="absolute inset-0 bg-white/90 dark:bg-slate-950/90 flex flex-col items-center justify-center p-8 backdrop-blur-sm">
-                          <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
-                          <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
-                            <div
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{ width: `${uploadProgress}%` }}
-                            />
-                          </div>
-                          <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-                            Subiendo: {uploadProgress}%
-                          </p>
-                        </div>
-                      )}
-                    </label>
                   </div>
                 </div>
 
@@ -363,7 +298,7 @@ export const Calentamiento: React.FC = () => {
                   <div className="flex gap-4">
                     <button
                       onClick={handleSaveVideo}
-                      disabled={saving || uploading}
+                      disabled={saving}
                       className="btn-press flex-[2] bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-black uppercase tracking-widest py-5 rounded-[1.5rem] disabled:opacity-20 transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-3 border border-slate-800 dark:border-slate-200 shadow-xl"
                     >
                       {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : '💾 Publicar Video'}
@@ -372,7 +307,7 @@ export const Calentamiento: React.FC = () => {
                     {videoConfig?.videoUrl && (
                       <button aria-label="Eliminar"
                         onClick={handleDeleteVideo}
-                        disabled={saving || uploading}
+                        disabled={saving}
                         className="btn-press flex-1 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white py-5 rounded-[1.5rem] border border-red-500/20 text-[10px] font-black uppercase tracking-widest transition-all"
                       >
                         <Trash2 className="w-5 h-5 mx-auto" />
