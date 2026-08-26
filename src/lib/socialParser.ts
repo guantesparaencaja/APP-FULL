@@ -26,14 +26,15 @@ const PATTERNS: { platform: SocialPlatform; regex: RegExp; extract: (m: RegExpMa
   {
     platform: 'instagram',
     regex: /instagram\.com\/(?:p|reel|reels)\/([\w-]+)/i,
-    extract: (m) => `https://www.instagram.com/embed/${m[1]}/`,
+    extract: (m) => `https://www.instagram.com/p/${m[1]}/embed/`,
   },
   {
     platform: 'facebook',
     regex: /facebook\.com\/.*?\/videos\/(\d+)|fb\.watch\/([\w-]+)/i,
     extract: (m) => {
       const id = m[1] || m[2];
-      return `https://www.facebook.com/plugins/video.php?href=https://www.facebook.com/video/${id}`;
+      const videoHref = encodeURIComponent(`https://www.facebook.com/video/${id}`);
+      return `https://www.facebook.com/plugins/video.php?href=${videoHref}`;
     },
   },
 ];

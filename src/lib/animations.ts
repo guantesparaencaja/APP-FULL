@@ -1,9 +1,8 @@
 /**
  * animations.ts — Variantes de animación reutilizables (Framer Motion).
- * Usa estas variantes en todas las secciones para mantener una
- * identidad de movimiento consistente en toda la app.
+ * Incluye variantes reducidas para prefers-reduced-motion.
  */
-import type { Variants, Transition } from 'motion/react';
+import { useReducedMotion, type Variants, type Transition } from 'motion/react';
 
 export const spring: Transition = { type: 'spring', stiffness: 260, damping: 24 };
 export const springSoft: Transition = { type: 'spring', stiffness: 180, damping: 22 };
@@ -60,3 +59,12 @@ export const pageTransition: Variants = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
   exit: { opacity: 0, y: -12, transition: { duration: 0.2, ease: 'easeIn' } },
 };
+
+/** Hook que retorna transiciones reducidas (sin movimiento) cuando el OS lo pide. */
+export function useReducedMotionVariants() {
+  const prefersReduced = useReducedMotion();
+  return {
+    prefersReduced,
+    instant: { duration: prefersReduced ? 0 : undefined },
+  };
+}

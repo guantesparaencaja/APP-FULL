@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Dumbbell, Clock, ChevronRight, ArrowLeft, Play, Loader2,
-  Plus, Eye, EyeOff, Trash2, Edit2, Users, CheckCircle2, X, Search,
+  Plus, Eye, EyeOff, Trash2, Edit2, Users, CheckCircle2, X, Search, Check,
   Target, Flame, AlertCircle,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -288,6 +288,7 @@ export function Boxing() {
   // Active exercise (for rest timer)
   const [activeExercise, setActiveExercise] = useState<Exercise | null>(null);
   const [showRestTimer, setShowRestTimer] = useState(false);
+  const [exerciseStartedToast, setExerciseStartedToast] = useState<Exercise | null>(null);
 
   // Video preview (expand to play on demand, keeps detail ligero)
   const [previewExercise, setPreviewExercise] = useState<Exercise | null>(null);
@@ -396,7 +397,13 @@ export function Boxing() {
   // ─── Active exercise detail: select and show timer ─────────────────────────
   const startExercise = (exercise: Exercise) => {
     setActiveExercise(exercise);
-    if (exercise.rest_seconds > 0) setShowRestTimer(true);
+    if (exercise.rest_seconds > 0) {
+      setShowRestTimer(true);
+    } else {
+      setShowRestTimer(false);
+      setExerciseStartedToast(exercise);
+      setTimeout(() => setExerciseStartedToast(null), 2000);
+    }
   };
 
   // ─── Calculate total exercises ─────────────────────────────────────────────
@@ -685,6 +692,21 @@ export function Boxing() {
                       <Play className="w-4 h-4" /> Iniciar con descanso
                     </button>
                   </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Exercise started toast (no rest) */}
+            <AnimatePresence>
+              {exerciseStartedToast && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                  className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-5 py-3 rounded-2xl shadow-xl shadow-emerald-500/20 flex items-center gap-2 font-bold text-sm"
+                >
+                  <Check className="w-4 h-4" />
+                  Ejercicio iniciado: {exerciseStartedToast.name}
                 </motion.div>
               )}
             </AnimatePresence>

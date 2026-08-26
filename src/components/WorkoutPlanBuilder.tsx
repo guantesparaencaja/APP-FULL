@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Plus, Trash2, GripVertical, Save, Eye, EyeOff, ChevronDown, ChevronUp,
+  Plus, Trash2, Save, Eye, EyeOff, ChevronDown, ChevronUp,
   Video, Dumbbell, Clock, AlertCircle, Loader2, Check, Link2, X,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -153,45 +153,109 @@ export function WorkoutPlanBuilder({ existingPlan, onSaved, onCancel }: WorkoutP
       if (planId) {
         const { error: e1 } = await supabase.from('workout_plans').update(planPayload).eq('id', planId);
         if (e1) throw e1;
-        // Remove old sections/exercises
-        await supabase.from('workout_exercises').delete().in('section_id',
-          sections.filter(s => s.id && !s.id.startsWith('local_')).map(s => s.id)
-        );
-        await supabase.from('workout_sections').delete().eq('plan_id', planId);
-      } else {
-        const { data, error: e1 } = await supabase.from('workout_plans').insert(planPayload).select('id').single();
-        if (e1) throw e1;
-        planId = data!.id;
-      }
 
-      // Insert sections + exercises
-      for (let si = 0; si < sections.length; si++) {
-        const sec = sections[si];
-        const { data: secData, error: se } = await supabase
-          .from('workout_sections')
-          .insert({ plan_id: planId, title: sec.title, order_index: si })
-          .select('id')
-          .single();
-        if (se) throw se;
+        // Diferencial: comparar secciones y ejercicios existentes con los locales
+        const { data: existingSections } = await supabase
+          .from('workout_sections').select('id').eq('plan_id', planId);
 
-        if (sec.exercises.length > 0) {
+        const existingSectionIds = new Set((existingSections || []).map(s => s.id));
+        const localSectionIds = new Set(sections.filter(s => !s.id.startsWith('local_')).map(s => s.id));
+
+        // Borrar secciones que ya no existen en el editor
+        for (const oldId of existingSectionIds) {
+          if (!localSectionIds.has(oldId)) {
+            await supabase.from('workout_exercises').delete().eq('section_id', oldId);
+            await supabase.from('workout_sections').delete().eq('id', oldId);
+          }
+        }
+
+        // Upsert secciones y ejercicios
+        for (let si = 0; si < sections.length; si++) {
+          const sec = sections[si];
+          let secId = sec.id;
+
+          if (secId.startsWith('local_')) {
+            const { data: newSec, error: se } = await supabase
+              .from('workout_sections')
+              .insert({ plan_id: planId, title: sec.title, order_index: si })
+              .select('id').single();
+            if (se) throw se;
+            secId = newSec!.id;
+          } else {
+            const { error: se } = await supabase
+              .from('workout_sections')
+              .update({ title: sec.title, order_index: si })
+              .eq('id', secId);
+            if (se) throw se;
+
+            // Borrar ejercicios que ya no existen en esta sección
+            const { data: existingExs } = await supabase
+              .from('workout_exercises').select('id').eq('section_id', secId);
+            const existingExIds = new Set((existingExs || []).map(e => e.id));
+            const localExIds = new Set(sec.exercises.filter(e => !e.id.startsWith('local_')).map(e => e.id));
+            for (const oldExId of existingExIds) {
+              if (!localExIds.has(oldExId)) {
+                await supabase.from('workout_exercises').delete().eq('id', oldExId);
+              }
+            }
+          }
+
+          // Upsert ejercicios de esta sección
           const exercises = sec.exercises
             .filter(e => e.name.trim() !== '')
             .map((e, ei) => ({
-              section_id: secData!.id,
+              section_id: secId,
               name: e.name.trim(),
               description: e.description.trim(),
-              sets: e.sets,
+              sets: Math.max(1, Math.floor(Number.isFinite(e.sets) ? e.sets : 1)),
               reps: e.reps.trim(),
-              rest_seconds: e.rest_seconds,
+              rest_seconds: Math.max(0, Math.floor(Number.isFinite(e.rest_seconds) ? e.rest_seconds : 0)),
               video_url: e.video_url.trim(),
               notes: e.notes.trim(),
               equipment: e.equipment.trim(),
               order_index: ei,
             }));
-          if (exercises.length > 0) {
-            const { error: ee } = await supabase.from('workout_exercises').insert(exercises);
-            if (ee) throw ee;
+
+          for (const ex of exercises) {
+            if (ex.name) {
+              const { error: ee } = await supabase.from('workout_exercises').upsert(ex, { onConflict: 'id' });
+              if (ee) throw ee;
+            }
+          }
+        }
+      } else {
+        const { data, error: e1 } = await supabase.from('workout_plans').insert(planPayload).select('id').single();
+        if (e1) throw e1;
+        planId = data!.id;
+
+        // Insert secciones + ejercicios (nuevo plan, todo es local)
+        for (let si = 0; si < sections.length; si++) {
+          const sec = sections[si];
+          const { data: secData, error: se } = await supabase
+            .from('workout_sections')
+            .insert({ plan_id: planId, title: sec.title, order_index: si })
+            .select('id').single();
+          if (se) throw se;
+
+          if (sec.exercises.length > 0) {
+            const exercises = sec.exercises
+              .filter(e => e.name.trim() !== '')
+              .map((e, ei) => ({
+                section_id: secData!.id,
+                name: e.name.trim(),
+                description: e.description.trim(),
+                sets: Math.max(1, Math.floor(Number.isFinite(e.sets) ? e.sets : 1)),
+                reps: e.reps.trim(),
+                rest_seconds: Math.max(0, Math.floor(Number.isFinite(e.rest_seconds) ? e.rest_seconds : 0)),
+                video_url: e.video_url.trim(),
+                notes: e.notes.trim(),
+                equipment: e.equipment.trim(),
+                order_index: ei,
+              }));
+            if (exercises.length > 0) {
+              const { error: ee } = await supabase.from('workout_exercises').insert(exercises);
+              if (ee) throw ee;
+            }
           }
         }
       }
@@ -389,7 +453,14 @@ interface ExerciseRowProps {
 
 function ExerciseRow({ exercise, index, onChange, onRemove, canRemove, ...rest }: ExerciseRowProps & { key?: React.Key }) {
   const [showVideo, setShowVideo] = useState(false);
+  const [videoInput, setVideoInput] = useState(exercise.video_url);
   const parsed = exercise.video_url ? parseSocialUrl(exercise.video_url) : null;
+
+  // Debounce video URL update
+  useEffect(() => {
+    const t = setTimeout(() => { if (videoInput !== exercise.video_url) onChange({ video_url: videoInput }); }, 400);
+    return () => clearTimeout(t);
+  }, [videoInput]);
 
   return (
     <motion.div
@@ -420,7 +491,10 @@ function ExerciseRow({ exercise, index, onChange, onRemove, canRemove, ...rest }
         <div>
           <label className="text-[10px] font-bold text-slate-400 uppercase">Series</label>
           <input type="number" value={exercise.sets} min={1} max={20}
-            onChange={e => onChange({ sets: +e.target.value })}
+            onChange={e => {
+              const v = Number(e.target.value);
+              onChange({ sets: Number.isFinite(v) && v >= 1 ? Math.floor(v) : 1 });
+            }}
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
         </div>
@@ -457,13 +531,13 @@ function ExerciseRow({ exercise, index, onChange, onRemove, canRemove, ...rest }
                 <Link2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <input
                   type="url"
-                  value={exercise.video_url}
-                  onChange={e => onChange({ video_url: e.target.value })}
+                  value={videoInput}
+                  onChange={e => setVideoInput(e.target.value)}
                   placeholder="Pega URL de YouTube, TikTok, Instagram..."
                   className="flex-1 bg-transparent text-xs text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-300"
                 />
-                {exercise.video_url && (
-                  <button type="button" onClick={() => onChange({ video_url: '' })}
+                {videoInput && (
+                  <button type="button" onClick={() => { setVideoInput(''); onChange({ video_url: '' }); }}
                     className="p-0.5 text-slate-400 hover:text-red-500"
                   >
                     <X className="w-3 h-3" />

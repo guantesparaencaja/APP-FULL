@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Dumbbell, Clock, ChevronRight, ArrowLeft, Play, Pause, Star,
+  Dumbbell, Clock, ChevronRight, ArrowLeft, Play,
   Plus, Settings, Loader2, AlertCircle, Eye, EyeOff, Trash2, Edit2,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -16,7 +16,7 @@ import { SocialVideoEmbed } from '../components/SocialVideoEmbed';
 import { RestTimer } from '../components/RestTimer';
 import { WorkoutPlanBuilder } from '../components/WorkoutPlanBuilder';
 import { staggerContainer, staggerItem, liftCard } from '../lib/animations';
-import { platformLabel } from '../lib/socialParser';
+import { platformLabel, platformColor } from '../lib/socialParser';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -246,7 +246,7 @@ export function WorkoutPlans() {
                               <h4 className="font-bold text-sm text-slate-900 dark:text-white">{exercise.name}</h4>
                               {exercise.video_url && (
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black text-white"
-                                  style={{ backgroundColor: platformLabel(exercise.video_url.includes('youtube') ? 'youtube' : exercise.video_url.includes('tiktok') ? 'tiktok' : exercise.video_url.includes('instagram') ? 'instagram' : 'unknown') ? undefined : '#6B7280' }}
+                                  style={{ backgroundColor: platformColor(exercise.video_url.includes('youtube') ? 'youtube' : exercise.video_url.includes('tiktok') ? 'tiktok' : exercise.video_url.includes('instagram') ? 'instagram' : 'unknown') }}
                                 >
                                   VIDEO
                                 </span>

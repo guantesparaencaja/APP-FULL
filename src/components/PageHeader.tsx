@@ -1,8 +1,8 @@
 /**
  * PageHeader.tsx — Encabezado de página consistente y animado.
- * Uso: <PageHeader emoji="🥊" title="Entrenos" subtitle="..."/>
+ * Respeta prefers-reduced-motion.
  */
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import React from 'react';
 
 interface PageHeaderProps {
@@ -13,6 +13,27 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ emoji, title, subtitle, right }: PageHeaderProps) {
+  const prefersReduced = useReducedMotion();
+
+  if (prefersReduced) {
+    return (
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          {emoji && <span className="text-3xl leading-none" aria-hidden>{emoji}</span>}
+          <div>
+            <h1 className="font-black uppercase italic tracking-tighter text-2xl sm:text-3xl text-slate-900 dark:text-white">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>
+            )}
+          </div>
+        </div>
+        {right && <div className="shrink-0">{right}</div>}
+      </header>
+    );
+  }
+
   return (
     <motion.header
       initial={{ opacity: 0, y: 16 }}

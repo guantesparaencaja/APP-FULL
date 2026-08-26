@@ -22,7 +22,7 @@ import { twMerge } from 'tailwind-merge';
 import { OnboardingModal } from './OnboardingModal';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { pageTransition } from '../lib/animations';
 import { NotificationsPanel } from './NotificationsPanel';
 const MIN_SWIPE_DISTANCE = 50;
@@ -33,6 +33,7 @@ let touchStartTime = 0;
 
 export function Layout() {
   const location = useLocation();
+  const prefersReduced = useReducedMotion();
   const user = useStore((state) => state.user);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -273,10 +274,10 @@ export function Layout() {
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              variants={pageTransition}
-              initial="initial"
-              animate="animate"
-              exit="exit"
+              variants={prefersReduced ? undefined : pageTransition}
+              initial={prefersReduced ? false : 'initial'}
+              animate={prefersReduced ? { opacity: 1 } : 'animate'}
+              exit={prefersReduced ? undefined : 'exit'}
             >
               <Outlet />
             </motion.div>

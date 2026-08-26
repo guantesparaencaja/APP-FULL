@@ -1,20 +1,25 @@
 /**
  * Reveal.tsx — Envuelve contenido para revelarlo con scroll (whileInView).
- * Uso: <Reveal delay={0.1}><div>...</div></Reveal>
+ * Respeta prefers-reduced-motion.
  */
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import React from 'react';
 
 interface RevealProps {
   children: React.ReactNode;
   delay?: number;
   className?: string;
-  /** Dirección de entrada */
   direction?: 'up' | 'down' | 'left' | 'right' | 'none';
 }
 
 export function Reveal({ children, delay = 0, className, direction = 'up' }: RevealProps) {
+  const prefersReduced = useReducedMotion();
   const offset = 24;
+
+  if (prefersReduced) {
+    return <div className={className}>{children}</div>;
+  }
+
   const variants = {
     hidden: {
       opacity: 0,

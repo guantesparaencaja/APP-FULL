@@ -74,7 +74,7 @@ export function SocialVideoEmbed({ url, title, className = '', maxHeight = 500 }
       className={`relative w-full overflow-hidden rounded-xl bg-black ${className}`}
       style={{ maxHeight }}
     >
-      <div className={`w-full ${aspectRatio} max-h-[${maxHeight}px]`}>
+      <div className={`w-full ${aspectRatio}`} style={{ maxHeight }}>
         <iframe
           src={parsed.embedUrl}
           title={title || `${platformLabel(parsed.platform)} video`}
@@ -82,8 +82,14 @@ export function SocialVideoEmbed({ url, title, className = '', maxHeight = 500 }
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
           loading="lazy"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           onError={() => setLoadError(true)}
+          onLoad={(e) => {
+            const iframe = e.currentTarget;
+            setTimeout(() => {
+              try { if (iframe.contentWindow?.document.body?.innerHTML === '') setLoadError(true); } catch {}
+            }, 5000);
+          }}
         />
       </div>
 
