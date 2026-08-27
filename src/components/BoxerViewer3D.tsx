@@ -9,7 +9,8 @@ function BoxerModel({ url }: { url: string }) {
   useFrame((_, delta) => {
     if (ref.current) ref.current.rotation.y += delta * 0.3;
   });
-  return <primitive ref={ref} object={scene} scale={1.5} position={[0, -1, 0]} />;
+  // Escala normalizada para el bbox del scan (alto ~1.03 unidades)
+  return <primitive ref={ref} object={scene} scale={2.2} position={[0, -0.9, 0]} />;
 }
 
 function LoadingFallback() {
@@ -51,4 +52,4 @@ export function BoxerViewer3D({ glbUrl, height = '400px' }: Props) {
   );
 }
 
-useGLTF.preload = useGLTF.preload || (() => {});
+

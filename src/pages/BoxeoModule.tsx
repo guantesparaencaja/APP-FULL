@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 import { BoxerAnimatedHero } from '../components/BoxerAnimatedHero';
+import { BoxerViewer3D } from '../components/BoxerViewer3D';
 
 interface BoxeoVideo {
   id: string;
@@ -533,6 +534,22 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
               </div>
             </div>
           </div>
+        </div>
+      </motion.div>
+
+      {/* Viewer 3D interactivo */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}
+        className="mx-4 mb-6">
+        <div className="rounded-3xl overflow-hidden border border-white/5 relative">
+          <div className="absolute top-3 left-4 z-10 flex items-center gap-2 pointer-events-none">
+            <span className="px-3 py-1 bg-white/10 backdrop-blur-sm text-white text-[10px] font-black rounded-lg uppercase tracking-widest border border-white/10">
+              Tu Boxeador 3D
+            </span>
+          </div>
+          <BoxerViewer3D glbUrl="/modelo3D.glb" height="360px" />
+          <p className="absolute bottom-3 right-4 z-10 text-[10px] font-bold text-white/40 pointer-events-none">
+            Arrastra para rotar
+          </p>
         </div>
       </motion.div>
 
