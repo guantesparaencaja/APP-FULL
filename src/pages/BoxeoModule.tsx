@@ -27,6 +27,9 @@ interface BoxeoVideo {
   creado_en?: any;
 }
 
+// Modelo 3D del boxeador, alojado en Google Drive (carpeta "3D Modelos")
+const MODELO_3D_URL = 'https://drive.usercontent.google.com/download?id=1ZS-6G_38Uh4oBFH5khqSKmZphDcEo7u7&export=download';
+
 const SUBCATEGORIAS = [
   { id: 'Tecnica-Basica',  label: 'Tecnica Basica',    icon: '\u{1F94A}', color: 'from-red-500/80 to-red-700/80',     glow: 'shadow-red-500/20',     desc: 'Golpes fundamentales del boxeo',      min_level: 1 },
   { id: 'Calentamiento',   label: 'Calentamiento',      icon: '\u{1F525}', color: 'from-pink-500/80 to-pink-700/80',   glow: 'shadow-pink-500/20',    desc: 'Movilidad y estiramiento',            min_level: 1 },
@@ -546,7 +549,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
               Tu Boxeador 3D
             </span>
           </div>
-          <BoxerViewer3D glbUrl="/modelo3D.glb" height="360px" />
+          <BoxerViewer3D glbUrl={MODELO_3D_URL} height="360px" />
           <p className="absolute bottom-3 right-4 z-10 text-[10px] font-bold text-white/40 pointer-events-none">
             Arrastra para rotar
           </p>
