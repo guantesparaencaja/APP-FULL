@@ -153,12 +153,13 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const handleMarkWatched = async (videoId: string) => {
     if (!user || watchedIds.has(videoId)) return;
     setWatchedIds(prev => new Set([...prev, videoId]));
-    await supabase.from('video_progress').upsert({ user_id: user.id, video_id: videoId }, { onConflict: 'user_id,video_id' });
+    const { error } = await supabase.from('video_progress').upsert({ user_id: user.id, video_id: videoId }, { onConflict: 'user_id,video_id' });
+    if (error) setWatchedIds(prev => { const next = new Set(prev); next.delete(videoId); return next; });
   };
 
   const [seedMsg, setSeedMsg] = useState('');
   const handleSeed = async () => {
-    if (seeding) return;
+    if (!isAdmin || seeding) return;
     setSeeding(true);
     try {
       if (videos.length === 0) {
@@ -173,7 +174,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
 
   const seedRunRef = useRef(false);
   useEffect(() => {
-    if (!loading && !seedRunRef.current) { seedRunRef.current = true; handleSeed(); }
+    if (isAdmin && !loading && !seedRunRef.current) { seedRunRef.current = true; handleSeed(); }
   }, [loading, isAdmin]);
 
   const handleHide = async (video: BoxeoVideo) => {
@@ -201,12 +202,13 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
         ...addForm,
         puntos_clave: typeof addForm.puntos_clave === 'string' ? addForm.puntos_clave.split('\n').map(s => s.trim()).filter(Boolean) : addForm.puntos_clave,
         errores_comunes: typeof addForm.errores_comunes === 'string' ? addForm.errores_comunes.split('\n').map(s => s.trim()).filter(Boolean) : addForm.errores_comunes,
-        updated_at: new Date().toISOString(),
       };
       if (editingVideoId) {
-        await supabase.from('boxeo_videos').update(data).eq('id', editingVideoId);
+        const { error } = await supabase.from('boxeo_videos').update(data).eq('id', editingVideoId);
+        if (error) throw error;
       } else {
-        await supabase.from('boxeo_videos').insert({ ...data, activo: true, orden: 999, created_at: new Date().toISOString() });
+        const { error } = await supabase.from('boxeo_videos').insert({ ...data, activo: true, orden: 999, creado_en: new Date().toISOString() });
+        if (error) throw error;
       }
       setShowAddModal(false); setEditingVideoId(null); setAddForm(defaultForm); setPickedVideo(null);
     } catch (err: any) { alert('Error: ' + err.message); }
@@ -227,12 +229,14 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
   };
 
   const handleToggleActive = async (v: BoxeoVideo) => {
-    await supabase.from('boxeo_videos').update({ activo: !v.activo }).eq('id', v.id);
+    const { error } = await supabase.from('boxeo_videos').update({ activo: !v.activo }).eq('id', v.id);
+    if (error) alert('Error al actualizar video: ' + error.message);
   };
 
   const handleDelete = async (v: BoxeoVideo) => {
     if (!confirm('Eliminar este video permanentemente?')) return;
-    await supabase.from('boxeo_videos').delete().eq('id', v.id);
+    const { error } = await supabase.from('boxeo_videos').delete().eq('id', v.id);
+    if (error) alert('Error al eliminar video: ' + error.message);
   };
 
   const visibleVideos = videos.filter(v => {
@@ -263,7 +267,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
     }, {});
   }, [visibleVideos, watchedIds]);
 
-  const totalWatched = watchedIds.size;
+  const totalWatched = visibleVideos.filter(v => watchedIds.has(v.id)).length;
   const totalVisible = visibleVideos.length;
   const overallProgress = totalVisible > 0 ? Math.round((totalWatched / totalVisible) * 100) : 0;
 

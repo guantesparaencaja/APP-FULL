@@ -278,22 +278,18 @@ export function Calendar() {
       const timeStr = `${selectedTime.start_time} - ${selectedTime.end_time}`;
       const status = isManualPayment ? 'pending_payment' : 'active';
 
-      const { error: insertError } = await supabase.from('bookings').insert({
-        user_id: String(targetUser.id),
-        user_name: targetUser.name,
-        user_email: targetUser.email || '',
-        class_id: selectedTime.id,
-        date: dateStr,
-        time: timeStr,
-        status,
-        created_at: new Date().toISOString(),
+      const { error: insertError } = await supabase.rpc('book_class', {
+        p_class_id: selectedTime.id,
+        p_date: dateStr,
+        p_time: timeStr,
+        p_user_id: targetUser.id,
+        p_status: status,
       });
 
       if (insertError) throw insertError;
 
       if (status === 'active') {
         const newRemaining = Math.max(0, (targetUser.classes_remaining || 0) - 1);
-        await supabase.from('profiles').update({ classes_remaining: newRemaining }).eq('id', targetUser.id);
         if (targetUser.id === user?.id) setUser({ ...user!, classes_remaining: newRemaining });
 
         try {
@@ -320,14 +316,10 @@ export function Calendar() {
     try {
       const { data: bookingData } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
       if (bookingData) {
-        await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
-        if (bookingData.status === 'active') {
-          const { data: profileData } = await supabase.from('profiles').select('classes_remaining').eq('id', bookingData.user_id).single();
-          if (profileData) {
-            const newRemaining = (profileData.classes_remaining || 0) + 1;
-            await supabase.from('profiles').update({ classes_remaining: newRemaining }).eq('id', bookingData.user_id);
-            if (bookingData.user_id === user?.id) setUser({ ...user!, classes_remaining: newRemaining });
-          }
+        const { error: cancelError } = await supabase.rpc('cancel_booking', { p_booking_id: bookingId });
+        if (cancelError) throw cancelError;
+        if (bookingData.status === 'active' && bookingData.user_id === user?.id) {
+          setUser({ ...user!, classes_remaining: (user.classes_remaining || 0) + 1 });
         }
         try {
           const cancelHtml = `<div style="font-family:Arial,sans-serif;padding:32px;background:#0f172a;color:#f1f5f9;border-radius:16px;"><h2 style="color:#ef4444;">❌ Clase Cancelada</h2><p>Tu reserva para el <strong>${bookingData.date}</strong> a las <strong>${bookingData.time}</strong> ha sido cancelada. La clase fue devuelta a tu plan.</p></div>`;

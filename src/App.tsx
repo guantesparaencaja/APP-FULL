@@ -125,7 +125,9 @@ function ProtectedRoute({
 }
 
 export default function App() {
+  const user = useStore((state) => state.user);
   const theme = useStore((state) => state.theme);
+  const userId = user?.id;
   const setUser = useStore((state) => state.setUser);
   const [loading, setLoading] = useState(true);
   const [showVersionModal, setShowVersionModal] = useState(false);
@@ -263,14 +265,13 @@ export default function App() {
 
   // ── Suscripción realtime al perfil del usuario actual ────────────────────
   useEffect(() => {
-    const currentUser = useStore.getState().user;
-    if (!currentUser?.id) return;
+    if (!userId) return;
 
     const channel = supabase
       .channel('profile-changes')
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${currentUser.id}` },
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
         (payload) => {
           const updated = payload.new as any;
           const current = useStore.getState().user;
@@ -286,7 +287,7 @@ export default function App() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [useStore.getState().user?.id, setUser]);
+  }, [userId, setUser]);
 
   // ── Theme ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -329,7 +330,7 @@ export default function App() {
 
   // ── Notification banner ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!useStore.getState().user) return;
+    if (!user) return;
     const alreadyAsked = localStorage.getItem('gpte_notif_asked');
     if (alreadyAsked) return;
     const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
@@ -337,7 +338,7 @@ export default function App() {
       const timer = setTimeout(() => setShowNotifBanner(true), 2500);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [user]);
 
   if (loading) {
     return (

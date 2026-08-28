@@ -10,6 +10,8 @@ ALTER TABLE video_progress ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "video_progress_select_own" ON video_progress FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "video_progress_insert_own" ON video_progress FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "video_progress_update_own" ON video_progress;
+CREATE POLICY "video_progress_update_own" ON video_progress FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "video_progress_delete_own" ON video_progress FOR DELETE USING (auth.uid() = user_id);
 
 CREATE INDEX idx_video_progress_user ON video_progress(user_id);
