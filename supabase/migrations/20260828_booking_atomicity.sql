@@ -16,7 +16,6 @@ declare
   v_profile public.profiles%rowtype;
   v_booking public.bookings%rowtype;
   v_booked integer;
-  v_previous_status text;
 begin
   if auth.uid() is null then
     raise exception 'Authentication required';
@@ -71,6 +70,7 @@ set search_path = public
 as $$
 declare
   v_booking public.bookings%rowtype;
+  v_previous_status text;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
   select * into v_booking from public.bookings where id = p_booking_id for update;
