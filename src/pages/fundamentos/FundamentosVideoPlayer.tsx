@@ -6,6 +6,7 @@ import { FundamentosVideo } from '../../types/fundamentos.types';
 import { Reveal } from '../../components/Reveal';
 import { PageHeader } from '../../components/PageHeader';
 import { fadeIn, spring } from '../../lib/animations';
+import { FundamentosMediaPlayer } from '../../components/fundamentos/FundamentosMediaPlayer';
 
 export function FundamentosVideoPlayer() {
   const navigate = useNavigate();
@@ -55,13 +56,7 @@ export function FundamentosVideoPlayer() {
       >
         <Reveal direction="none">
           <div className="aspect-video bg-black rounded-[2.5rem] overflow-hidden border border-slate-800 shadow-2xl">
-            <iframe
-              src={video.videoUrl}
-              className="w-full h-full"
-              frameBorder="0"
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-            ></iframe>
+            <FundamentosMediaPlayer video={video} />
           </div>
         </Reveal>
 

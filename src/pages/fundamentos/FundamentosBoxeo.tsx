@@ -9,6 +9,7 @@ import { FundamentosAdminPanel } from '../../components/fundamentos/FundamentosA
 import { Reveal } from '../../components/Reveal';
 import { PageHeader } from '../../components/PageHeader';
 import { staggerContainer, staggerItem, spring } from '../../lib/animations';
+import { FundamentosMediaPlayer } from '../../components/fundamentos/FundamentosMediaPlayer';
 
 export function FundamentosBoxeo() {
   const navigate = useNavigate();
@@ -260,12 +261,7 @@ export function FundamentosBoxeo() {
                 </button>
               </div>
               <div className="aspect-video bg-black">
-                <iframe
-                  src={selectedVideo.videoUrl}
-                  className="w-full h-full"
-                  allow="autoplay; fullscreen"
-                  allowFullScreen
-                />
+                <FundamentosMediaPlayer video={selectedVideo} />
               </div>
               {(selectedVideo.description || selectedVideo.execution) && (
                 <div className="p-6 space-y-4">
