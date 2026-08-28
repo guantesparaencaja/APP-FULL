@@ -17,6 +17,7 @@ import { useClassReminders } from './hooks/useClassReminders';
 import { useAppNotifications } from './hooks/useAppNotifications';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { VersionCheckModal } from './components/VersionCheckModal';
+import { isAdminUser } from './lib/admin';
 
 // ── Páginas cargadas dinámicamente (Code-Splitting) ────────────────────────
 const Home                 = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
@@ -57,11 +58,6 @@ import { supabase } from './lib/supabase';
 import { getProfile } from './lib/db';
 
 const APP_VERSION = '1.0.1';
-
-const ADMIN_EMAILS = [
-  'hernandezkevin001998@gmail.com',
-  'guantesparaencajar@gmail.com',
-];
 
 // Rutas restringidas por cantidad de clases (acceso completo solo con 4+ clases)
 const RESTRICTED_CLASS_ROUTES = [
@@ -143,7 +139,7 @@ export default function App() {
     const handleSession = async (session: any) => {
       if (session?.user) {
         const supabaseUser = session.user;
-        const isAdmin = supabaseUser.email && ADMIN_EMAILS.includes(supabaseUser.email);
+        const isAdmin = isAdminUser({ email: supabaseUser.email });
 
         try {
           // Obtener perfil desde Supabase

@@ -41,6 +41,7 @@ import {
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
+import { isAdminUser } from '../lib/admin';
 import { Modal } from '../components/Modal';
 import { sendEmail } from '../lib/email';
 import { Reveal } from '../components/Reveal';
@@ -94,7 +95,7 @@ interface Booking {
 export function Calendar() {
   const user = useStore((state) => state.user);
   const setUser = useStore((state) => state.setUser);
-  const isAdmin = user?.role === 'admin' || user?.email === 'hernandezkevin001998@gmail.com';
+  const isAdmin = isAdminUser(user);
 
   // State
   const [classes, setClasses] = useState<Class[]>([]);

@@ -86,6 +86,30 @@ function LoadingFallback() {
   );
 }
 
+class ModelErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  private readonly children: React.ReactNode;
+
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.children = props.children;
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="h-full flex items-center justify-center px-6 text-center text-sm text-slate-400">El modelo 3D no está disponible en este momento.</div>;
+    }
+    return this.children;
+  }
+}
+
 interface Props {
   glbUrl?: string;
   height?: string;
@@ -93,9 +117,7 @@ interface Props {
 }
 
 export function BoxerViewer3D({ glbUrl, height = '400px', ring = true }: Props) {
-  const [hasError, setHasError] = useState(false);
-
-  if (!glbUrl || hasError) return null;
+  if (!glbUrl) return null;
 
   return (
     <div style={{ height, width: '100%', borderRadius: '1.5rem', overflow: 'hidden', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)' }}>
@@ -104,7 +126,7 @@ export function BoxerViewer3D({ glbUrl, height = '400px', ring = true }: Props) 
         <directionalLight position={[5, 6, 5]} intensity={1.1} />
         <spotLight position={[0, 6, 0]} angle={0.6} penumbra={0.8} intensity={0.9} color="#fef3c7" />
         <Suspense fallback={<LoadingFallback />}>
-          <BoxerModel url={glbUrl} />
+          <ModelErrorBoundary><BoxerModel url={glbUrl} /></ModelErrorBoundary>
           {ring && <BoxingRing />}
           <Environment preset="studio" />
         </Suspense>

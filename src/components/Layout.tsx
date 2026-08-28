@@ -25,6 +25,7 @@ import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { pageTransition } from '../lib/animations';
 import { NotificationsPanel } from './NotificationsPanel';
+import { isAdminUser } from '../lib/admin';
 const MIN_SWIPE_DISTANCE = 50;
 const SWIPE_THRESHOLD_VELOCITY = 0.5;
 let lastTouchStartX = 0;
@@ -111,10 +112,7 @@ export function Layout() {
     { path: '/profile', icon: User, label: 'Perfil' },
   ];
 
-  const isSpecialUser =
-    user?.email === 'hernandezkevin001998@gmail.com' ||
-    user?.role === 'admin' ||
-    user?.plan === 'premium';
+  const isSpecialUser = isAdminUser(user) || user?.plan === 'premium';
 
   const hasFullAccess = isSpecialUser || (user?.classes_per_month && user.classes_per_month >= 4);
 

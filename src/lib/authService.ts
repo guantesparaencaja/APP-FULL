@@ -9,11 +9,7 @@
 
 import { supabase } from './supabase';
 import type { Session, User } from '@supabase/supabase-js';
-
-const ADMIN_EMAILS = [
-  'hernandezkevin001998@gmail.com',
-  'guantesparaencajar@gmail.com',
-];
+import { isAdminUser } from './admin';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,7 +25,7 @@ export interface AuthUser {
  * Crea o actualiza el perfil del usuario en public.profiles después del login.
  */
 async function ensureProfile(user: User): Promise<void> {
-  const isAdmin = user.email && ADMIN_EMAILS.includes(user.email);
+  const isAdmin = isAdminUser({ email: user.email });
 
   const { data: existing } = await supabase
     .from('profiles')

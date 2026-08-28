@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { spring } from '../lib/animations';
+import { isAdminUser } from '../lib/admin';
 
 // ── Helper: format timestamp as "Lun 14 Abr • 03:45 PM" ───────────────────
 function formatMessageDate(ts: any): string {
@@ -72,7 +73,7 @@ export function Chat() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = user?.role === 'admin' || user?.email === 'hernandezkevin001998@gmail.com';
+  const isAdmin = isAdminUser(user);
 
   // ── Load students list (admin only) ─────────────────────────────────────
   useEffect(() => {
