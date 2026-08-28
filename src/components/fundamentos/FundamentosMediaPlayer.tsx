@@ -13,10 +13,28 @@ function isDirectVideoSource(url: string) {
   return /\.(mp4|webm|ogg)(?:[?#].*)?$/i.test(url) || /drive\.google\.com\/uc\?/i.test(url);
 }
 
+function getYouTubeId(url: string) {
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/i);
+  return match?.[1] ?? null;
+}
+
 export function FundamentosMediaPlayer({ video, className = '' }: Props) {
   const mediaRef = useRef<HTMLVideoElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
   const directSource = isDirectVideoSource(video.videoUrl);
+  const youtubeId = getYouTubeId(video.videoUrl);
+
+  const setRate = (rate: number) => {
+    setPlaybackRate(rate);
+    if (mediaRef.current) mediaRef.current.playbackRate = rate;
+    if (youtubeId && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: 'setPlaybackRate', args: [rate] }),
+        'https://www.youtube.com',
+      );
+    }
+  };
 
   useEffect(() => {
     if (mediaRef.current) mediaRef.current.playbackRate = playbackRate;
@@ -26,16 +44,37 @@ export function FundamentosMediaPlayer({ video, className = '' }: Props) {
     return (
       <div className={`relative h-full w-full bg-black ${className}`}>
         <iframe
-          src={video.videoUrl}
+          ref={iframeRef}
+          src={youtubeId ? `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&origin=${window.location.origin}` : video.videoUrl}
           title={video.title}
           className="h-full w-full"
           frameBorder="0"
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen
         />
-        <div className="absolute bottom-3 left-3 right-3 rounded-xl bg-black/75 px-3 py-2 text-[11px] text-slate-300">
-          Para activar cámara lenta, convierte este enlace a MP4 o WebM directo.
-        </div>
+        {youtubeId ? (
+          <div className="absolute bottom-14 left-3 flex items-center gap-1 rounded-xl border border-white/10 bg-black/75 p-1 backdrop-blur-md">
+            <Gauge className="ml-2 h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            {SPEEDS.map((speed) => (
+              <button
+                key={speed}
+                type="button"
+                onClick={() => setRate(speed)}
+                aria-label={`Velocidad ${speed === 0.5 ? 'lenta' : 'normal'}`}
+                aria-pressed={playbackRate === speed}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${
+                  playbackRate === speed ? 'bg-primary text-white' : 'text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                {speed === 0.5 ? 'Lenta 0.5×' : 'Normal 1×'}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="absolute bottom-3 left-3 right-3 rounded-xl bg-black/75 px-3 py-2 text-[11px] text-slate-300">
+            Para activar cámara lenta, usa un video de YouTube, MP4 o WebM directo.
+          </div>
+        )}
       </div>
     );
   }
@@ -59,7 +98,7 @@ export function FundamentosMediaPlayer({ video, className = '' }: Props) {
           <button
             key={speed}
             type="button"
-            onClick={() => setPlaybackRate(speed)}
+            onClick={() => setRate(speed)}
             aria-label={`Velocidad ${speed === 0.5 ? 'lenta' : 'normal'}`}
             aria-pressed={playbackRate === speed}
             className={`rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${
