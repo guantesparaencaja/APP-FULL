@@ -9,3 +9,7 @@ coverage/
 
 .vercel
 .env*
+
+# Tooling local (no subir)
+.token-optimizer/
+supabase/.temp/

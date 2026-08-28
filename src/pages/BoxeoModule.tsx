@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 import { BoxerAnimatedHero } from '../components/BoxerAnimatedHero';
 import { BoxerViewer3D } from '../components/BoxerViewer3D';
+import { BoxeoVideoPicker, PickedVideo } from '../components/BoxeoVideoPicker';
 
 interface BoxeoVideo {
   id: string;
@@ -107,6 +108,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const defaultForm = { nombre: '', subcategoria: 'Tecnica-Basica', nivel: 'Principiante', duracion_seg: 45, descripcion: '', puntos_clave: '', errores_comunes: '', url_directa: '', drive_file_id: '' };
   const [addForm, setAddForm] = useState(defaultForm);
+  const [pickedVideo, setPickedVideo] = useState<PickedVideo | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -206,7 +208,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
       } else {
         await supabase.from('boxeo_videos').insert({ ...data, activo: true, orden: 999, created_at: new Date().toISOString() });
       }
-      setShowAddModal(false); setEditingVideoId(null); setAddForm(defaultForm);
+      setShowAddModal(false); setEditingVideoId(null); setAddForm(defaultForm); setPickedVideo(null);
     } catch (err: any) { alert('Error: ' + err.message); }
   };
 
@@ -218,6 +220,9 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
       puntos_clave: (v.puntos_clave || []).join('\n'), errores_comunes: (v.errores_comunes || []).join('\n'),
       url_directa: v.url_directa || '', drive_file_id: v.drive_file_id || ''
     });
+    setPickedVideo(v.url_directa
+      ? { name: v.nombre || 'Video', url: v.url_directa, drive_file_id: v.drive_file_id || undefined }
+      : null);
     setShowAddModal(true);
   };
 
@@ -344,7 +349,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
               <motion.div className="bg-slate-900 rounded-3xl p-6 w-full max-h-[90vh] overflow-y-auto border border-slate-800" initial={{ y: 60 }} animate={{ y: 0 }} exit={{ y: 60 }}>
                 <div className="flex justify-between mb-6">
                   <h3 className="text-xl font-black text-white uppercase">{editingVideoId ? 'Editar Video' : 'Nuevo Video'}</h3>
-                  <button aria-label="Cerrar" type="button" onClick={() => { setShowAddModal(false); setEditingVideoId(null); setAddForm(defaultForm); }}><X className="w-5 h-5 text-slate-400" /></button>
+                  <button aria-label="Cerrar" type="button" onClick={() => { setShowAddModal(false); setEditingVideoId(null); setAddForm(defaultForm); setPickedVideo(null); }}><X className="w-5 h-5 text-slate-400" /></button>
                 </div>
                 <form onSubmit={handleAddVideo} className="space-y-4">
                   <input required placeholder="Nombre del ejercicio" value={addForm.nombre} onChange={e => setAddForm(f => ({...f, nombre: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm" />
@@ -361,7 +366,18 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
                   <textarea placeholder="Puntos clave (uno por linea)" value={addForm.puntos_clave} onChange={e => setAddForm(f => ({...f, puntos_clave: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm resize-none h-20" />
                   <textarea placeholder="Errores comunes (uno por linea)" value={addForm.errores_comunes} onChange={e => setAddForm(f => ({...f, errores_comunes: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm resize-none h-20" />
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">URL del video (Google Drive)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Video de la leccion</label>
+                    <BoxeoVideoPicker
+                      value={pickedVideo}
+                      onSelect={(v) => {
+                        setPickedVideo(v);
+                        setAddForm(f => ({ ...f, url_directa: v.url, drive_file_id: v.drive_file_id || '' }));
+                      }}
+                      onClear={() => {
+                        setPickedVideo(null);
+                        setAddForm(f => ({ ...f, url_directa: '', drive_file_id: '' }));
+                      }}
+                    />
                     <input type="url" placeholder="https://drive.google.com/file/d/..." value={addForm.url_directa} onChange={e => setAddForm(f => ({...f, url_directa: e.target.value}))} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm" />
                   </div>
                   <button type="submit" className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest">{editingVideoId ? 'Actualizar Video' : 'Guardar Video'}</button>
@@ -387,7 +403,7 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
             </div>
           </div>
           {isAdmin && (
-            <button aria-label="Agregar" type="button" onClick={() => { setEditingVideoId(null); setAddForm(defaultForm); setShowAddModal(true); }} className="bg-primary p-2.5 rounded-xl text-white shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow">
+            <button aria-label="Agregar" type="button" onClick={() => { setEditingVideoId(null); setAddForm(defaultForm); setPickedVideo(null); setShowAddModal(true); }} className="bg-primary p-2.5 rounded-xl text-white shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow">
               <Plus className="w-5 h-5" />
             </button>
           )}
