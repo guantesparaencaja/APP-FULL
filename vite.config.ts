@@ -48,7 +48,6 @@ export default defineConfig(() => {
               if (id.includes('@supabase')) return 'supabase';
               if (id.includes('@sentry') || id.includes('@logrocket')) return 'monitoring';
               if (id.includes('@codetrix') || id.includes('@capacitor')) return 'capacitor';
-              if (id.includes('react')) return 'react';
               if (id.includes('framer-motion') || id.includes('motion')) return 'motion';
               return 'vendor';
             }

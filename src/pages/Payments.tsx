@@ -105,14 +105,15 @@ export function Payments() {
     setError(null);
     try {
       const extension = file.name.split('.').pop() || 'jpg';
-      const path = `pagos/${user.id}/comprobante_${Date.now()}.${extension}`;
+      const path = `${user.id}/comprobante_${Date.now()}.${extension}`;
 
-      const { error: upErr } = await supabase.storage.from('gpte-videos').upload(path, file, { upsert: true });
+      const { error: upErr } = await supabase.storage.from('receipts').upload(path, file, { upsert: false });
       if (upErr) throw new Error(upErr.message);
       setProgress(100);
 
-      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
-      const downloadURL = urlData.publicUrl;
+      const { data: urlData, error: urlErr } = await supabase.storage.from('receipts').createSignedUrl(path, 60 * 60 * 24 * 7);
+      if (urlErr || !urlData?.signedUrl) throw new Error(urlErr?.message || 'No se pudo generar el enlace del comprobante');
+      const downloadURL = urlData.signedUrl;
 
       if (planId) {
         await supabase.from('payments').insert({

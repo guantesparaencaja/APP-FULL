@@ -699,16 +699,14 @@ set search_path = public
 as $$
 begin
   if TG_OP = 'INSERT' then
-    if new.email in ('hernandezkevin001998@gmail.com', 'guantesparaencajar@gmail.com') then
-      new.role := 'admin';
-    else
+    if auth.role() <> 'service_role' then
       new.role := 'student';
     end if;
     return new;
   end if;
-if new.role is distinct from old.role
-     and not public.is_admin()
-     and new.email not in ('hernandezkevin001998@gmail.com', 'guantesparaencajar@gmail.com') then
+  if new.role is distinct from old.role
+     and auth.role() <> 'service_role'
+     and not public.is_admin() then
     new.role := old.role; -- ignora intentos de escalación de usuarios que NO son admin
   end if;
   return new;
@@ -782,7 +780,7 @@ drop policy if exists "Admin gestiona reservas" on public.bookings;
 create policy "Usuario ve sus reservas" on public.bookings for select using (auth.uid() = user_id or public.is_admin());
 create policy "Usuario/admin crean reservas" on public.bookings for insert with check (auth.uid() = user_id or public.is_admin());
 create policy "Usuario cancela reservas" on public.bookings for update
-  using (auth.uid() = user_id) with check (auth.uid() = user_id and new.status = 'cancelled');
+  using (auth.uid() = user_id) with check (auth.uid() = user_id and status = 'cancelled');
 create policy "Admin gestiona reservas" on public.bookings for all using (public.is_admin()) with check (public.is_admin());
 
 -- PAYMENTS (el usuario inserta; SOLO admin aprueba/cambia)
@@ -791,7 +789,7 @@ drop policy if exists "Usuario registra pagos" on public.payments;
 drop policy if exists "Admin gestiona pagos" on public.payments;
 create policy "Usuario ve sus pagos" on public.payments for select using (auth.uid() = user_id or public.is_admin());
 create policy "Usuario registra pagos" on public.payments for insert
-  with check (auth.uid() = user_id and new.status in ('pending','submitted'));
+  with check (auth.uid() = user_id and status in ('pending','submitted'));
 create policy "Admin gestiona pagos" on public.payments for update using (public.is_admin()) with check (public.is_admin());
 create policy "Admin borra pagos" on public.payments for delete using (public.is_admin());
 
@@ -802,7 +800,7 @@ drop policy if exists "Usuario marca leída" on public.notifications;
 create policy "Usuario ve sus notifs" on public.notifications for select
   using (auth.uid() = user_id or user_id = 'admin' or public.is_admin());
 create policy "Usuario/admin insertan notifs" on public.notifications for insert
-  with check (public.is_admin() or auth.uid() = user_id or new.user_id = 'admin');
+  with check (public.is_admin() or auth.uid() = user_id or user_id = 'admin');
 create policy "Usuario marca leída" on public.notifications for update
   using (auth.uid() = user_id or public.is_admin()) with check (auth.uid() = user_id or public.is_admin());
 

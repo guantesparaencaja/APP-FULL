@@ -22,37 +22,8 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'hernandezkevin001998@gmail.com';
 // Carpeta compartida "Videos de box" (1qiJzBMvIZEVk0A3mw1qBDT2gZn5yViSQ)
 const BOXEO_FOLDER_ID = '1qiJzBMvIZEVk0A3mw1qBDT2gZn5yViSQ';
 
-const CLIENT_EMAIL = process.env.DRIVE_CLIENT_EMAIL || 'drive-firestore-sync@gpte007.iam.gserviceaccount.com';
-const PRIVATE_KEY =
-  process.env.DRIVE_PRIVATE_KEY ||
-  '-----BEGIN PRIVATE KEY-----\n' +
-    'MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDjVe0WpWHR9Jm0\n' +
-    'o0hxbVmSwQLsaOKCebRBqaYPJcavjpa4pU5OVt4knw2C8i6ze8dCHTchDN/YmhcL\n' +
-    '/psSI6kUCTctTe70eOykbES1+3TasciHfJXWvNM4+GYcZvRHEOgSOoueSjB9D2Mz\n' +
-    'iO9Qq7rYZvGtZXbKBZvWDUx9KuDXtvogFMgYr7D/md778iSSkSqJTHDfTLy+fXSD\n' +
-    '29tF51Sc+AJQYwKt5NMcVUANfzfvyk4cyNHLYb7n+rJPYUMrgqiqOUv+OvXDlXWr\n' +
-    '27NSB8WVsvv2LwNoxM2mDCabsVLyhcIhw3hRbPkbQInRdR+4H+iIIfWJzXQXeAlh\n' +
-    'yqFNDVFVAgMBAAECggEANoOe4GzVKbc5eo8jKov5zE67aDx4gKg1mP9ZAk3hOKz9\n' +
-    'KJb/UZrUFz0KzOlNWJ3oeMqvsx22ueateyNZRT7G5zaUhCkpkXdD6+PIkEkVyvGR\n' +
-    '8CdoeP97uTAbsFjh3/7GX8SpQVJyETM06yE9nf8oRYdeEeIAW85/gZNb0bIMC73x\n' +
-    'xsIUw4YNvZ5/eVMWjVVIMgKz88ebMbbIkg+PTY1XLbOgD62wGRMbKHABfjHZ985c\n' +
-    'f9fNgAz5Bx40nHO0mLuE3PYTNn5UpjKcWfatJM1+NMwfT2ER0NSjpFiWJY7pOzDl\n' +
-    'THVDKiBFTCxN2LeRGk2VCb1f4y5pTsMJYxGPG6FPKwKBgQDxrzJEMyH9tVLi+jF7\n' +
-    'H3cx5HnDVt4HEGq7UvFwHbXqzvzvXDN01KM8SggRyTmmh8bdFBR+P9XjbTlnsu6K\n' +
-    'bE0O+9OrjTHuxtmOdbb7TuWjMQhDhWDP5svxNzJw0DH+DpznpdUXYLQMYyFce/jK\n' +
-    'VpTx6mXj9Gyyj9sGfZ2ZbdViowKBgQDwzSbXgGn/TZBcD8j86TIrSJnLhcB52/H1\n' +
-    '1PNKX0xvH1vhD9VYfNVjtkXA98+H0TkR+wY5oXK8x7pdV3bmMBpYnuX8gFrfUDbX\n' +
-    'IeUbIIBYa9hjAnHu9mUdSEftEDbe2pLT9mVQyGX8t3GxJkFX7rbNJ1vzFInKL1Nx\n' +
-    '3vjkkbazpwKBgEpoZvBqUa+7sI4i+zLt6BObRQWn6+l+221axux+qTBmk6bZ2xnA\n' +
-    'EZWRMVTQgAhOSyJreTe5TY+cZA0SILDLURoo2+04JkReQkLC6RgMHVUV1nZ7TOgV\n' +
-    'JXrZRJVI8+tE8ne7LZTp9+TMbEv9+wXIjEjCoqYA7ao38fXYnLnM/+JDAoGAW+Ls\n' +
-    '327xA6rlWzvqxhd2PW4GwdLYD6gOPHB2JfsXf4/Hz6nrD0kTZGk5VNk7J+h+jo3r\n' +
-    'YjJpRgAw7U1i4ZOZeheoSyHviydgxdb5RdCxKQx+FcnpD/aVvwbF64A0b/WX8aok\n' +
-    'Hx9ZS4X0rFScuqEswDw0qh08Nxq4DMu4zf+MaCECgYEAnj//TzmXVSAyPwjAow84\n' +
-    'd4obcoI0wbzvhoavuclTNJoFCQctO5A4nkwjUIys807dc/dcMR3AnEB836FdY9Mt\n' +
-    'ZYnR8XopHPpae4iqPUwrw/JSjclt5W8SiaHwDrapgUMvLY/z1sstNmqyscIv+8a7\n' +
-    '4QiNKBi+B2xq7lYb7I0lf2Q=\n' +
-    '-----END PRIVATE KEY-----';
+const CLIENT_EMAIL = process.env.DRIVE_CLIENT_EMAIL || '';
+const PRIVATE_KEY = (process.env.DRIVE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
 
 async function getDriveToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
@@ -85,6 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!supabaseUrl || !supabaseAnonKey) {
     return res.status(500).json({ error: 'Auth service not configured' });
+  }
+  if (!CLIENT_EMAIL || !PRIVATE_KEY) {
+    return res.status(500).json({ error: 'Drive service not configured' });
   }
 
   // ── Verificar sesión Supabase + rol admin ──────────────────────────────────

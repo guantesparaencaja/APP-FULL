@@ -207,37 +207,39 @@ export function Plans() {
     setIsUploading(true);
     try {
       const ext = paymentFile.name.split('.').pop() || 'jpg';
-      const path = `pagos/${user.id}/plan_${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('gpte-videos').upload(path, paymentFile, { upsert: true });
-      if (upErr) throw new Error(upErr.message);
-      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
-      const receiptUrl = urlData.publicUrl;
+       const path = `${user.id}/plan_${Date.now()}.${ext}`;
+       const { error: upErr } = await supabase.storage.from('receipts').upload(path, paymentFile, { upsert: false });
+       if (upErr) throw new Error(upErr.message);
+       const { data: urlData, error: urlErr } = await supabase.storage.from('receipts').createSignedUrl(path, 60 * 60 * 24 * 7);
+       if (urlErr || !urlData?.signedUrl) throw new Error(urlErr?.message || 'No se pudo generar el enlace del comprobante');
+       const receiptUrl = urlData.signedUrl;
 
-      await supabase.from('profiles').update({
-        plan_id: selectedPlan.id, plan_name: selectedPlan.name, plan_status: 'pending_approval',
+       const { error: profileError } = await supabase.from('profiles').update({
+         plan_id: selectedPlan.id, plan_name: selectedPlan.name, plan_status: 'pending_verification',
         classes_per_month: allowedClasses, classes_remaining: allowedClasses,
         receipt_url: receiptUrl,
-      }).eq('id', user.id);
+       }).eq('id', user.id);
+       if (profileError) throw profileError;
 
       for (const cls of selectedClasses) {
-        await supabase.from('bookings').insert({
+         const { error: bookingError } = await supabase.from('bookings').insert({
           user_id: user.id, user_name: user.name, user_email: user.email || '',
           class_id: cls.avail.id, date: format(cls.date, 'yyyy-MM-dd'),
           time: `${cls.avail.start_time} - ${cls.avail.end_time}`,
           status: 'pending', created_at: new Date().toISOString(),
-        });
-      }
+         });
+         if (bookingError) throw bookingError;
+       }
 
-      if (qualifiesForDiscount) {
-        await supabase.from('payments').insert({
+       const { error: paymentError } = await supabase.from('payments').insert({
           user_id: user.id, plan_id: selectedPlan.id, plan_name: selectedPlan.name,
           original_price: currentPrice, discount_percent: discountPercent,
           discount_amount: discountAmount, final_price: finalPrice,
           discount_reason: 'Descuento nuevo estudiante 10%',
-          classes_per_month: allowedClasses, status: 'submitted',
+           classes_per_month: allowedClasses, status: 'submitted', receipt_url: receiptUrl,
           created_at: new Date().toISOString(),
-        });
-      }
+         });
+       if (paymentError) throw paymentError;
 
       setCurrentStep(4);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -252,18 +254,28 @@ export function Plans() {
     if (!user || !selectedPlan || selectedClasses.length === 0) return;
     setIsUploading(true);
     try {
-      await supabase.from('profiles').update({
-        plan_id: selectedPlan.id, plan_name: selectedPlan.name, plan_status: 'pending_approval',
+       const { error: profileError } = await supabase.from('profiles').update({
+         plan_id: selectedPlan.id, plan_name: selectedPlan.name, plan_status: 'pending_payment',
         classes_per_month: allowedClasses, classes_remaining: allowedClasses,
         receipt_url: 'whatsapp_pending',
-      }).eq('id', user.id);
+       }).eq('id', user.id);
+       if (profileError) throw profileError;
+
+       const { error: paymentError } = await supabase.from('payments').insert({
+         user_id: user.id, plan_id: selectedPlan.id, plan_name: selectedPlan.name,
+         original_price: currentPrice, final_price: finalPrice,
+         classes_per_month: allowedClasses, status: 'pending', receipt_url: 'whatsapp_pending',
+         created_at: new Date().toISOString(),
+       });
+       if (paymentError) throw paymentError;
 
       for (const cls of selectedClasses) {
-        await supabase.from('bookings').insert({
+         const { error: bookingError } = await supabase.from('bookings').insert({
           user_id: user.id, user_name: user.name, class_id: cls.avail.id,
           date: format(cls.date, 'yyyy-MM-dd'), time: cls.avail.start_time,
           status: 'pending', created_at: new Date().toISOString(), receipt_url: 'whatsapp_pending',
-        });
+         });
+         if (bookingError) throw bookingError;
       }
       const msg = `Hola, mi nombre es ${user.name}. Acabo de solicitar el plan ${selectedPlan.name} en la app y por aquí adjuntaré mi comprobante de pago.`;
       window.open(`https://wa.me/573022028477?text=${encodeURIComponent(msg)}`, '_blank');
