@@ -13,6 +13,8 @@ export interface HealthyRecipe {
   calorias_aprox: number;
   fuente: string;
   imagen_url?: string;
+  objetivo?: 'bajar' | 'mantener' | 'subir' | 'general';
+  tips?: string;
 }
 
 export const HEALTHY_RECIPES: HealthyRecipe[] = [

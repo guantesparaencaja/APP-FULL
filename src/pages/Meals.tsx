@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import {
   ArrowLeft,
@@ -22,6 +22,7 @@ import {
   Clock,
   Lightbulb,
   Edit2,
+  Target,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -49,8 +50,24 @@ interface Meal {
   protein?: number;
   fats?: number;
   tags?: string[];
+  goal?: 'bajar' | 'mantener' | 'subir' | 'general' | string;
+  tips?: string;
+  source_book?: string;
   created_by?: string;
 }
+
+const GOAL_OPTIONS = [
+  { id: 'bajar', label: 'Bajar peso', description: 'Menos calorías y más saciedad' },
+  { id: 'mantener', label: 'Mantener', description: 'Alimentación equilibrada' },
+  { id: 'subir', label: 'Subir peso', description: 'Más energía y proteína' },
+] as const;
+
+const normalizeGoal = (value?: string) => {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('bajar') || normalized.includes('perd')) return 'bajar';
+  if (normalized.includes('subir') || normalized.includes('aument') || normalized.includes('ganar')) return 'subir';
+  return 'mantener';
+};
 
 export function Meals() {
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -64,14 +81,16 @@ export function Meals() {
     instructions: '',
     video_url: '',
     image_url: '',
+    goal: 'general',
+    tips: '',
+    source_book: '',
   });
   const [nutrition, setNutrition] = useState({ calories: '', carbs: '', protein: '', fats: '' });
-  const [uploadingImage, setUploadingImage] = useState(false);
   const user = useStore((state) => state.user);
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('todas');
+  const [activeGoal, setActiveGoal] = useState<string>('mantener');
   const [consumedMeals, setConsumedMeals] = useState<string[]>([]);
   const [showMealPlanner, setShowMealPlanner] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
@@ -109,6 +128,10 @@ export function Meals() {
   const weight = user?.weight || 70;
   const goal = user?.goal || 'mantener';
 
+  useEffect(() => {
+    setActiveGoal(normalizeGoal(user?.goal));
+  }, [user?.goal]);
+
   let baseCalories = weight * 24 * 1.3;
   if (goal === 'bajar') baseCalories -= 500;
   if (goal === 'subir') baseCalories += 500;
@@ -145,7 +168,16 @@ export function Meals() {
       meal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'todas' || meal.category === activeCategory;
-    return matchesSearch && matchesCategory;
+    const matchesGoal = activeGoal === 'todas' || !meal.goal || meal.goal === 'general' || normalizeGoal(meal.goal) === activeGoal;
+    return matchesSearch && matchesCategory && matchesGoal;
+  });
+
+  const filteredBookRecipes = HEALTHY_RECIPES.filter((recipe) => {
+    if (activeGoal === 'todas') return true;
+    if (recipe.objetivo) return recipe.objetivo === activeGoal || recipe.objetivo === 'general';
+    // Compatibilidad con el catálogo anterior mientras se clasifican los libros.
+    const inferred = recipe.calorias_aprox <= 350 ? 'bajar' : recipe.calorias_aprox >= 600 ? 'subir' : 'mantener';
+    return inferred === activeGoal;
   });
 
   useEffect(() => {
@@ -161,16 +193,16 @@ export function Meals() {
   const handleAddMeal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (editingMealId) {
-        await supabase.from('meals').update(newMeal).eq('id', editingMealId);
-        setEditingMealId(null);
-      } else {
-        await supabase.from('meals').insert({ ...newMeal, created_by: String(user?.id) });
-      }
+      const savedEditingId = editingMealId;
+      const { error } = savedEditingId
+        ? await supabase.from('meals').update(newMeal).eq('id', savedEditingId)
+        : await supabase.from('meals').insert({ ...newMeal, created_by: String(user?.id) });
+      if (error) throw error;
+      setEditingMealId(null);
       setActiveCategory(newMeal.category); setSearchQuery('');
       setShowAddForm(false);
-      setNewMeal({ name: '', category: 'desayuno', ingredients: '', instructions: '', video_url: '', image_url: '' });
-    } catch (error) { console.error('Error saving meal:', error); }
+      setNewMeal({ name: '', category: 'desayuno', ingredients: '', instructions: '', video_url: '', image_url: '', goal: 'general', tips: '', source_book: '' });
+    } catch (error) { console.error('Error saving meal:', error); showAlert('No se guardó la receta', 'Revisa los datos e inténtalo de nuevo.', 'error'); }
   };
 
   const handleDeleteMeal = async (meal: Meal) => {
@@ -178,33 +210,10 @@ export function Meals() {
     try { await supabase.from('meals').delete().eq('id', meal.id); } catch (error) { console.error('Error deleting meal:', error); }
   };
 
-  const handleDeleteImage = async () => {
-    if (!newMeal.image_url || !window.confirm('¿Deseas quitar la imagen actual?')) return;
-    try {
-      setNewMeal({ ...newMeal, image_url: '' });
-      if (editingMealId) { await supabase.from('meals').update({ image_url: '' }).eq('id', editingMealId); }
-      showAlert('Éxito', 'Imagen eliminada correctamente', 'success');
-    } catch (error) { console.error('Error deleting image:', error); setNewMeal({ ...newMeal, image_url: '' }); }
-  };
-
   const handleEditMealClick = (meal: Meal) => {
     setNewMeal(meal);
     setEditingMealId(meal.id);
     setShowAddForm(true);
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingImage(true);
-    try {
-      const ext = file.name.split('.').pop();
-      const path = `meals/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('gpte-videos').upload(path, file, { upsert: true });
-      if (error) throw error;
-      const { data: urlData } = supabase.storage.from('gpte-videos').getPublicUrl(path);
-      setNewMeal({ ...newMeal, image_url: urlData.publicUrl });
-    } catch (error) { console.error('Error in image upload:', error); } finally { setUploadingImage(false); }
   };
 
   const handleAddNutrition = async (e: React.FormEvent, mealId: string) => {
@@ -449,7 +458,7 @@ export function Meals() {
               />
             </Reveal>
 
-            <Reveal className="flex overflow-x-auto hide-scrollbar gap-2 mb-6 pb-2">
+            <Reveal className="flex overflow-x-auto hide-scrollbar gap-2 mb-3 pb-2">
               {[
                 { id: 'todas', label: 'Todas', icon: Utensils },
                 { id: 'desayuno', label: 'Desayuno', icon: Coffee },
@@ -469,6 +478,29 @@ export function Meals() {
                   </button>
                 );
               })}
+            </Reveal>
+
+            <Reveal className="mb-6">
+              <div className="flex items-center gap-2 mb-2 text-slate-400">
+                <Target className="w-4 h-4 text-emerald-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Objetivo nutricional</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button
+                  onClick={() => setActiveGoal('todas')}
+                  className={`btn-press px-3 py-2 rounded-xl text-xs font-bold ${activeGoal === 'todas' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}
+                >Todas
+                </button>
+                {GOAL_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setActiveGoal(option.id)}
+                    title={option.description}
+                    className={`btn-press px-3 py-2 rounded-xl text-xs font-bold ${activeGoal === option.id ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}
+                  >{option.label}
+                  </button>
+                ))}
+              </div>
             </Reveal>
 
             {user?.role === 'admin' && !showAddForm && (
@@ -502,53 +534,20 @@ export function Meals() {
               title={editingMealId ? 'Editar Receta' : 'Nueva Receta'}
             >
               <form onSubmit={handleAddMeal} className="flex flex-col gap-4">
-                <div
-                  onClick={() => !uploadingImage && fileInputRef.current?.click()}
-                  className={`w-full min-h-[200px] bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden relative group ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {uploadingImage ? (
-                    <div className="flex flex-col items-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-3"></div>
-                      <span className="text-sm font-medium text-slate-400">Subiendo imagen...</span>
-                    </div>
-                  ) : newMeal.image_url ? (
-                    <div className="relative w-full group">
-                      <img
-                        src={newMeal.image_url}
-                        alt="Preview"
-                        className="w-full aspect-video object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <p className="text-white text-xs font-black uppercase tracking-widest">Cambiar Imagen</p>
-                      </div>
-                      <button aria-label="Eliminar"
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteImage();
-                        }}
-                        className="btn-press absolute top-4 right-4 p-3 bg-red-500 text-white rounded-2xl shadow-xl hover:scale-110 transition-all"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center py-12">
-                      <ImageIcon className="w-12 h-12 text-slate-600 mb-4" />
-                      <span className="text-xs font-black text-slate-500 uppercase tracking-widest text-center px-6">
-                        Click para añadir foto <br/>
-                        <span className="text-[10px] text-slate-600 lowercase">(formatos: jpg, png, webp)</span>
-                      </span>
-                    </div>
-                  )}
+                <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ImageIcon className="w-4 h-4 text-emerald-400" />
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">URL externa de imagen</label>
+                  </div>
+                  <input
+                    type="url"
+                    placeholder="https://... (Drive público, CDN o imagen externa)"
+                    value={newMeal.image_url || ''}
+                    onChange={(e) => setNewMeal({ ...newMeal, image_url: e.target.value })}
+                    className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-sm font-bold focus:border-primary outline-none text-white"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-2">No se suben imágenes a Supabase ni a Vercel.</p>
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
                 
                 <div className="space-y-4">
                   <div>
@@ -574,6 +573,18 @@ export function Meals() {
                       <option value="almuerzo">Almuerzo</option>
                       <option value="cena">Cena</option>
                       <option value="snack">Snack</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 block ml-1">Objetivo del estudiante</label>
+                    <select
+                      value={newMeal.goal || 'general'}
+                      onChange={(e) => setNewMeal({ ...newMeal, goal: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-sm font-bold focus:border-primary outline-none text-white appearance-none"
+                    >
+                      <option value="general">General / mostrar en todos</option>
+                      {GOAL_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                     </select>
                   </div>
 
@@ -649,11 +660,31 @@ export function Meals() {
                       required
                     />
                   </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 block ml-1">Tips de valor</label>
+                    <textarea
+                      placeholder="Conservación, sustituciones, punto de cocción o recomendación nutricional..."
+                      value={newMeal.tips || ''}
+                      onChange={(e) => setNewMeal({ ...newMeal, tips: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-sm font-bold focus:border-primary outline-none text-white h-24 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 block ml-1">Libro / fuente</label>
+                    <input
+                      type="text"
+                      placeholder="Nombre del libro o fuente autorizada"
+                      value={newMeal.source_book || ''}
+                      onChange={(e) => setNewMeal({ ...newMeal, source_book: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-sm font-bold focus:border-primary outline-none text-white"
+                    />
+                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={uploadingImage}
                   className="btn-press w-full bg-emerald-600 text-white font-black py-4 rounded-xl mt-4 shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-5 h-5" />
@@ -721,6 +752,13 @@ export function Meals() {
                       </div>
                     </div>
 
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">
+                        {meal.goal === 'bajar' ? 'Bajar peso' : meal.goal === 'subir' ? 'Subir peso' : meal.goal === 'mantener' ? 'Mantener' : 'General'}
+                      </span>
+                      {meal.source_book && <span className="text-[10px] font-bold text-slate-500 bg-slate-900 px-2 py-1 rounded-lg">{meal.source_book}</span>}
+                    </div>
+
                     <div className="flex gap-4 text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">
                       <span className="flex items-center gap-1">
                         <Flame className="w-3 h-3 text-orange-400" /> {meal.calories || 0} kcal
@@ -749,6 +787,12 @@ export function Meals() {
                         </p>
                         <p className="text-2xl text-slate-300 leading-relaxed">{meal.instructions}</p>
                       </div>
+                      {meal.tips && (
+                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
+                          <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Tips de valor</p>
+                          <p className="text-sm text-slate-300 leading-relaxed">{meal.tips}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -832,7 +876,11 @@ export function Meals() {
             variants={staggerContainer}
             className="grid grid-cols-1 md:grid-cols-2 gap-4"
           >
-            {HEALTHY_RECIPES.map((recipe) => (
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-slate-300">
+              <p className="font-bold text-emerald-300">Recetas organizadas por objetivo</p>
+              <p className="mt-1 text-xs text-slate-400">El filtro se adapta a tu objetivo. Las recetas sin objetivo específico aparecen como generales.</p>
+            </div>
+            {filteredBookRecipes.map((recipe) => (
               <motion.div key={recipe.id} variants={staggerItem} {...liftCard}>
                 <RecipeCard
                   recipe={recipe}
@@ -905,6 +953,7 @@ export function Meals() {
                   </div>
 
                   <div className="pt-6 border-t border-slate-800 text-center">
+                    {selectedHealthyRecipe.tips && <p className="text-sm text-amber-300 mb-4">Tip: {selectedHealthyRecipe.tips}</p>}
                     <p className="text-[10px] text-slate-500 uppercase tracking-widest">
                       Fuente: {selectedHealthyRecipe.fuente}
                     </p>
