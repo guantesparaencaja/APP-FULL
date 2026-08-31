@@ -94,7 +94,6 @@ export function Profile() {
     workouts_unlocked: false,
     nutrition_unlocked: false,
     technique_unlocked: false,
-    challenge_unlocked: false,
   });
   const [togglingSection, setTogglingSection] = useState<string | null>(null);
   const [expandedAdminSections, setExpandedAdminSections] = useState<Set<string>>(
@@ -2233,7 +2232,6 @@ export function Profile() {
                       { key: 'workouts_unlocked', label: 'Entrenamientos', emoji: '💪' },
                       { key: 'technique_unlocked', label: 'Técnica / Saberes', emoji: '🥊' },
                       { key: 'nutrition_unlocked', label: 'Nutrición', emoji: '🥗' },
-                      { key: 'challenge_unlocked', label: 'Reto del Día', emoji: '🏆' },
                     ] as const
                   ).map(({ key, label, emoji }) => {
                     const isOn = appSettings[key];

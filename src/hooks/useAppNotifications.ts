@@ -167,39 +167,4 @@ export function useAppNotifications() {
     };
   }, [user]);
 
-  // Daily Challenge — Supabase Realtime
-  useEffect(() => {
-    if (!user) return;
-    const isWeb = Capacitor.getPlatform() === 'web';
-
-    const challengeChannel = supabase
-      .channel('realtime:daily_challenge')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'settings' },
-        (payload) => {
-          const row = payload.new as { id: string; title?: string };
-          if (row.id === 'daily_challenge') {
-            const title = '🎯 Nuevo Reto del Día';
-            const body = row.title || '¡Revisa el reto de hoy y supérate!';
-            if (isWeb) {
-              const lastC = localStorage.getItem('last_challenge_id');
-              if (lastC !== String(payload.commit_timestamp)) {
-                sendPushNotification(String(user.id), title, body);
-                localStorage.setItem('last_challenge_id', String(payload.commit_timestamp));
-              }
-            } else {
-              LocalNotifications.schedule({
-                notifications: [{ title, body, id: 50, schedule: { at: new Date(Date.now() + 1000) } }],
-              });
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(challengeChannel);
-    };
-  }, [user]);
 }

@@ -17,11 +17,11 @@ export function PageHeader({ emoji, title, subtitle, right }: PageHeaderProps) {
 
   if (prefersReduced) {
     return (
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <header className="mb-6 flex min-w-0 flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 items-start gap-3">
           {emoji && <span className="text-3xl leading-none" aria-hidden>{emoji}</span>}
-          <div>
-            <h1 className="font-black uppercase italic tracking-tighter text-2xl sm:text-3xl text-slate-900 dark:text-white">
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words font-black uppercase italic tracking-tighter text-2xl sm:text-3xl text-slate-900 dark:text-white">
               {title}
             </h1>
             {subtitle && (
@@ -29,7 +29,7 @@ export function PageHeader({ emoji, title, subtitle, right }: PageHeaderProps) {
             )}
           </div>
         </div>
-        {right && <div className="shrink-0">{right}</div>}
+        {right && <div className="w-full min-w-0 sm:w-auto sm:shrink-0">{right}</div>}
       </header>
     );
   }
@@ -39,9 +39,9 @@ export function PageHeader({ emoji, title, subtitle, right }: PageHeaderProps) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="mb-6 flex items-start justify-between gap-4"
+      className="mb-6 flex min-w-0 flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-start"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-start gap-3">
         {emoji && (
           <motion.span
             initial={{ scale: 0, rotate: -20 }}
@@ -53,8 +53,8 @@ export function PageHeader({ emoji, title, subtitle, right }: PageHeaderProps) {
             {emoji}
           </motion.span>
         )}
-        <div>
-          <h1 className="font-black uppercase italic tracking-tighter text-2xl sm:text-3xl text-slate-900 dark:text-white">
+        <div className="min-w-0 flex-1">
+          <h1 className="break-words font-black uppercase italic tracking-tighter text-2xl sm:text-3xl text-slate-900 dark:text-white">
             {title}
           </h1>
           {subtitle && (
@@ -64,7 +64,7 @@ export function PageHeader({ emoji, title, subtitle, right }: PageHeaderProps) {
           )}
         </div>
       </div>
-      {right && <div className="shrink-0">{right}</div>}
+      {right && <div className="w-full min-w-0 sm:w-auto sm:shrink-0">{right}</div>}
     </motion.header>
   );
 }

@@ -151,7 +151,6 @@ export function Home() {
     workouts_unlocked: false,
     nutrition_unlocked: false,
     technique_unlocked: false,
-    challenge_unlocked: false,
   });
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [challengeForm, setChallengeForm] = useState({
@@ -326,6 +325,10 @@ export function Home() {
   }, [user?.id]);
 
   useEffect(() => {
+    // El Reto del Día fue retirado. Se conserva este bloque temporalmente para
+    // no mezclar una limpieza estructural con otros cambios de Inicio.
+    return;
+    /* istanbul ignore next -- legacy challenge code kept out of the runtime
     if (!user || hasBoxingClassToday !== false) return;
     supabase.from('challenges').select('*').order('created_at', { ascending: false }).then(async ({ data: allChallenges }) => {
       if (!allChallenges) return;
@@ -339,7 +342,8 @@ export function Home() {
         if (rec) { setIsChallengeCompleted(true); if (rec.checkedTasks) setCheckedTasks(new Set(rec.checkedTasks)); }
       } else { setCurrentChallenge(null); }
     });
-  }, [user?.fitnessGoal, user?.id, hasBoxingClassToday]);
+    */
+  }, []);
 
   const [challengeVideoUrl, setChallengeVideoUrl] = useState('');
   const [challengeGifUrl, setChallengeGifUrl] = useState('');
@@ -374,7 +378,7 @@ export function Home() {
 
   const isNutritionUnlocked = isSpecialUser || appSettings.nutrition_unlocked || hasFullAccess;
   const isTechniqueUnlocked = isSpecialUser || appSettings.technique_unlocked || hasFullAccess;
-  const isChallengeUnlocked = isSpecialUser || appSettings.challenge_unlocked || hasFullAccess;
+  const isChallengeUnlocked = false;
   const isWorkoutsUnlocked = isSpecialUser || appSettings.workouts_unlocked || hasFullAccess;
 
   const handleChallengeVideoUrl = async () => {
@@ -465,7 +469,7 @@ export function Home() {
         </Reveal>
       )}
 
-      <Reveal>
+      {false && <Reveal>
       <section className={`mb-16 relative ${!isChallengeUnlocked ? 'opacity-60 grayscale' : ''}`}>
         {!isChallengeUnlocked && (
           <div className="absolute inset-0 bg-slate-950/20 z-30 flex items-center justify-center rounded-[2.5rem] backdrop-blur-[2px]">
@@ -733,7 +737,7 @@ export function Home() {
           )}
         </div>
       </section>
-      </Reveal>
+      </Reveal>}
 
       {user.role === 'student' && (
         <Reveal>
@@ -1226,8 +1230,7 @@ export function Home() {
 
       {/* Panel de Control de Secciones está SOLO en Perfil (admin) */}
 
-      {/* Challenge Admin Modal */}
-      <Modal
+      {false && <Modal
         isOpen={showChallengeModal}
         onClose={() => setShowChallengeModal(false)}
         title="Crear Nuevo Reto"
@@ -1504,7 +1507,7 @@ export function Home() {
             </button>
           </form>
         </div>
-      </Modal>
+      </Modal>}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { Capacitor } from '@capacitor/core';
 
 import { Modal } from '../components/Modal';
 import { motion } from 'motion/react';
+import { BrandMark } from '../components/BrandMark';
 import { staggerContainer, staggerItem, scaleIn, fadeUp } from '../lib/animations';
 
 export function Login() {
@@ -317,14 +318,12 @@ export function Login() {
         animate="show"
         className="flex flex-col items-center justify-center pt-8 pb-4 px-6"
       >
-        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 neon-border neon-glow">
-          <span className="text-primary text-5xl">🥊</span>
-        </div>
+        <BrandMark size="lg" />
         <h1 className="text-slate-100 tracking-tight text-4xl font-bold leading-tight text-center">
           GPTE
         </h1>
-        <p className="text-slate-400 text-base font-normal leading-normal mt-2 text-center">
-          Guantes para encajarte🥊
+        <p className="max-w-[18rem] text-slate-400 text-base font-normal leading-normal mt-2 text-center">
+          Guantes para encajar
         </p>
       </motion.div>
 

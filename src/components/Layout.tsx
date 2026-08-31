@@ -11,7 +11,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  Shield,
   Bell,
   Apple,
   ShoppingBag,
@@ -26,6 +25,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { pageTransition } from '../lib/animations';
 import { NotificationsPanel } from './NotificationsPanel';
 import { isAdminUser } from '../lib/admin';
+import { BrandMark } from './BrandMark';
 const MIN_SWIPE_DISTANCE = 50;
 const SWIPE_THRESHOLD_VELOCITY = 0.5;
 let lastTouchStartX = 0;
@@ -43,7 +43,6 @@ export function Layout() {
     workouts_unlocked: false,
     nutrition_unlocked: false,
     technique_unlocked: false,
-    challenge_unlocked: false,
   });
 
   useEffect(() => {
@@ -203,7 +202,7 @@ export function Layout() {
       <OnboardingModal />
 
       {/* Top Bar — Bell+Hamburger izquierda, Logo derecha */}
-      <header className="fixed top-0 left-0 right-0 z-60 px-4 py-3 flex items-center justify-between backdrop-blur-md bg-background-light/70 dark:bg-background-dark/70 border-b border-white/10 dark:border-slate-800/50">
+      <header className="fixed top-0 left-0 right-0 z-60 flex min-w-0 items-center justify-between gap-3 px-4 py-3 backdrop-blur-md bg-background-light/70 dark:bg-background-dark/70 border-b border-white/10 dark:border-slate-800/50">
         {/* LEFT: actions */}
         <div className="flex items-center gap-2">
           <motion.button
@@ -233,11 +232,8 @@ export function Layout() {
         </div>
 
         {/* RIGHT: branding */}
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="font-black italic uppercase tracking-tighter text-lg group-hover:text-primary transition-colors">GPTE</span>
-          <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
-            <Shield className="w-5 h-5 text-white stroke-[2.5px]" />
-          </div>
+        <Link to="/" className="group shrink-0">
+          <BrandMark size="sm" showName />
         </Link>
       </header>
 

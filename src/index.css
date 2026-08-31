@@ -3,9 +3,9 @@
 @custom-variant dark (&:is(.dark, .dark *));
 
 @theme {
-  --color-primary: #1d4ed8; /* Azul Oscuro Premium GPTE */
-  --color-primary-dark: #1e3a8a;
-  --color-accent-purple: #60a5fa; /* Acento Celeste */
+  --color-primary: #2563eb; /* Azul profundo de acción */
+  --color-primary-dark: #172554;
+  --color-accent-purple: #a855f7; /* Morado de identidad */
   --color-background-light: #f8fafc;
   --color-background-dark: #020617; /* Slate 950 ultra-oscuro */
   --color-surface: #0f172a; /* Slate 900 */
@@ -111,6 +111,19 @@ html.dark {
 body {
   font-family: 'Inter', sans-serif;
   @apply text-slate-900;
+}
+
+/* Protección responsive: evita que títulos, chips y textos largos monten otros elementos. */
+*, *::before, *::after { min-width: 0; }
+img, video, svg { max-width: 100%; }
+h1, h2, h3, h4, p, label, button, a { overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  main { min-width: 0; }
+  main > div { max-width: 100%; }
+  button, a { max-width: 100%; }
+  .text-4xl { font-size: 2rem; line-height: 1.08; }
+  .text-3xl { font-size: 1.65rem; line-height: 1.12; }
 }
 
 .dark body {
