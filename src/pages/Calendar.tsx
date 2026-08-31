@@ -89,6 +89,7 @@ interface Booking {
   status: string;
   rating?: number;
   feedback?: string;
+  credit_returned?: boolean;
   created_at?: string;
 }
 
@@ -137,6 +138,9 @@ export function Calendar() {
   const [dataLoading, setDataLoading] = useState(true);
   const [exceptions, setExceptions] = useState<{ slot_id: string; date: string }[]>([]);
   const [confirmTimeSlot, setConfirmTimeSlot] = useState<string | null>(null);
+  const [rulesAccepted, setRulesAccepted] = useState(false);
+  const [equipmentConfirmed, setEquipmentConfirmed] = useState(false);
+  const [medicalNotice, setMedicalNotice] = useState('');
   // T1+T2: Inline admin editing of description and rules
   const [editingField, setEditingField] = useState<'description' | 'rules' | null>(null);
   const [editingFieldValue, setEditingFieldValue] = useState('');
@@ -260,6 +264,10 @@ export function Calendar() {
   const handleBook = async () => {
     const targetUser = isAdmin && selectedStudentForSchedule ? selectedStudentForSchedule : user;
     if (!targetUser || !selectedTime) return;
+    if (!isAdmin && (!rulesAccepted || !equipmentConfirmed)) {
+      setAlertModal({ show: true, message: 'Debes aceptar las reglas y confirmar que llevas el equipo necesario.', type: 'info' });
+      return;
+    }
 
     const isManualPayment = isAdmin && scheduleMode === 'payment';
     if (!isManualPayment && (targetUser.classes_remaining || 0) <= 0) {
@@ -279,12 +287,21 @@ export function Calendar() {
       const timeStr = `${selectedTime.start_time} - ${selectedTime.end_time}`;
       const status = isManualPayment ? 'pending_payment' : 'active';
 
+      if (!isAdmin && medicalNotice.trim() && user?.id) {
+        await supabase.from('profiles').update({
+          medical_conditions: medicalNotice.trim(),
+          medical_conditions_updated_at: new Date().toISOString(),
+        }).eq('id', user.id);
+      }
+
       const { error: insertError } = await supabase.rpc('book_class', {
         p_class_id: selectedTime.id,
         p_date: dateStr,
         p_time: timeStr,
         p_user_id: targetUser.id,
         p_status: status,
+        p_rules_accepted: isAdmin || rulesAccepted,
+        p_equipment_confirmed: isAdmin || equipmentConfirmed,
       });
 
       if (insertError) throw insertError;
@@ -315,11 +332,13 @@ export function Calendar() {
   const handleCancelBooking = async (bookingId: string) => {
     if (!window.confirm('¿Deseas cancelar esta reserva?')) return;
     try {
+      let cancelledBooking: Booking | null = null;
       const { data: bookingData } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
       if (bookingData) {
-        const { error: cancelError } = await supabase.rpc('cancel_booking', { p_booking_id: bookingId });
+        const { data, error: cancelError } = await supabase.rpc('cancel_booking', { p_booking_id: bookingId, p_reason: 'Cancelación solicitada por el usuario' });
         if (cancelError) throw cancelError;
-        if (bookingData.status === 'active' && bookingData.user_id === user?.id) {
+        cancelledBooking = data as Booking;
+        if (cancelledBooking?.credit_returned && bookingData.user_id === user?.id) {
           setUser({ ...user!, classes_remaining: (user.classes_remaining || 0) + 1 });
         }
         try {
@@ -327,7 +346,7 @@ export function Calendar() {
           await sendEmail(bookingData.user_email || '', '❌ Clase Cancelada — Guantes Para Encajarte', cancelHtml);
         } catch (e) { console.warn('Cancel email error:', e); }
       }
-      setAlertModal({ show: true, message: 'Reserva cancelada.', type: 'info' });
+      setAlertModal({ show: true, message: cancelledBooking?.status === 'late_cancelled' ? 'Cancelación tardía: la clase se tomó como inasistencia y no se devolvió.' : 'Reserva cancelada. La clase fue devuelta a tu plan.', type: 'info' });
     } catch (err) {
       console.error(err);
     }
@@ -777,7 +796,7 @@ export function Calendar() {
                           </div>
                         ) : (
                           <p className="text-xs leading-relaxed text-slate-500 whitespace-pre-line">
-                            {selectedTime?.rules || '• Cancelación con mínimo 2 horas de anticipación.\n• Llegar 5 minutos antes.\n• Traer guantes, vendas e hidratación.'}
+                            {`• Cancelar con mínimo 2 horas de anticipación para recuperar la clase.\n• Llegar 10 minutos antes.\n• Llegar vendado.\n• Llevar guantes, vendas, toalla, agua y lazo.\n• Bucal opcional, obligatorio los domingos.\n• Informar cualquier situación médica antes de entrenar.${selectedTime?.rules ? `\n• ${selectedTime.rules}` : ''}`}
                           </p>
                         )}
                       </div>
@@ -1000,6 +1019,11 @@ export function Calendar() {
                                   onClick={() => {
                                     setSelectedTime(slot);
                                     setConfirmTimeSlot(isSlotConfirming ? null : slot.id);
+                                    if (!isSlotConfirming) {
+                                      setRulesAccepted(false);
+                                      setEquipmentConfirmed(false);
+                                      setMedicalNotice('');
+                                    }
                                   }}
                                   className={cn(
                                     'flex-1 py-4 text-sm font-black rounded-xl border-2 transition-all duration-300',
@@ -1020,7 +1044,7 @@ export function Calendar() {
                                       animate={{ scaleX: 1, opacity: 1 }}
                                       exit={{ scaleX: 0, opacity: 0 }}
                                       onClick={handleBook}
-                                      disabled={loading}
+                                      disabled={loading || (!isAdmin && (!rulesAccepted || !equipmentConfirmed))}
                                       className="flex-1 bg-primary text-white py-4 px-6 rounded-xl text-xs font-black uppercase shadow-2xl shadow-primary/30 hover:bg-primary-dark transition-all"
                                     >
                                       {loading ? (
@@ -1032,6 +1056,20 @@ export function Calendar() {
                                   )}
                                 </AnimatePresence>
                               </div>
+
+                              {isSlotConfirming && !isAdmin && (
+                                <div className="mt-3 space-y-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-left">
+                                  <label className="flex gap-2 text-[11px] text-slate-300">
+                                    <input type="checkbox" checked={rulesAccepted} onChange={(e) => setRulesAccepted(e.target.checked)} className="mt-0.5 accent-emerald-500" />
+                                    <span>Acepto las reglas: llegar 10 minutos antes, llegar vendado y respetar la cancelación con 2 horas de anticipación.</span>
+                                  </label>
+                                  <label className="flex gap-2 text-[11px] text-slate-300">
+                                    <input type="checkbox" checked={equipmentConfirmed} onChange={(e) => setEquipmentConfirmed(e.target.checked)} className="mt-0.5 accent-emerald-500" />
+                                    <span>Confirmo que llevaré guantes, vendas, toalla, agua y lazo. El bucal es obligatorio los domingos.</span>
+                                  </label>
+                                  <textarea value={medicalNotice} onChange={(e) => setMedicalNotice(e.target.value)} placeholder="Informa lesiones o situaciones médicas relevantes (opcional si no tienes ninguna)..." className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] text-white outline-none focus:border-emerald-500" rows={2} />
+                                </div>
+                              )}
 
                               {isAdmin && (
                                 <div className="mt-3 space-y-3">
