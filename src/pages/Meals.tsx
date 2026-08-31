@@ -69,6 +69,15 @@ const normalizeGoal = (value?: string) => {
   return 'mantener';
 };
 
+const EXTERNAL_MEAL_PLACEHOLDERS: Record<string, string> = {
+  desayuno: 'https://images.unsplash.com/photo-1533087375-6c3f4f9f5a1f?w=1200&q=80',
+  almuerzo: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=1200&q=80',
+  cena: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1200&q=80',
+  snack: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=1200&q=80',
+};
+
+const getMealImage = (meal: Meal) => meal.image_url || EXTERNAL_MEAL_PLACEHOLDERS[meal.category.toLowerCase()] || EXTERNAL_MEAL_PLACEHOLDERS.almuerzo;
+
 export function Meals() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -710,15 +719,14 @@ export function Meals() {
                   {...liftCard}
                   className={`bg-slate-800 rounded-xl border transition-colors overflow-hidden shadow-lg ${isConsumed ? 'border-emerald-500/50 ring-1 ring-emerald-500/20' : 'border-slate-700'}`}
                 >
-                  {meal.image_url && (
-                    <div className="w-full aspect-16/10 bg-slate-900 flex items-center justify-center border-b border-slate-700 relative overflow-hidden">
-                      <img
-                        src={meal.image_url}
-                        alt={meal.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
+                  <div className="w-full aspect-16/10 bg-slate-900 flex items-center justify-center border-b border-slate-700 relative overflow-hidden">
+                    <img
+                      src={getMealImage(meal)}
+                      alt={meal.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {!meal.image_url && <span className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-white/80">Imagen provisional</span>}
+                  </div>
                   <div className="p-5">
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-bold text-2xl text-white wrap-break-word pr-2">
