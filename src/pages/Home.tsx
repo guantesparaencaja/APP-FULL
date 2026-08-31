@@ -130,6 +130,14 @@ export function Home() {
     text_aumentar?: string;
     title?: string;
     categoria?: string;
+    exercise_type?: string;
+    repetitions?: number;
+    rounds?: number;
+    work_seconds?: number;
+    rest_seconds?: number;
+    source_url?: string;
+    source_name?: string;
+    license?: string;
     dificultad?: string;
     objetivo?: string;
     tasks?: string[];
@@ -157,6 +165,14 @@ export function Home() {
     objetivo: 'general',
     tasks: [] as string[],
     period: 'dia' as 'dia' | 'semana' | 'mes',
+    exercise_type: 'full_body',
+    repetitions: 10,
+    rounds: 3,
+    work_seconds: 30,
+    rest_seconds: 30,
+    source_url: '',
+    source_name: '',
+    license: '',
   });
   // Helper: manage task items in the form
   const [newTaskInput, setNewTaskInput] = useState('');
@@ -376,9 +392,10 @@ export function Home() {
     e.preventDefault();
     if (!challengeForm.title) { showAlert('Error', 'El título es obligatorio.', 'error'); return; }
     try {
-      await supabase.from('challenges').insert({ ...challengeForm, gif_url: challengeGifUrl.trim() || null, created_at: new Date().toISOString(), created_by: user.id });
+      const { error } = await supabase.from('challenges').insert({ ...challengeForm, gif_url: challengeGifUrl.trim() || null, source_url: challengeForm.source_url.trim() || null, source_name: challengeForm.source_name.trim() || null, license: challengeForm.license.trim() || null, created_at: new Date().toISOString(), created_by: user.id });
+      if (error) throw error;
       setShowChallengeModal(false);
-      setChallengeForm({ title: '', text: '', text_bajar_peso: '', text_mantener: '', text_aumentar: '', categoria: 'Boxeo', dificultad: 'intermedio', objetivo: 'general', tasks: [], period: 'dia' });
+      setChallengeForm({ title: '', text: '', text_bajar_peso: '', text_mantener: '', text_aumentar: '', categoria: 'Boxeo', dificultad: 'intermedio', objetivo: 'general', tasks: [], period: 'dia', exercise_type: 'full_body', repetitions: 10, rounds: 3, work_seconds: 30, rest_seconds: 30, source_url: '', source_name: '', license: '' });
       setNewTaskInput('');
       setChallengeGifUrl('');
       showAlert('Éxito', 'Reto publicado correctamente.', 'success');
@@ -589,7 +606,17 @@ export function Home() {
                     {currentChallenge.period === 'semana' ? '📅 Reto semanal' : '🗓️ Reto mensual'}
                   </span>
                 )}
+                {currentChallenge.exercise_type && <span className="px-4 py-2 bg-orange-500/10 text-orange-300 border border-orange-500/20 rounded-xl text-xs font-black uppercase tracking-widest">{currentChallenge.exercise_type.replace('_', ' ')}</span>}
               </div>
+
+              {(currentChallenge.repetitions || currentChallenge.rounds || currentChallenge.work_seconds) && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+                  <div><p className="text-[9px] uppercase text-slate-500">Repeticiones</p><p className="text-lg font-black text-white">{currentChallenge.repetitions || '—'}</p></div>
+                  <div><p className="text-[9px] uppercase text-slate-500">Rondas</p><p className="text-lg font-black text-white">{currentChallenge.rounds || '—'}</p></div>
+                  <div><p className="text-[9px] uppercase text-slate-500">Trabajo</p><p className="text-lg font-black text-white">{currentChallenge.work_seconds ? `${currentChallenge.work_seconds}s` : '—'}</p></div>
+                  <div><p className="text-[9px] uppercase text-slate-500">Descanso</p><p className="text-lg font-black text-white">{currentChallenge.rest_seconds ? `${currentChallenge.rest_seconds}s` : '—'}</p></div>
+                </div>
+              )}
 
               {/* ── Checklist de tareas ── */}
               {currentChallenge.tasks && currentChallenge.tasks.length > 0 && (
@@ -1231,6 +1258,28 @@ export function Home() {
               className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-sm text-slate-900 dark:text-white focus:border-primary outline-none font-medium"
             />
             <p className="text-[10px] text-slate-500">Usa una URL externa con permiso de reutilización. El GIF no se sube a Supabase ni a Vercel.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de ejercicio
+              <select value={challengeForm.exercise_type} onChange={(e) => setChallengeForm({ ...challengeForm, exercise_type: e.target.value })} className="mt-2 w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-3 text-sm text-white">
+                <option value="full_body">Cuerpo completo</option><option value="boxeo">Boxeo</option><option value="saltar_cuerda">Saltar cuerda</option><option value="yoga_estiramiento">Yoga / estiramiento</option>
+              </select>
+            </label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fuente
+              <input value={challengeForm.source_name} onChange={(e) => setChallengeForm({ ...challengeForm, source_name: e.target.value })} placeholder="Giphy, Tenor, Wikimedia..." className="mt-2 w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-3 text-sm text-white" />
+            </label>
+            {(['repetitions', 'rounds', 'work_seconds', 'rest_seconds'] as const).map((field) => (
+              <label key={field} className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{field === 'repetitions' ? 'Repeticiones' : field === 'rounds' ? 'Rondas' : field === 'work_seconds' ? 'Trabajo (seg)' : 'Descanso (seg)'}
+                <input type="number" min="0" value={challengeForm[field]} onChange={(e) => setChallengeForm({ ...challengeForm, [field]: Number(e.target.value) })} className="mt-2 w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-3 text-sm text-white" />
+              </label>
+            ))}
+            <label className="col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">URL de la fuente / licencia
+              <input value={challengeForm.source_url} onChange={(e) => setChallengeForm({ ...challengeForm, source_url: e.target.value })} placeholder="https://..." className="mt-2 w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-3 text-sm text-white" />
+            </label>
+            <label className="col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Licencia
+              <input value={challengeForm.license} onChange={(e) => setChallengeForm({ ...challengeForm, license: e.target.value })} placeholder="CC BY, uso permitido, etc." className="mt-2 w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-3 text-sm text-white" />
+            </label>
           </div>
 
           <div className="relative">
