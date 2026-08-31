@@ -123,6 +123,7 @@ export function Home() {
   const [currentChallenge, setCurrentChallenge] = useState<{
     id: string;
     url?: string;
+    gif_url?: string;
     text?: string;
     text_bajar_peso?: string;
     text_mantener?: string;
@@ -136,6 +137,7 @@ export function Home() {
     createdAt?: any;
   } | null>(null);
   const [isChallengeCompleted, setIsChallengeCompleted] = useState(false);
+  const [hasBoxingClassToday, setHasBoxingClassToday] = useState<boolean | null>(null);
   const [checkedTasks, setCheckedTasks] = useState<Set<number>>(new Set());
   const [appSettings, setAppSettings] = useState({
     workouts_unlocked: false,
@@ -293,6 +295,22 @@ export function Home() {
 
   useEffect(() => {
     if (!user) return;
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    Promise.all([
+      supabase.from('bookings').select('class_id, date, status').eq('user_id', user.id).eq('date', todayStr),
+      supabase.from('availabilities').select('id, title, description'),
+    ]).then(([bookingResult, availabilityResult]) => {
+      const boxingIds = new Set((availabilityResult.data || [])
+        .filter((a: any) => /boxeo|boxing/i.test(`${a.title || ''} ${a.description || ''}`))
+        .map((a: any) => String(a.id)));
+      setHasBoxingClassToday((bookingResult.data || []).some((b: any) =>
+        ['active', 'pending', 'pending_payment'].includes(b.status) && boxingIds.has(String(b.class_id))
+      ));
+    }).catch(() => setHasBoxingClassToday(false));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || hasBoxingClassToday !== false) return;
     supabase.from('challenges').select('*').order('created_at', { ascending: false }).then(async ({ data: allChallenges }) => {
       if (!allChallenges) return;
       const userGoal = user.fitnessGoal || 'general';
@@ -305,9 +323,10 @@ export function Home() {
         if (rec) { setIsChallengeCompleted(true); if (rec.checkedTasks) setCheckedTasks(new Set(rec.checkedTasks)); }
       } else { setCurrentChallenge(null); }
     });
-  }, [user?.fitnessGoal, user?.id]);
+  }, [user?.fitnessGoal, user?.id, hasBoxingClassToday]);
 
   const [challengeVideoUrl, setChallengeVideoUrl] = useState('');
+  const [challengeGifUrl, setChallengeGifUrl] = useState('');
 
   if (!user) return null;
 
@@ -357,10 +376,11 @@ export function Home() {
     e.preventDefault();
     if (!challengeForm.title) { showAlert('Error', 'El título es obligatorio.', 'error'); return; }
     try {
-      await supabase.from('challenges').insert({ ...challengeForm, created_at: new Date().toISOString(), created_by: user.id });
+      await supabase.from('challenges').insert({ ...challengeForm, gif_url: challengeGifUrl.trim() || null, created_at: new Date().toISOString(), created_by: user.id });
       setShowChallengeModal(false);
       setChallengeForm({ title: '', text: '', text_bajar_peso: '', text_mantener: '', text_aumentar: '', categoria: 'Boxeo', dificultad: 'intermedio', objetivo: 'general', tasks: [], period: 'dia' });
       setNewTaskInput('');
+      setChallengeGifUrl('');
       showAlert('Éxito', 'Reto publicado correctamente.', 'success');
     } catch (error) { showAlert('Error', 'No se pudo guardar el reto.', 'error'); }
   };
@@ -485,7 +505,15 @@ export function Home() {
             )}
           </div>
 
-          {currentChallenge ? (
+          {hasBoxingClassToday === null ? (
+            <div className="p-8 text-center rounded-2xl border border-slate-800 bg-slate-900/40 text-sm text-slate-400">Comprobando tu agenda de hoy…</div>
+          ) : hasBoxingClassToday ? (
+            <div className="p-8 text-center rounded-2xl border border-primary/20 bg-primary/5">
+              <Calendar className="w-10 h-10 mx-auto mb-3 text-primary" />
+              <p className="font-black uppercase tracking-widest text-white">Hoy tienes clase de boxeo</p>
+              <p className="mt-2 text-sm text-slate-400">Guarda tu energía para el entrenamiento. El reto diario se activará en tu próximo día sin clase.</p>
+            </div>
+          ) : currentChallenge ? (
             <div className="space-y-6">
               {user.role === 'admin' && (
                 <div className="flex justify-end p-2">
@@ -494,7 +522,14 @@ export function Home() {
                   </span>
                 </div>
               )}
-              {currentChallenge.url ? (
+              {currentChallenge.gif_url ? (
+                <div className="space-y-4">
+                  <div className="aspect-video rounded-2xl overflow-hidden bg-black relative shadow-2xl border border-slate-800">
+                    <img src={currentChallenge.gif_url} alt={currentChallenge.title || 'Demostración del reto'} className="w-full h-full object-contain" />
+                  </div>
+                  {currentChallenge.title && <h4 className="text-base sm:text-lg font-bold text-white">{currentChallenge.title}</h4>}
+                </div>
+              ) : currentChallenge.url ? (
                 <div className="space-y-4">
                   <div className="aspect-video rounded-2xl overflow-hidden bg-black relative shadow-2xl border border-slate-800">
                     <LazyVideoWrapper
@@ -1182,6 +1217,20 @@ export function Home() {
               placeholder="https://drive.google.com/..."
               className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-sm text-slate-900 dark:text-white focus:border-primary outline-none font-medium"
             />
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-xs font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
+              <Activity className="w-4 h-4" /> URL externa del GIF
+            </h4>
+            <input
+              type="url"
+              value={challengeGifUrl}
+              onChange={(e) => setChallengeGifUrl(e.target.value)}
+              placeholder="https://.../ejercicio.gif"
+              className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-4 text-sm text-slate-900 dark:text-white focus:border-primary outline-none font-medium"
+            />
+            <p className="text-[10px] text-slate-500">Usa una URL externa con permiso de reutilización. El GIF no se sube a Supabase ni a Vercel.</p>
           </div>
 
           <div className="relative">
