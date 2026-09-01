@@ -17,7 +17,7 @@ export function BrandMark({ size = 'md', showName = false, className = '' }: Bra
   const s = sizes[size];
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
-      <img className={`${s.box} shrink-0 rounded-xl object-cover shadow-[0_0_22px_rgba(34,211,238,0.28)]`} src="/gpte-app-icon.svg" alt="" aria-hidden="true" />
+      <img className={`${s.box} shrink-0 rounded-xl object-contain shadow-[0_0_22px_rgba(34,211,238,0.28)]`} src="/gpte-logo-elegido.png" alt="" aria-hidden="true" />
       {showName && <span className={`${s.text} font-black italic uppercase tracking-[-0.08em] text-white`}>GPTE</span>}
     </span>
   );

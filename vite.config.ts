@@ -21,19 +21,19 @@ export default defineConfig(() => {
           orientation: 'portrait',
           icons: [
             {
-              src: '/gpte-app-icon.svg',
+              src: '/gpte-logo-elegido.png',
               sizes: '192x192',
-              type: 'image/svg+xml'
+              type: 'image/png'
             },
             {
-              src: '/gpte-app-icon.svg',
+              src: '/gpte-logo-elegido.png',
               sizes: '512x512',
-              type: 'image/svg+xml'
+              type: 'image/png'
             },
             {
-              src: '/gpte-app-icon.svg',
+              src: '/gpte-logo-elegido.png',
               sizes: '512x512',
-              type: 'image/svg+xml',
+              type: 'image/png',
               purpose: 'maskable'
             }
           ]
