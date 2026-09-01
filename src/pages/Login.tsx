@@ -14,7 +14,6 @@ import { Capacitor } from '@capacitor/core';
 
 import { Modal } from '../components/Modal';
 import { motion } from 'motion/react';
-import { BrandMark } from '../components/BrandMark';
 import { staggerContainer, staggerItem, scaleIn, fadeUp } from '../lib/animations';
 
 export function Login() {
@@ -318,7 +317,7 @@ export function Login() {
         animate="show"
         className="flex flex-col items-center justify-center pt-8 pb-4 px-6"
       >
-        <BrandMark size="lg" />
+        <img src="/gpte-academy-logo.svg" alt="GPTE Club de Boxeo" className="h-56 w-56 max-w-full object-contain sm:h-64 sm:w-64" />
         <h1 className="text-slate-100 tracking-tight text-4xl font-bold leading-tight text-center">
           GPTE
         </h1>

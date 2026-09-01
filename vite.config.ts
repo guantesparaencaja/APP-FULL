@@ -15,25 +15,25 @@ export default defineConfig(() => {
         manifest: {
           name: 'Guantes Para Encajar',
           short_name: 'Guantes',
-          theme_color: '#0f172a',
-          background_color: '#0f172a',
+          theme_color: '#070711',
+          background_color: '#070711',
           display: 'standalone',
           orientation: 'portrait',
           icons: [
             {
-              src: '/icons/icon-192.png',
+              src: '/gpte-app-icon.svg',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/svg+xml'
             },
             {
-              src: '/icons/icon-512.png',
+              src: '/gpte-app-icon.svg',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/svg+xml'
             },
             {
-              src: '/icons/icon-maskable-512.png',
+              src: '/gpte-app-icon.svg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/svg+xml',
               purpose: 'maskable'
             }
           ]
