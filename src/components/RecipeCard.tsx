@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Clock, Flame, ChefHat, Info } from 'lucide-react';
+import { Clock, Flame, ChefHat, ChevronRight } from 'lucide-react';
 import { HealthyRecipe } from '../data/healthyRecipes';
 
 interface RecipeCardProps {
@@ -63,7 +63,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onViewDetails })
             </div>
 
             <div className="flex items-center gap-1 text-emerald-400 font-bold text-[10px] uppercase tracking-wider">
-              Ver detalles <Info className="w-3 h-3" />
+              Ver detalles <ChevronRight className="w-3 h-3" />
             </div>
           </div>
         </div>

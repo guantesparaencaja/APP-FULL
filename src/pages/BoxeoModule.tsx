@@ -8,7 +8,6 @@ import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 import { BoxerAnimatedHero } from '../components/BoxerAnimatedHero';
-import { BoxerViewer3D } from '../components/BoxerViewer3D';
 import { BoxeoVideoPicker, PickedVideo } from '../components/BoxeoVideoPicker';
 
 interface BoxeoVideo {
@@ -27,9 +26,6 @@ interface BoxeoVideo {
   orden: number;
   creado_en?: any;
 }
-
-// Modelo 3D del boxeador, alojado en Google Drive (carpeta "3D Modelos")
-const MODELO_3D_URL = 'https://drive.usercontent.google.com/download?id=1ZS-6G_38Uh4oBFH5khqSKmZphDcEo7u7&export=download';
 
 const SUBCATEGORIAS = [
   { id: 'Tecnica-Basica',  label: 'Tecnica Basica',    icon: '\u{1F94A}', color: 'from-red-500/80 to-red-700/80',     glow: 'shadow-red-500/20',     desc: 'Golpes fundamentales del boxeo',      min_level: 1 },
@@ -557,22 +553,6 @@ export function BoxeoModule({ isEmbedded = false }: { isEmbedded?: boolean }) {
               </div>
             </div>
           </div>
-        </div>
-      </motion.div>
-
-      {/* Viewer 3D interactivo */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}
-        className="mx-4 mb-6">
-        <div className="rounded-3xl overflow-hidden border border-white/5 relative">
-          <div className="absolute top-3 left-4 z-10 flex items-center gap-2 pointer-events-none">
-            <span className="px-3 py-1 bg-white/10 backdrop-blur-sm text-white text-[10px] font-black rounded-lg uppercase tracking-widest border border-white/10">
-              Tu Boxeador 3D
-            </span>
-          </div>
-          <BoxerViewer3D glbUrl={MODELO_3D_URL} height="360px" />
-          <p className="absolute bottom-3 right-4 z-10 text-[10px] font-bold text-white/40 pointer-events-none">
-            Arrastra para rotar
-          </p>
         </div>
       </motion.div>
 

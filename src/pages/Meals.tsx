@@ -8,6 +8,7 @@ import {
   Wheat,
   Beef,
   X,
+  ChevronDown,
   Image as ImageIcon,
   Trash2,
   Droplet,
@@ -110,6 +111,7 @@ export function Meals() {
     'mis_recetas'
   );
   const [selectedHealthyRecipe, setSelectedHealthyRecipe] = useState<HealthyRecipe | null>(null);
+  const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
   const [alertModal, setAlertModal] = useState({
     isOpen: false,
     title: '',
@@ -782,26 +784,31 @@ export function Meals() {
                       </span>
                     </div>
 
-                    <div className="mt-4 space-y-4">
-                      <div>
-                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">
-                          Ingredientes
-                        </p>
-                        <p className="text-2xl text-slate-300 leading-relaxed">{meal.ingredients}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">
-                          Preparación
-                        </p>
-                        <p className="text-2xl text-slate-300 leading-relaxed">{meal.instructions}</p>
-                      </div>
-                      {meal.tips && (
-                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
-                          <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Tips de valor</p>
-                          <p className="text-sm text-slate-300 leading-relaxed">{meal.tips}</p>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedMeals((current) => {
+                        const next = new Set(current);
+                        if (next.has(meal.id)) next.delete(meal.id); else next.add(meal.id);
+                        return next;
+                      })}
+                      className="mt-4 w-full flex items-center justify-between rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-emerald-400 hover:border-emerald-500/50 transition-colors"
+                      aria-expanded={expandedMeals.has(meal.id)}
+                    >
+                      <span>{expandedMeals.has(meal.id) ? 'Ocultar receta' : 'Ver ingredientes y preparación'}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${expandedMeals.has(meal.id) ? 'rotate-180' : ''}`} />
+                    </button>
+                    {expandedMeals.has(meal.id) && (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl bg-slate-900/60 p-4">
+                          <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Ingredientes</p>
+                          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">{meal.ingredients}</p>
                         </div>
-                      )}
-                    </div>
+                        <div className="rounded-xl bg-slate-900/60 p-4">
+                          <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Preparación</p>
+                          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">{meal.instructions}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {editingMealId === meal.id && (

@@ -15,6 +15,7 @@ import { PageHeader } from '../components/PageHeader';
 import { SocialVideoEmbed } from '../components/SocialVideoEmbed';
 import { RestTimer } from '../components/RestTimer';
 import { WorkoutPlanBuilder } from '../components/WorkoutPlanBuilder';
+import { ExerciseRating } from '../components/ExerciseRating';
 import { staggerContainer, staggerItem, liftCard } from '../lib/animations';
 import { platformLabel, platformColor } from '../lib/socialParser';
 
@@ -78,6 +79,7 @@ export function WorkoutPlans() {
   // Active exercise (for rest timer)
   const [activeExercise, setActiveExercise] = useState<Exercise | null>(null);
   const [showRestTimer, setShowRestTimer] = useState(false);
+  const [ratings, setRatings] = useState<Record<string, number>>({});
 
   // ─── Load plans ────────────────────────────────────────────────────────────
   const loadPlans = useCallback(async () => {
@@ -125,6 +127,15 @@ export function WorkoutPlans() {
       plan.sections = [];
     }
 
+    if (user?.id) {
+      const { data: ratingRows, error: ratingsError } = await supabase
+        .from('workout_exercise_ratings')
+        .select('exercise_id, rating')
+        .eq('user_id', user.id);
+      if (ratingsError) console.error('[WorkoutPlans] Error cargando calificaciones:', ratingsError);
+      setRatings(Object.fromEntries((ratingRows || []).map((row) => [row.exercise_id, row.rating])));
+    }
+
     setPlanDetail(plan);
     setLoadingDetail(false);
   }, []);
@@ -152,6 +163,19 @@ export function WorkoutPlans() {
     if (exercise.rest_seconds > 0) setShowRestTimer(true);
   };
 
+  const saveRating = async (exerciseId: string, rating: number) => {
+    if (!user?.id) return;
+    const { error } = await supabase.from('workout_exercise_ratings').upsert(
+      { exercise_id: exerciseId, user_id: user.id, rating, updated_at: new Date().toISOString() },
+      { onConflict: 'exercise_id,user_id' },
+    );
+    if (error) {
+      console.error('[WorkoutPlans] Error guardando calificación:', error);
+      return;
+    }
+    setRatings((previous) => ({ ...previous, [exerciseId]: rating }));
+  };
+
   // ─── Calculate total exercises ─────────────────────────────────────────────
   const totalExercises = (plan: Plan) => {
     if (plan.sections) return plan.sections.reduce((acc, s) => acc + (s.exercises?.length || 0), 0);
@@ -159,7 +183,7 @@ export function WorkoutPlans() {
   };
 
   // ─── Builder mode ──────────────────────────────────────────────────────────
-  if (showBuilder) {
+  if (showBuilder && isAdmin) {
     return (
       <div className="space-y-4">
         <PageHeader
@@ -282,6 +306,10 @@ export function WorkoutPlans() {
                               <Play className="w-3 h-3" />
                               Iniciar ejercicio
                             </button>
+
+                            {!isAdmin && (
+                              <ExerciseRating value={ratings[exercise.id]} onChange={(rating) => saveRating(exercise.id, rating)} />
+                            )}
 
                             {exercise.notes && (
                               <p className="text-[10px] text-slate-400 mt-1 italic">{exercise.notes}</p>

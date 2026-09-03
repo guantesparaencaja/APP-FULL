@@ -25,7 +25,6 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { pageTransition } from '../lib/animations';
 import { NotificationsPanel } from './NotificationsPanel';
 import { isAdminUser } from '../lib/admin';
-import { BrandMark } from './BrandMark';
 const MIN_SWIPE_DISTANCE = 50;
 const SWIPE_THRESHOLD_VELOCITY = 0.5;
 let lastTouchStartX = 0;
@@ -232,8 +231,11 @@ export function Layout() {
         </div>
 
         {/* RIGHT: branding */}
-        <Link to="/" className="group shrink-0">
-          <BrandMark size="sm" showName />
+        <Link to="/" className="flex items-center gap-2 group">
+          <span className="font-black italic uppercase tracking-tighter text-lg group-hover:text-primary transition-colors">GPTE</span>
+          <div className="w-10 h-10 rounded-full bg-primary/20 p-0.5 ring-2 ring-primary/60 shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
+            <img src="/logo.png" alt="Guantes Para Encajar" className="w-full h-full rounded-full object-cover" />
+          </div>
         </Link>
       </header>
 

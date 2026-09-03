@@ -17,6 +17,7 @@ import { PageHeader } from '../components/PageHeader';
 import { SocialVideoEmbed } from '../components/SocialVideoEmbed';
 import { RestTimer } from '../components/RestTimer';
 import { WorkoutPlanBuilder } from '../components/WorkoutPlanBuilder';
+import { ExerciseRating } from '../components/ExerciseRating';
 import { staggerContainer, staggerItem, liftCard } from '../lib/animations';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -292,6 +293,7 @@ export function Boxing() {
 
   // Video preview (expand to play on demand, keeps detail ligero)
   const [previewExercise, setPreviewExercise] = useState<Exercise | null>(null);
+  const [ratings, setRatings] = useState<Record<string, number>>({});
 
   // Acordeón de secciones en el detalle (más compacto)
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
@@ -306,28 +308,43 @@ export function Boxing() {
   // ─── Load plans + preview de ejercicios (RLS filtra por rol) ─────────────
   const loadPlans = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error: plansError } = await supabase
       .from('workout_plans')
       .select('*')
       .order('created_at', { ascending: false });
+    if (plansError) {
+      console.error('[Boxing] Error cargando planes:', plansError);
+      setPlans([]);
+      setLoading(false);
+      return;
+    }
     const plansData = data || [];
 
     // Cargar secciones + ejercicios para previsualización compacta
     if (plansData.length > 0) {
       const planIds = plansData.map((p) => p.id);
-      const { data: sections } = await supabase
+      const { data: sections, error: sectionsError } = await supabase
         .from('workout_sections')
         .select('*')
         .in('plan_id', planIds)
         .order('order_index');
+      if (sectionsError) {
+        console.error('[Boxing] Error cargando secciones:', sectionsError);
+        setPlans(plansData);
+        setLoading(false);
+        return;
+      }
       const sectionIds = (sections || []).map((s) => s.id);
-      const { data: exercises } = sectionIds.length > 0
+      const { data: exercises, error: exercisesError } = sectionIds.length > 0
         ? await supabase
             .from('workout_exercises')
             .select('*')
             .in('section_id', sectionIds)
             .order('order_index')
         : { data: [] };
+      if (exercisesError) {
+        console.error('[Boxing] Error cargando ejercicios:', exercisesError);
+      }
 
       plansData.forEach((plan) => {
         plan.sections = (sections || [])
@@ -348,29 +365,41 @@ export function Boxing() {
   // ─── Load plan detail ──────────────────────────────────────────────────────
   const loadPlanDetail = useCallback(async (planId: string) => {
     setLoadingDetail(true);
-    const { data: plan } = await supabase.from('workout_plans').select('*').eq('id', planId).single();
+    const { data: plan, error: planError } = await supabase.from('workout_plans').select('*').eq('id', planId).single();
+    if (planError) console.error('[Boxing] Error cargando detalle:', planError);
     if (!plan) { setLoadingDetail(false); return; }
 
-    const { data: sections } = await supabase
+    const { data: sections, error: sectionsError } = await supabase
       .from('workout_sections')
       .select('*')
       .eq('plan_id', planId)
       .order('order_index');
 
+    if (sectionsError) console.error('[Boxing] Error cargando detalle de secciones:', sectionsError);
     if (sections && sections.length > 0) {
       const sectionIds = sections.map((s) => s.id);
-      const { data: exercises } = await supabase
+      const { data: exercises, error: exercisesError } = await supabase
         .from('workout_exercises')
         .select('*')
         .in('section_id', sectionIds)
         .order('order_index');
 
+      if (exercisesError) console.error('[Boxing] Error cargando detalle de ejercicios:', exercisesError);
       plan.sections = sections.map((s) => ({
         ...s,
         exercises: (exercises || []).filter((e) => e.section_id === s.id),
       }));
     } else {
       plan.sections = [];
+    }
+
+    if (user?.id) {
+      const { data: ratingRows, error: ratingsError } = await supabase
+        .from('workout_exercise_ratings')
+        .select('exercise_id, rating')
+        .eq('user_id', user.id);
+      if (ratingsError) console.error('[Boxing] Error cargando calificaciones:', ratingsError);
+      setRatings(Object.fromEntries((ratingRows || []).map((row) => [row.exercise_id, row.rating])));
     }
 
     setPlanDetail(plan);
@@ -406,6 +435,19 @@ export function Boxing() {
     }
   };
 
+  const saveRating = async (exerciseId: string, rating: number) => {
+    if (!user?.id) return;
+    const { error } = await supabase.from('workout_exercise_ratings').upsert(
+      { exercise_id: exerciseId, user_id: user.id, rating, updated_at: new Date().toISOString() },
+      { onConflict: 'exercise_id,user_id' },
+    );
+    if (error) {
+      console.error('[Boxing] Error guardando calificación:', error);
+      return;
+    }
+    setRatings((previous) => ({ ...previous, [exerciseId]: rating }));
+  };
+
   // ─── Calculate total exercises ─────────────────────────────────────────────
   const totalExercises = (plan: Plan) => {
     if (plan.sections) return plan.sections.reduce((acc, s) => acc + (s.exercises?.length || 0), 0);
@@ -413,7 +455,7 @@ export function Boxing() {
   };
 
   // ─── Builder mode ──────────────────────────────────────────────────────────
-  if (showBuilder) {
+  if (showBuilder && isAdmin) {
     return (
       <div className="space-y-4">
         <PageHeader
@@ -543,7 +585,7 @@ export function Boxing() {
                                       </p>
                                     )}
 
-                                    {/* Video preview (expand on tap) */}
+                                    {/* El video y el inicio están disponibles para miembros; la gestión queda para admin. */}
                                     {exercise.video_url && (
                                       <button
                                         type="button"
@@ -594,6 +636,10 @@ export function Boxing() {
                                       <Play className="w-3 h-3" />
                                       Iniciar ejercicio
                                     </button>
+
+                                    {!isAdmin && (
+                                      <ExerciseRating value={ratings[exercise.id]} onChange={(rating) => saveRating(exercise.id, rating)} />
+                                    )}
 
                                     {exercise.notes && (
                                       <p className="text-[10px] text-slate-400 mt-1 italic">{exercise.notes}</p>

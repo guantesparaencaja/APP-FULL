@@ -473,26 +473,22 @@ export function Profile() {
         return;
       }
 
-      // Limpiar imágenes de perfil
-      const u = allUsers.find((x: any) => x.id === userToDelete.id);
-      if (u) {
-        if (u.profile_pic) await deleteStorageFile(u.profile_pic).catch(() => null);
-        if (u.before_pic) await deleteStorageFile(u.before_pic).catch(() => null);
-        if (u.after_pic) await deleteStorageFile(u.after_pic).catch(() => null);
-      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error('La sesión de administrador expiró. Inicia sesión nuevamente.');
 
-      // Eliminar datos relacionados
-      const { data: approvalData } = await supabase.from('student_approvals').select('*').eq('id', userToDelete.id).single();
-      if (approvalData?.step1_video_url) await deleteStorageFile(approvalData.step1_video_url).catch(() => null);
-      await supabase.from('student_approvals').delete().eq('id', userToDelete.id);
-      await supabase.from('notifications').delete().eq('user_id', userToDelete.id);
-      await supabase.from('payments').delete().eq('user_id', userToDelete.id);
-      await supabase.from('bookings').delete().eq('user_id', userToDelete.id);
-      await supabase.from('profiles').delete().eq('id', userToDelete.id);
+      const response = await fetch('/api/admin-delete-user', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userToDelete.id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'No se pudo eliminar el usuario.');
 
       showAlert('Éxito', 'Usuario y todos sus datos han sido eliminados permanentemente.', 'success');
       setUserToDelete(null);
       setDeleteAdminPassword('');
+      setAllUsers((users) => users.filter((item) => item.id !== userToDelete.id));
     } catch (error: any) {
       showAlert('Error', error.message || 'Error al eliminar usuario', 'error');
     } finally { setIsDeletingUser(false); }

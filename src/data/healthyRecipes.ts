@@ -39,7 +39,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '20 min',
     calorias_aprox: 350,
     fuente: 'COMPILADO RECETAS saludables.pdf',
-    imagen_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80',
   },
   {
     id: 'hr2',
@@ -124,7 +123,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '25 min',
     calorias_aprox: 380,
     fuente: 'Guía de Nutrición Deportiva',
-    imagen_url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&q=80',
   },
   {
     id: 'hr6',
@@ -144,7 +142,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '10 min',
     calorias_aprox: 180,
     fuente: 'Recetas Rápidas y Saludables',
-    imagen_url: 'https://images.unsplash.com/photo-1510693206972-df098062cb71?w=800&q=80',
   },
   {
     id: 'hr7',
@@ -227,7 +224,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '20 min',
     calorias_aprox: 310,
     fuente: 'Cocina Ligera',
-    imagen_url: 'https://images.unsplash.com/photo-1512058560366-cd2427ff56f3?w=800&q=80',
   },
   {
     id: 'hr11',
@@ -436,7 +432,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '10 min',
     calorias_aprox: 420,
     fuente: 'Comidas Rápidas Fit',
-    imagen_url: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=800&q=80',
   },
   {
     id: 'hr21',
@@ -460,7 +455,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '15 min (+ reposo)',
     calorias_aprox: 140,
     fuente: 'Cocina Mediterránea Deportiva',
-    imagen_url: 'https://images.unsplash.com/photo-1607532941433-304659e8198a?w=800&q=80',
   },
   {
     id: 'hr22',
@@ -574,7 +568,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '15 min',
     calorias_aprox: 380,
     fuente: 'Salads for Athletes',
-    imagen_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80',
   },
   {
     id: 'hr27',
@@ -662,7 +655,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '25 min',
     calorias_aprox: 510,
     fuente: 'High-Protein Pasta Cookbook',
-    imagen_url: 'https://images.unsplash.com/photo-1473093226795-af9932fe5856?w=800&q=80',
   },
   {
     id: 'hr31',
@@ -707,7 +699,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '20 min',
     calorias_aprox: 360,
     fuente: 'Iron Athletes Cook Book',
-    imagen_url: 'https://images.unsplash.com/photo-1512058560366-cd2427ff56f3?w=800&q=80',
   },
   {
     id: 'hr33',
@@ -728,7 +719,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '5 min',
     calorias_aprox: 140,
     fuente: 'The Champion\'s Nutrition Plan',
-    imagen_url: 'https://images.unsplash.com/photo-1544145945-f904253d0c7b?w=800&q=80',
   },
   {
     id: 'hr34',
@@ -773,7 +763,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '15 min (+ reposo)',
     calorias_aprox: 220,
     fuente: 'Homemade Sports Nutrition',
-    imagen_url: 'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=800&q=80',
   },
   {
     id: 'hr36',
@@ -796,7 +785,6 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '40 min',
     calorias_aprox: 460,
     fuente: 'Cocina de Alta Potencia',
-    imagen_url: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=800&q=80',
   },
   {
     id: 'hr37',
@@ -885,7 +873,5 @@ export const HEALTHY_RECIPES: HealthyRecipe[] = [
     tiempo: '50 min',
     calorias_aprox: 340,
     fuente: 'Recetas Sin Azúcar para Deportistas',
-    imagen_url: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=800&q=80',
   },
 ];
-
