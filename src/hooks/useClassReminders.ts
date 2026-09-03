@@ -53,7 +53,7 @@ export function useClassReminders() {
           if (diffMins > 0 && diffMins <= 120 && !localStorage.getItem(notifKey)) {
             new Notification('¡Tu clase está por comenzar!', {
               body: `Tienes una clase programada a las ${booking.time}. ¡Prepárate!`,
-              icon: '/favicon.ico',
+              icon: '/logo.png',
             });
             localStorage.setItem(notifKey, 'true');
           }

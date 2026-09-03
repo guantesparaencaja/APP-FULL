@@ -259,7 +259,7 @@ export function Profile() {
       setUser({ ...user, notifications_enabled: permission === 'granted' } as any);
     }
     if (permission === 'granted') {
-      new Notification('¡Notificaciones activadas!', { body: 'Te avisaremos 1 hora antes de tus clases.', icon: '/favicon.ico' });
+      new Notification('¡Notificaciones activadas!', { body: 'Te avisaremos 1 hora antes de tus clases.', icon: '/logo.png' });
     } else {
       showAlert('Permiso Denegado', 'Habilita las notificaciones en configuración del navegador.', 'error');
     }

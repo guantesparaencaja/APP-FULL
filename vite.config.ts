@@ -31,7 +31,7 @@ export default defineConfig(() => {
               type: 'image/png'
             },
             {
-              src: '/gpte-logo-elegido.png',
+              src: '/logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'
