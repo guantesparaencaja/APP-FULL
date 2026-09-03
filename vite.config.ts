@@ -11,7 +11,12 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        workbox: { maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 },
+        workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          cleanupOutdatedCaches: true,
+          skipWaiting: true,
+          clientsClaim: true,
+        },
         manifest: {
           name: 'Guantes Para Encajar',
           short_name: 'Guantes',
