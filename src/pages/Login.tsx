@@ -317,7 +317,7 @@ export function Login() {
         animate="show"
         className="flex flex-col items-center justify-center pt-8 pb-4 px-6"
       >
-        <img src="/logo.png" alt="GPTE Club de Boxeo" className="h-56 w-56 max-w-full rounded-full object-contain shadow-[0_0_35px_rgba(44,113,232,0.25)] sm:h-64 sm:w-64" />
+        <img src="/logo.svg" alt="GPTE Club de Boxeo" className="h-56 w-56 max-w-full object-contain drop-shadow-[0_0_35px_rgba(139,92,246,0.28)] sm:h-64 sm:w-64" />
         <h1 className="text-slate-100 tracking-tight text-4xl font-bold leading-tight text-center">
           GPTE
         </h1>

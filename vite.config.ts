@@ -26,19 +26,19 @@ export default defineConfig(() => {
           orientation: 'portrait',
           icons: [
             {
-              src: '/logo.png',
+              src: '/logo.svg',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/svg+xml'
             },
             {
-              src: '/logo.png',
+              src: '/logo.svg',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/svg+xml'
             },
             {
-              src: '/logo.png',
+              src: '/logo.svg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/svg+xml',
               purpose: 'maskable'
             }
           ]
